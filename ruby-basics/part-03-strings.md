@@ -1,1897 +1,1504 @@
-# ส่วนที่ 3: Strings - ขั้นตอนที่ 26-45
+# ตอนที่ 3: Strings
+
+## Ruby Programming Course สำหรับผู้เริ่มต้นภาษาไทย
+
+---
 
 ## บทนำ
 
-String (สตริง) เป็นหนึ่งในชนิดข้อมูลที่ใช้บ่อยที่สุดในการเขียนโปรแกรม Ruby มี String methods มากมายที่ช่วยให้การจัดการข้อความเป็นเรื่องง่าย ในส่วนนี้เราจะเรียนรู้ทุกแง่มุมของ String ใน Ruby อย่างละเอียด
+String คือลำดับของตัวอักษร (Sequence of Characters) และเป็นหนึ่งในประเภทข้อมูลที่ใช้งานบ่อยที่สุดในการเขียนโปรแกรม Ruby มี String Methods ที่ครบครันและทรงพลังมาก
+
+**สิ่งที่จะได้เรียนรู้:**
+- การสร้าง String แบบต่างๆ
+- String Interpolation
+- String Methods ทุก Method ที่สำคัญ
+- String Formatting
+- Multiline Strings และ Heredoc
+- Frozen String Literals
+- การค้นหา เปรียบเทียบ และแทนที่ใน String
+- การแยกและรวม String
+- String Encoding
+- String as Array
 
 ---
 
-## ขั้นตอนที่ 26: String Creation - การสร้าง String
+## Step 26: การสร้าง String
 
-### Single Quotes vs Double Quotes
+### 26.1 Single vs Double Quotes
 
 ```ruby
-# Single quotes - ตรงไปตรงมา ไม่แปลง escape sequences
-name = 'Alice'
-greeting = 'Hello, World!'
-path = 'C:\Users\Alice'  # \ ไม่ต้อง escape
+# Single Quotes - ตีความแค่ \\ และ \'
+single1 = 'Hello, World!'
+single2 = 'It\'s a beautiful day'
+single3 = 'เส้นทาง: C:\\Users\\User'
 
-# ข้อยกเว้น: ต้อง escape ' และ \ ใน single quote
-puts 'It\'s a beautiful day'   # => It's a beautiful day
-puts 'C:\\Users\\Alice'        # => C:\Users\Alice
+puts single1  # => Hello, World!
+puts single2  # => It's a beautiful day
+puts single3  # => เส้นทาง: C:\Users\User
 
-# Double quotes - รองรับ escape sequences และ interpolation
-full_name = "Alice Smith"
-newline_example = "Line 1\nLine 2"     # \n = newline
-tab_example = "Column1\tColumn2"       # \t = tab
-bell = "\a"                             # \a = bell sound
-escape = "Say \"Hello\""              # \" = double quote
+# Double Quotes - ตีความ Escape Sequences ทั้งหมดและ Interpolation
+double1 = "Hello, World!"
+double2 = "บรรทัดที่ 1\nบรรทัดที่ 2"
+double3 = "Tab:\there"
+double4 = "คำพูด: \"Ruby is fun!\""
 
-# Escape sequences ทั้งหมดใน double quotes
-puts "\n"   # newline
-puts "\t"   # tab
-puts "\r"   # carriage return
-puts "\\"   # backslash
-puts "\""   # double quote
-puts "\a"   # bell
-puts "\b"   # backspace
-puts "\f"   # form feed
-puts "\v"   # vertical tab
-puts "\e"   # escape
-puts "\s"   # space
-puts "\0"   # null
-
-# Unicode
-puts "\u0041"     # => A (Unicode character)
-puts "\u0E2A"     # => ส (Thai character)
-puts "\u{1F600}"  # => 😀 (Emoji)
-
-# String interpolation - เฉพาะ double quotes
-user = "Ruby"
-version = 3.3
-puts "Hello #{user} #{version}!"  # => Hello Ruby 3.3!
-puts 'Hello #{user} #{version}!'  # => Hello #{user} #{version}! (ไม่แปล!)
-
-# %q และ %Q
-str1 = %q(Single quote style - no interpolation #{1+1})
-str2 = %Q(Double quote style - with interpolation #{1+1})
-str3 = %(Same as %Q - #{1+1})
-
-puts str1  # => Single quote style - no interpolation #{1+1}
-puts str2  # => Double quote style - with interpolation 2
-puts str3  # => Same as %Q - 2
-
-# เหตุผลที่ใช้ %q/%Q: เมื่อ string มีทั้ง ' และ "
-quote = %q("It's wonderful," she said.)
-puts quote  # => "It's wonderful," she said.
+puts double1  # => Hello, World!
+puts double2  # => บรรทัดที่ 1 / บรรทัดที่ 2
+puts double3  # => Tab:    here
+puts double4  # => คำพูด: "Ruby is fun!"
 ```
 
-### String Constructor
+```ruby
+# Escape Sequences ใน Double Quotes
+puts "\n"   # Newline
+puts "\t"   # Tab
+puts "\r"   # Carriage Return
+puts "\\"   # Backslash
+puts "\""   # Double Quote
+puts "\'"   # Single Quote
+puts "\a"   # Bell
+puts "\b"   # Backspace
+puts "\f"   # Form Feed
+puts "\v"   # Vertical Tab
+puts "\e"   # Escape (ASCII 27)
+puts "\s"   # Space
+
+# Unicode Escape
+puts "\u0E2A"   # => ส (Thai character)
+puts "\u0E27\u0E31\u0E14\u0E35"  # => วัดี
+
+# Hex Escape
+puts "\x41"     # => A (ASCII 65 in hex)
+puts "\x4F"     # => O
+```
+
+### 26.2 String Literals
 
 ```ruby
-# String.new
-s1 = String.new("hello")
-s2 = String.new  # empty string
+# %q{} - เหมือน Single Quotes
+str1 = %q{Hello 'World' and "friends"}
+puts str1  # => Hello 'World' and "friends"
 
-puts s1           # => hello
-puts s2.empty?    # => true
-puts s2.inspect   # => ""
+# %Q{} หรือ %{} - เหมือน Double Quotes
+name = "สมชาย"
+str2 = %Q{สวัสดี #{name}!}
+str3 = %{สวัสดี #{name}!}
+puts str2  # => สวัสดี สมชาย!
+puts str3  # => สวัสดี สมชาย!
 
-# String method
-s3 = String("42")   # เหมือน "42".to_s
-puts s3.class        # => String
+# สามารถใช้ delimiter อื่นได้
+str4 = %q[ใช้ square brackets]
+str5 = %q(ใช้ parentheses)
+str6 = %q<ใช้ angle brackets>
+str7 = %q!ใช้ exclamation!
+
+puts str4  # => ใช้ square brackets
+puts str5  # => ใช้ parentheses
 ```
 
 ---
 
-## ขั้นตอนที่ 27: String Methods พื้นฐาน
+## Step 27: String Interpolation
 
-### Methods เกี่ยวกับ Case
+### 27.1 การใช้ #{}
 
 ```ruby
-str = "Hello, Ruby World!"
+name = "Ruby"
+version = 3.2
+year = 2023
 
-# Case transformation
-puts str.upcase      # => HELLO, RUBY WORLD!
-puts str.downcase    # => hello, ruby world!
-puts str.capitalize  # => Hello, ruby world! (พิมพ์ใหญ่เฉพาะตัวแรก)
-puts str.swapcase    # => hELLO, rUBY wORLD! (สลับ case)
+puts "ภาษา #{name} เวอร์ชัน #{version} ปี #{year}"
+# => ภาษา Ruby เวอร์ชัน 3.2 ปี 2023
 
-# Bang methods (แก้ไข in-place)
-str2 = "hello world"
-str2.upcase!
-puts str2   # => HELLO WORLD (แก้ไขตัวแปรเดิม)
+# ใส่ Expression ได้
+price = 100
+tax_rate = 0.07
+puts "ราคา #{price} บาท ภาษี #{price * tax_rate} บาท รวม #{price + price * tax_rate} บาท"
+# => ราคา 100 บาท ภาษี 7.0 บาท รวม 107.0 บาท
 
-# Methods ที่ได้ใน Rails (activesupport)
-# "hello_world".camelize    # => HelloWorld
-# "HelloWorld".underscore   # => hello_world
-# "hello world".titleize    # => Hello World
+# ใส่ Method Call ได้
+items = ["แอปเปิ้ล", "กล้วย", "มะม่วง"]
+puts "มีสินค้า #{items.length} รายการ: #{items.join(', ')}"
+# => มีสินค้า 3 รายการ: แอปเปิ้ล, กล้วย, มะม่วง
+```
 
-# titlecase ใน pure Ruby
-def titlecase(str)
-  str.split(' ').map(&:capitalize).join(' ')
+```ruby
+# Interpolation เรียก to_s อัตโนมัติ
+class Product
+  def initialize(name, price)
+    @name = name
+    @price = price
+  end
+  
+  def to_s
+    "#{@name} (#{@price} บาท)"
+  end
 end
 
-puts titlecase("hello ruby world")  # => Hello Ruby World
+product = Product.new("กาแฟ", 65)
+puts "สั่ง: #{product}"  # => สั่ง: กาแฟ (65 บาท)
+
+# Multi-line Interpolation
+result = "สรุป:\n" \
+         "  จำนวน: #{items.length}\n" \
+         "  รายการ: #{items.join(', ')}"
+puts result
 ```
 
-### Methods เกี่ยวกับ Length และ Size
+```ruby
+# String Concatenation vs Interpolation
+first_name = "สม"
+last_name = "ชาย"
+
+# Concatenation (+) - สร้าง String ใหม่
+full_name_concat = first_name + " " + last_name
+puts full_name_concat  # => สมชาย
+
+# Interpolation - เร็วกว่าและอ่านง่ายกว่า
+full_name_interp = "#{first_name} #{last_name}"
+puts full_name_interp  # => สมชาย
+
+# Append (<<) - แก้ไข String ต้นฉบับ (เร็วกว่า +)
+result = "Hello"
+result << ", " << "World" << "!"
+puts result  # => Hello, World!
+```
+
+---
+
+## Step 28: String Methods - Case และ Length
+
+### 28.1 Case Methods
+
+```ruby
+str = "hello, ruby world!"
+
+puts str.upcase      # => HELLO, RUBY WORLD!
+puts str.downcase    # => hello, ruby world!
+puts str.capitalize  # => Hello, ruby world! (ตัวแรกพิมพ์ใหญ่)
+puts str.swapcase    # => HELLO, RUBY WORLD! (สลับ case)
+
+# Thai doesn't have case, but works with ASCII parts
+mixed = "Hello สวัสดี WORLD"
+puts mixed.downcase  # => hello สวัสดี world
+puts mixed.upcase    # => HELLO สวัสดี WORLD
+
+# Bang versions (modify in place)
+str2 = "hello world"
+str2.upcase!
+puts str2  # => HELLO WORLD
+```
+
+### 28.2 Length Methods
 
 ```ruby
 str = "Hello, สวัสดี!"
 
-puts str.length       # => 14 (characters)
-puts str.size         # => 14 (เหมือน length)
-puts str.bytesize     # => 32 (bytes - UTF-8 Thai = 3 bytes/char)
-puts str.empty?       # => false
-puts "".empty?        # => true
-puts "   ".empty?     # => false (whitespace ไม่นับว่า empty)
-puts "   ".strip.empty?  # => true
+puts str.length    # => 14 (จำนวนตัวอักษร)
+puts str.size      # => 14 (เหมือน length)
+puts str.bytesize  # => 28 (จำนวน bytes ใน UTF-8)
+puts str.empty?    # => false
+puts "".empty?     # => true
+puts "   ".empty?  # => false (มีช่องว่าง)
 
-# count characters
-puts "hello".count("l")     # => 2 (นับตัว 'l')
-puts "hello".count("aeiou") # => 2 (นับสระ)
-puts "hello world".count("lo")  # => 5 (นับ l และ o)
+# เช็คว่า String ว่างหรือ whitespace เท่านั้น
+puts "   ".strip.empty?  # => true
 ```
 
-### Methods เกี่ยวกับ Searching
+---
+
+## Step 29: String Methods - Stripping และ Padding
+
+### 29.1 Strip Methods
 
 ```ruby
-str = "Hello, Ruby World! Ruby is great."
+str = "  \t Hello, World! \n  "
 
-# include? - ตรวจสอบว่ามีหรือไม่
-puts str.include?("Ruby")    # => true
-puts str.include?("Python")  # => false
+puts str.strip.inspect   # => "Hello, World!"
+puts str.lstrip.inspect  # => "Hello, World! \n  "
+puts str.rstrip.inspect  # => "  \t Hello, World!"
 
-# start_with? / end_with?
-puts str.start_with?("Hello")   # => true
-puts str.start_with?("Hi", "Hello", "Hey")  # => true (any match)
-puts str.end_with?("great.")     # => true
+# chomp - ลบ newline ท้าย
+line = "Hello\n"
+puts line.chomp.inspect  # => "Hello"
 
-# index / rindex - หา position
-puts str.index("Ruby")     # => 7 (ตำแหน่งแรก)
-puts str.rindex("Ruby")    # => 19 (ตำแหน่งสุดท้าย)
-puts str.index("Python")   # => nil (ไม่พบ)
+line2 = "Hello\r\n"
+puts line2.chomp.inspect  # => "Hello"
 
-# การใช้ index เพื่อ substring
-puts str[0, 5]       # => "Hello" (start, length)
-puts str[7, 4]       # => "Ruby"
-puts str[7..10]      # => "Ruby" (range)
-puts str[-5..-1]     # => "eat." (จากท้าย)
-puts str[-5, 5]      # => "reat." (จากท้าย, length)
+# chop - ลบตัวสุดท้ายเสมอ
+puts "Hello!".chop   # => "Hello"
+puts "Hello\n".chop  # => "Hello"
+
+# delete
+puts "Hello, World!".delete("lo")   # => "He, Wrd!"
+puts "Hello, World!".delete("a-e")  # => "Hllo, Worl!"  (ลบ range a-e)
+```
+
+### 29.2 Padding Methods
+
+```ruby
+str = "Hello"
+
+# ljust - ชิดซ้าย (padding ขวา)
+puts str.ljust(10)        # => "Hello     "
+puts str.ljust(10, '-')   # => "Hello-----"
+
+# rjust - ชิดขวา (padding ซ้าย)
+puts str.rjust(10)        # => "     Hello"
+puts str.rjust(10, '0')   # => "00000Hello"
+
+# center - กึ่งกลาง
+puts str.center(11)       # => "   Hello   "
+puts str.center(11, '*')  # => "***Hello***"
+
+# ใช้จัดรูปแบบตาราง
+items = [["สินค้า", "ราคา", "จำนวน"],
+         ["แอปเปิ้ล", "50", "100"],
+         ["กล้วย", "20", "200"],
+         ["มะม่วง", "80", "50"]]
+
+items.each do |row|
+  puts "#{row[0].ljust(12)} #{row[1].rjust(8)} #{row[2].rjust(8)}"
+end
+```
+
+---
+
+## Step 30: String Methods - squeeze และ tr
+
+### 30.1 squeeze
+
+```ruby
+# squeeze - ลดตัวอักษรซ้ำๆ ที่ติดกัน
+puts "aaabbbccc".squeeze       # => "abc"
+puts "hello    world".squeeze  # => "hello world"
+puts "aabbccdd".squeeze("a-c") # => "abccdd" (squeeze เฉพาะ a-c)
+
+# ใช้ในการ normalize
+def normalize_spaces(text)
+  text.strip.squeeze(" ")
+end
+
+puts normalize_spaces("  hello    world  ")  # => "hello world"
+```
+
+### 30.2 tr (Transliterate)
+
+```ruby
+# tr - แทนที่ตัวอักษร (คล้าย tr command ใน Unix)
+puts "hello".tr('el', 'ip')      # => "hippo"
+puts "hello".tr('aeiou', '*')    # => "h*ll*"
+puts "Hello, World".tr('a-y', 'b-z')  # => "Ifmmp, Xpsme"
+
+# tr_s - tr แล้ว squeeze
+puts "hello".tr_s('l', 'r')   # => "hero"
+
+# นำไปใช้จริง - ROT13 cipher
+puts "Hello World".tr('A-Za-z', 'N-ZA-Mn-za-m')  # => "Uryyb Jbeyq"
+# Decode กลับ
+puts "Uryyb Jbeyq".tr('A-Za-z', 'N-ZA-Mn-za-m')  # => "Hello World"
+
+# แปลง Thai transliteration (ตัวอย่าง)
+thai_vowels = "กขคงจฉชซ"
+substitutes  = "ABCDEFGH"
+puts thai_vowels.tr("กขคง", "ABCD")  # => ABCDจฉชซ
+```
+
+---
+
+## Step 31: String Methods - Count และ Checking
+
+### 31.1 count
+
+```ruby
+str = "Hello, World!"
+
+puts str.count("l")       # => 3 (นับ 'l')
+puts str.count("a-e")     # => 1 (นับ range a-e)
+puts str.count("aeiou")   # => 3 (นับ vowels)
+puts str.count("^aeiou")  # => 10 (นับ non-vowels)
+
+# นับจำนวนคำในประโยค
+def count_words(text)
+  text.split.length
+end
+
+puts count_words("Ruby is a beautiful programming language")  # => 6
+```
+
+### 31.2 Checking Methods
+
+```ruby
+str = "Hello, World!"
+
+puts str.include?("World")    # => true
+puts str.include?("world")    # => false (case sensitive)
+puts str.start_with?("Hello") # => true
+puts str.start_with?("World") # => false
+puts str.end_with?("!")       # => true
+puts str.end_with?("World")   # => false
+
+# Multiple arguments
+puts str.start_with?("Hello", "Hi", "Hey")  # => true (ตรวจทุก arg)
+puts str.end_with?("?", "!", ".")            # => true
+
+# match? - ตรวจ regex
+puts "hello123".match?(/\d+/)  # => true
+puts "hello".match?(/\d+/)     # => false
+```
+
+---
+
+## Step 32: String Searching
+
+### 32.1 index และ rindex
+
+```ruby
+str = "Hello, World! Hello, Ruby!"
+
+puts str.index("Hello")     # => 0 (ตำแหน่งแรก)
+puts str.rindex("Hello")    # => 14 (ตำแหน่งสุดท้าย)
+puts str.index("Hello", 1)  # => 14 (เริ่มค้นจาก position 1)
+puts str.index("xyz")       # => nil (ไม่พบ)
+
+# index ด้วย Regex
+str2 = "phone: 02-123-4567, mobile: 081-234-5678"
+puts str2.index(/\d{2,3}-\d{3}-\d{4}/)  # => 7
 
 # scan - หาทุก occurrence
-puts str.scan("Ruby").inspect     # => ["Ruby", "Ruby"]
-puts "abc123def456".scan(/\d+/).inspect  # => ["123", "456"]
-
-# match - regex matching
-if m = str.match(/(\w+) is (\w+)/)
-  puts m[0]  # => "Ruby is great"
-  puts m[1]  # => "Ruby"
-  puts m[2]  # => "great"
-end
+puts str.scan("Hello").inspect  # => ["Hello", "Hello"]
+phones = str2.scan(/\d{2,3}-\d{3}-\d{4}/)
+puts phones.inspect  # => ["02-123-4567", "081-234-5678"]
 ```
 
 ---
 
-## ขั้นตอนที่ 28: String Interpolation ขั้นสูง
+## Step 33: String Replacing
+
+### 33.1 sub และ gsub
 
 ```ruby
-# Basic interpolation
-name = "Alice"
-age = 25
-puts "ชื่อ: #{name}, อายุ: #{age}"
+str = "Hello, World! Hello, Ruby!"
 
-# Expression ใน interpolation
-puts "2 + 2 = #{2 + 2}"
-puts "Upper: #{"hello".upcase}"
-puts "Array sum: #{[1,2,3].sum}"
+# sub - แทนที่ครั้งแรกที่พบ
+puts str.sub("Hello", "Hi")    # => "Hi, World! Hello, Ruby!"
 
-# Multi-line expression
-result = "ผล: #{
-  numbers = [1, 2, 3, 4, 5]
-  numbers.select(&:odd?).sum
-}"
-puts result  # => ผล: 9
+# gsub - แทนที่ทุก occurrence
+puts str.gsub("Hello", "Hi")   # => "Hi, World! Hi, Ruby!"
 
-# Nested interpolation
-greeting = "Hello, #{
-  first = "Ruby"
-  last = "World"
-  "#{first} #{last}"
-}!"
-puts greeting  # => Hello, Ruby World!
+# ใช้ Regex
+puts str.gsub(/Hello/, "Hi")   # => "Hi, World! Hi, Ruby!"
 
-# การจัดรูปแบบใน interpolation
-price = 1234567.89
-puts "ราคา: #{format('%.2f', price)}"
-puts "ราคา: #{sprintf('%,.2f', price)}"  # ไม่มี comma ใน sprintf ปกติ
+# ใช้ Block ใน gsub
+result = "hello world ruby".gsub(/\b\w/) { |match| match.upcase }
+puts result  # => "Hello World Ruby"
 
-# Format numbers ด้วย custom method
-def format_number(n)
-  n.to_s.reverse.gsub(/(\d{3})(?=\d)/, '\\1,').reverse
-end
+# gsub ด้วย Hash
+codes = { "US" => "สหรัฐ", "TH" => "ไทย", "JP" => "ญี่ปุ่น" }
+text = "US ส่งสินค้าไป TH และ JP"
+puts text.gsub(/US|TH|JP/, codes)  # => "สหรัฐ ส่งสินค้าไป ไทย และ ญี่ปุ่น"
+```
 
-puts "ราคา: #{format_number(price.to_i)} บาท"
+```ruby
+# sub! และ gsub! - แก้ไข in-place
+str = "Hello, World!"
+str.gsub!(/[aeiou]/, "*")
+puts str  # => "H*ll*, W*rld!"
 
-# String multiplication
-puts "=" * 30
-puts "-" * 30
+# ใช้ Capture Groups ใน gsub
+phone = "0812345678"
+formatted = phone.gsub(/(\d{3})(\d{3})(\d{4})/, '\1-\2-\3')
+puts formatted  # => 081-234-5678
 
-# Building strings efficiently
-parts = []
-parts << "Hello"
-parts << "World"
-puts parts.join(", ")
-
-# สร้าง String จาก Array
-puts ["Alice", "Bob", "Charlie"].join(" and ")
-# => Alice and Bob and Charlie
+# เปลี่ยน Word Case
+"hello_world_ruby".gsub(/_(\w)/) { $1.upcase }  # => "helloWorldRuby"
 ```
 
 ---
 
-## ขั้นตอนที่ 29: String Formatting
+## Step 34: String Splitting
 
-### printf / sprintf / format
+### 34.1 split
 
 ```ruby
-name = "Alice"
-age = 25
-score = 98.765
-balance = 1234567.89
+# split ด้วย delimiter
+csv = "แอปเปิ้ล,กล้วย,มะม่วง,ส้ม"
+fruits = csv.split(",")
+puts fruits.inspect  # => ["แอปเปิ้ล", "กล้วย", "มะม่วง", "ส้ม"]
 
-# %s - String
-printf("Name: %s\n", name)
-# Name: Alice
+# split ด้วย whitespace (default)
+sentence = "Hello   Ruby   World"
+words = sentence.split
+puts words.inspect  # => ["Hello", "Ruby", "World"]
 
-# %d - Integer
-printf("Age: %d\n", age)
-# Age: 25
+# split ด้วย Regex
+data = "one  two   three    four"
+parts = data.split(/\s+/)
+puts parts.inspect  # => ["one", "two", "three", "four"]
 
-# %f - Float
-printf("Score: %f\n", score)
-# Score: 98.765000
+# กำหนดจำนวนสูงสุด
+puts "a,b,c,d,e".split(",", 3).inspect  # => ["a", "b", "c,d,e"]
 
-# %.2f - Float with 2 decimal places
-printf("Score: %.2f\n", score)
-# Score: 98.77
+# split แต่ละตัวอักษร
+puts "hello".split("").inspect   # => ["h", "e", "l", "l", "o"]
+puts "hello".chars.inspect       # => ["h", "e", "l", "l", "o"] (เหมือนกัน)
+```
 
-# %e - Scientific notation
-printf("Balance: %e\n", balance)
-# Balance: 1.234568e+06
+```ruby
+# bytes - แยกเป็น bytes
+str = "Hi!"
+puts str.bytes.inspect   # => [72, 105, 33]
 
-# %-20s - Left align with width 20
-printf("%-20s %5d %8.2f\n", name, age, score)
-# Alice                   25    98.77
+# chars - แยกเป็นตัวอักษร (Unicode aware)
+thai = "สวัสดี"
+puts thai.chars.inspect  # => ["ส", "ว", "ั", "ส", "ด", "ี"]
+puts thai.length         # => 6
 
-# %05d - Zero-padded
-printf("ID: %05d\n", 42)
-# ID: 00042
-
-# %+d - Show sign
-printf("Temperature: %+d°C\n", -5)
-# Temperature: -5°C
-printf("Temperature: %+d°C\n", 25)
-# Temperature: +25°C
-
-# sprintf/format returns string
-msg = sprintf("Hello, %s! You scored %.1f%%", name, score)
-puts msg  # => Hello, Alice! You scored 98.8%
-
-msg2 = format("Balance: $%,.2f", balance)
-puts msg2  # => Balance: $1234567.89 (format ไม่มี comma ใน Ruby stdlib)
-
-# % operator
-puts "Hello, %s!" % name
-puts "Score: %.2f%%" % score
-puts "%s is %d years old" % [name, age]
-
-# การ format table
-headers = ["ชื่อ", "อายุ", "คะแนน"]
-data = [
-  ["Alice", 25, 98.5],
-  ["Bob", 30, 87.3],
-  ["Charlie", 22, 92.1]
-]
-
-printf("%-15s %5s %8s\n", *headers)
-puts "-" * 30
-data.each do |row|
-  printf("%-15s %5d %8.1f\n", *row)
-end
+# lines - แยกเป็นบรรทัด
+multiline = "บรรทัด 1\nบรรทัด 2\nบรรทัด 3"
+puts multiline.lines.inspect
+# => ["บรรทัด 1\n", "บรรทัด 2\n", "บรรทัด 3"]
 ```
 
 ---
 
-## ขั้นตอนที่ 30: Multiline Strings และ Heredoc
+## Step 35: String Joining
 
-### Heredoc
+### 35.1 Array Join
 
 ```ruby
-# Basic heredoc (<<IDENTIFIER)
-message = <<HEREDOC
-สวัสดีครับ!
-นี่คือ multiline string
-ที่เก็บไว้ใน heredoc
+words = ["Ruby", "is", "awesome"]
+puts words.join(" ")      # => "Ruby is awesome"
+puts words.join(", ")     # => "Ruby, is, awesome"
+puts words.join(" and ")  # => "Ruby and is and awesome"
+puts words.join          # => "Rubyisawesome" (no separator)
+
+# สร้าง CSV
+headers = ["ชื่อ", "อายุ", "เมือง"]
+data = ["สมชาย", "25", "กรุงเทพ"]
+puts headers.join(",")  # => ชื่อ,อายุ,เมือง
+puts data.join(",")     # => สมชาย,25,กรุงเทพ
+```
+
+---
+
+## Step 36: String Formatting
+
+### 36.1 % Operator
+
+```ruby
+# % - String formatting (คล้าย printf ใน C)
+printf_format = "ชื่อ: %s, อายุ: %d, GPA: %.2f"
+puts printf_format % ["สมชาย", 25, 3.85]
+# => ชื่อ: สมชาย, อายุ: 25, GPA: 3.85
+
+# Format Specifiers
+puts "%d" % 42          # => 42 (decimal)
+puts "%f" % 3.14        # => 3.140000
+puts "%.2f" % 3.14      # => 3.14
+puts "%e" % 1234567     # => 1.234567e+06
+puts "%s" % "hello"     # => hello
+puts "%10s" % "hello"   # => "     hello" (right-aligned, width 10)
+puts "%-10s" % "hello"  # => "hello     " (left-aligned)
+puts "%010d" % 42       # => 0000000042 (zero-padded)
+puts "%+d" % 42         # => +42
+puts "%x" % 255         # => ff (hexadecimal)
+puts "%X" % 255         # => FF
+puts "%o" % 8           # => 10 (octal)
+puts "%b" % 10          # => 1010 (binary)
+```
+
+```ruby
+# sprintf / format - เหมือน % แต่อ่านง่ายกว่า
+name = "สมหญิง"
+age = 22
+score = 95.5
+
+result = sprintf("ชื่อ: %-10s อายุ: %3d คะแนน: %5.1f", name, age, score)
+puts result  # => ชื่อ: สมหญิง      อายุ:  22 คะแนน:  95.5
+
+# format เหมือน sprintf
+result2 = format("ราคา: %,.2f บาท", 1234567.89)
+puts result2  # => ราคา: 1234567.89 บาท (ไม่มี comma ใน Ruby โดย default)
+
+# Named format
+puts "%{name} มีอายุ %{age} ปี" % { name: "สมชาย", age: 25 }
+# => สมชาย มีอายุ 25 ปี
+```
+
+---
+
+## Step 37: Multiline Strings (Heredoc)
+
+### 37.1 Heredoc
+
+```ruby
+# <<IDENTIFIER - ไม่ strip indent
+text1 = <<HEREDOC
+บรรทัดที่ 1
+บรรทัดที่ 2
+บรรทัดที่ 3
 HEREDOC
 
-puts message
+puts text1
+# => บรรทัดที่ 1
+# => บรรทัดที่ 2
+# => บรรทัดที่ 3
 
-# Squiggly heredoc (<<~) - ลบ indentation
+# <<~IDENTIFIER - strip indent (Ruby 2.3+)
+text2 = <<~HEREDOC
+  บรรทัดที่ 1
+  บรรทัดที่ 2
+  บรรทัดที่ 3
+HEREDOC
+
+puts text2  # เหมือนกัน แต่ strip indent ออก
+
+# <<~'HEREDOC' - no interpolation
+name = "Ruby"
+text3 = <<~'HEREDOC'
+  Hello #{name}!
+  ไม่มี interpolation
+HEREDOC
+puts text3  # => Hello #{name}!
+```
+
+```ruby
+# Heredoc ใน Method Call
 sql = <<~SQL
   SELECT users.name, orders.total
   FROM users
   JOIN orders ON users.id = orders.user_id
-  WHERE users.active = true
+  WHERE orders.total > 1000
   ORDER BY orders.total DESC
 SQL
 
 puts sql
 
-# Interpolation ใน heredoc (default)
-user = "Alice"
-count = 5
-greeting = <<~MSG
-  สวัสดี #{user}!
-  คุณมี #{count} ข้อความใหม่
-  #{"-" * 30}
-  วันที่: #{Time.now.strftime("%d/%m/%Y")}
-MSG
+# HTML Template
+name = "สมชาย"
+items = ["แอปเปิ้ล", "กล้วย"]
 
-puts greeting
+html = <<~HTML
+  <div class="user-card">
+    <h1>#{name}</h1>
+    <ul>
+      #{items.map { |item| "<li>#{item}</li>" }.join("\n      ")}
+    </ul>
+  </div>
+HTML
 
-# Heredoc ไม่มี interpolation (ใส่ quote รอบ identifier)
-raw = <<~'CODE'
-  x = #{variable}
-  puts "No interpolation here"
-CODE
-puts raw  # แสดงตรงๆ ไม่แปล
-
-# Heredoc สำหรับ methods
-def generate_html(title, body)
-  <<~HTML
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>#{title}</title>
-      </head>
-      <body>
-        <h1>#{title}</h1>
-        <p>#{body}</p>
-      </body>
-    </html>
-  HTML
-end
-
-puts generate_html("My Page", "Welcome to Ruby!")
-
-# Heredoc inline
-puts <<~TEXT.upcase
-  hello world
-TEXT
-# => HELLO WORLD
-
-# Multiple heredocs (Ruby 2.3+)
-a, b = <<~A, <<~B
-  First string
-A
-  Second string
-B
-puts a  # => First string
-puts b  # => Second string
+puts html
 ```
 
-### Multiline Strings ด้วยวิธีอื่น
-
 ```ruby
-# การต่อ String ข้ามบรรทัด (\ ท้ายบรรทัด)
-long_string = "This is a very long string that " \
-              "spans multiple lines in code " \
-              "but is one string in memory"
-puts long_string
-
-# การต่อ String ด้วย +
-another = "Hello " +
-          "World " +
-          "from Ruby!"
-puts another
-
-# Array join
-lines = [
-  "Line 1",
-  "Line 2",
-  "Line 3"
+# Heredoc ใน Array
+messages = [
+  <<~MSG1,
+    ข้อความที่ 1
+    บรรทัด 2 ของข้อความที่ 1
+  MSG1
+  <<~MSG2
+    ข้อความที่ 2
+    บรรทัด 2 ของข้อความที่ 2
+  MSG2
 ]
-puts lines.join("\n")
-```
 
----
-
-## ขั้นตอนที่ 31: String Comparison
-
-```ruby
-# == เปรียบเทียบเนื้อหา
-puts "hello" == "hello"   # => true
-puts "hello" == "Hello"   # => false (case sensitive)
-
-# eql? - เหมือน ==
-puts "hello".eql?("hello")  # => true
-
-# equal? - เปรียบเทียบ object identity
-s1 = "hello"
-s2 = "hello"
-s3 = s1
-
-puts s1.equal?(s2)  # => false (คนละ object)
-puts s1.equal?(s3)  # => true (object เดียวกัน)
-puts s1.object_id == s2.object_id  # => false
-
-# <=> Spaceship operator
-puts "apple" <=> "apple"   # => 0 (เท่ากัน)
-puts "apple" <=> "banana"  # => -1 (น้อยกว่า)
-puts "banana" <=> "apple"  # => 1 (มากกว่า)
-
-# Comparable methods (String รวม Comparable)
-puts "apple" < "banana"    # => true
-puts "apple" <= "apple"    # => true
-puts "cherry" > "banana"   # => true
-puts "apple".between?("aaa", "zzz")  # => true
-
-# Case-insensitive comparison
-puts "Hello".casecmp("hello")   # => 0 (เท่ากัน)
-puts "Hello".casecmp?("hello")  # => true (Ruby 2.4+)
-
-# Sorting strings
-words = ["banana", "apple", "cherry", "date"]
-puts words.sort.inspect
-# => ["apple", "banana", "cherry", "date"]
-
-puts words.sort_by { |w| w.length }.inspect
-# => ["date", "apple", "banana", "cherry"]
-
-# Sort Thai strings
-thai_words = ["สมชาย", "กมล", "อรุณ", "ชาลี"]
-puts thai_words.sort.inspect
-```
-
----
-
-## ขั้นตอนที่ 32: String Manipulation - gsub, sub, split, join
-
-### gsub และ sub
-
-```ruby
-str = "Hello, Ruby! Ruby is great!"
-
-# sub - แทนที่แค่ครั้งแรก
-puts str.sub("Ruby", "Python")
-# => Hello, Python! Ruby is great!
-
-# gsub - แทนที่ทั้งหมด
-puts str.gsub("Ruby", "Python")
-# => Hello, Python! Python is great!
-
-# sub/gsub กับ Regex
-puts "hello world".gsub(/[aeiou]/, "*")
-# => h*ll* w*rld
-
-# gsub กับ block
-puts "hello world".gsub(/\w+/) { |word| word.capitalize }
-# => Hello World
-
-# gsub กับ hash
-puts "hello world".gsub(/\w+/, "hello" => "goodbye", "world" => "earth")
-# => goodbye earth
-
-# Bang versions (in-place)
-text = "Hello, World!"
-text.sub!("Hello", "Hi")
-puts text  # => Hi, World!
-
-text.gsub!(/[aeiou]/, "")
-puts text  # => H, Wrld!
-
-# Practical examples
-# ลบ HTML tags
-html = "<p>Hello <b>World</b>!</p>"
-puts html.gsub(/<[^>]+>/, "")  # => Hello World!
-
-# แทนที่หลายอย่างพร้อมกัน
-corrections = {
-  "teh" => "the",
-  "recieve" => "receive",
-  "definately" => "definitely"
-}
-text2 = "I teh definately need to recieve this"
-result = text2.gsub(/\b(#{corrections.keys.join('|')})\b/, corrections)
-puts result  # => I the definitely need to receive this
-
-# tr - transliterate (เปลี่ยน character ต่อ character)
-puts "hello".tr('aeiou', '*')        # => h*ll*
-puts "hello".tr('a-y', 'b-z')       # => ifmmp (shift +1)
-puts "Hello World".tr('A-Z', 'a-z') # => hello world (เหมือน downcase)
-puts "hello".tr_s('l', 'r')         # => hero (tr + squeeze)
-
-# delete - ลบ characters
-puts "hello world".delete('aeiou')  # => hll wrld
-puts "hello 123 world".delete('0-9')  # => hello  world
-```
-
-### split และ join
-
-```ruby
-# split - แบ่ง string เป็น array
-sentence = "Hello World Ruby Programming"
-
-puts sentence.split.inspect
-# => ["Hello", "World", "Ruby", "Programming"]
-
-puts "a,b,c,d".split(",").inspect
-# => ["a", "b", "c", "d"]
-
-puts "a,,b,,c".split(",").inspect
-# => ["a", "", "b", "", "c"]
-
-puts "a,,b,,c".split(",", -1).inspect
-# => ["a", "", "b", "", "c"] (เก็บ empty strings ท้าย)
-
-puts "a,,b,,c".split(/,+/).inspect
-# => ["a", "b", "c"] (regex: หนึ่งหรือมากกว่า comma)
-
-# split กับ limit
-puts "a,b,c,d,e".split(",", 3).inspect
-# => ["a", "b", "c,d,e"] (แบ่งแค่ 2 ครั้ง)
-
-# split ตัวอักษร
-puts "hello".split("").inspect
-# => ["h", "e", "l", "l", "o"]
-
-puts "hello".chars.inspect  # เหมือนกัน
-# => ["h", "e", "l", "l", "o"]
-
-# join - รวม array เป็น string
-arr = ["Hello", "World", "Ruby"]
-puts arr.join        # => HelloWorldRuby
-puts arr.join(" ")   # => Hello World Ruby
-puts arr.join(", ")  # => Hello, World, Ruby
-puts arr.join(" | ") # => Hello | World | Ruby
-
-# Practical: CSV parsing
-csv_line = "Alice,25,alice@example.com,Bangkok"
-fields = csv_line.split(",")
-puts "Name: #{fields[0]}"
-puts "Age: #{fields[1]}"
-puts "Email: #{fields[2]}"
-puts "City: #{fields[3]}"
-
-# Practical: Word count
-text = "the quick brown fox jumps over the lazy dog"
-word_count = text.split.each_with_object(Hash.new(0)) do |word, counts|
-  counts[word] += 1
+messages.each.with_index(1) do |msg, i|
+  puts "Message #{i}:"
+  puts msg
 end
-puts word_count.sort_by { |_, count| -count }.first(5).to_h.inspect
 ```
 
 ---
 
-## ขั้นตอนที่ 33: String Methods เพิ่มเติม
+## Step 38: Frozen String Literal
 
-### Trimming และ Padding
+### 38.1 # frozen_string_literal: true
 
 ```ruby
-# strip, lstrip, rstrip
-puts "  hello  ".strip    # => "hello" (ลบทั้งสองข้าง)
-puts "  hello  ".lstrip   # => "hello  " (ลบซ้าย)
-puts "  hello  ".rstrip   # => "  hello" (ลบขวา)
+# เพิ่มที่บรรทัดแรกของไฟล์เพื่อทำให้ทุก String literal เป็น frozen
+# frozen_string_literal: true
 
-# chomp - ลบ newline ท้าย
-puts "hello\n".chomp      # => "hello"
-puts "hello\r\n".chomp    # => "hello"
-puts "hello".chomp        # => "hello" (ไม่มีอะไรลบ)
-puts "hello\n\n".chomp    # => "hello\n" (ลบแค่ครั้งเดียว)
+str = "Hello"
+puts str.frozen?  # => true (ถ้า frozen_string_literal: true)
 
-# chop - ลบตัวอักษรสุดท้าย
-puts "hello".chop         # => "hell"
-puts "hello\n".chop       # => "hello"
+# ข้อดี:
+# 1. ประหยัด memory (ไม่สร้าง String object ซ้ำ)
+# 2. Thread safe
+# 3. Performance ดีขึ้น
 
-# squeeze - บีบ repeated characters
-puts "aaabbbccc".squeeze  # => "abc"
-puts "  hello   world  ".squeeze(" ")  # => " hello world "
+# ถ้าต้องการ mutable string ให้ใช้ + "" หรือ String.new
+mutable = +"Hello"         # unary + ทำให้เป็น mutable ใน Ruby 2.3+
+mutable2 = "Hello".dup    # dup ทำให้ได้ mutable copy
+mutable3 = String.new("Hello")
 
-# center, ljust, rjust - alignment
-puts "hello".center(20)         # => "       hello        "
-puts "hello".center(20, "-")    # => "-------hello--------"
-puts "hello".ljust(20)          # => "hello               "
-puts "hello".ljust(20, ".")     # => "hello..............."
-puts "hello".rjust(20)          # => "               hello"
-puts "hello".rjust(20, "0")     # => "000000000000000hello"
-puts "42".rjust(5, "0")         # => "00042" (zero padding)
+mutable << " World"
+puts mutable  # => Hello World
+```
+
+```ruby
+# ประโยชน์ของ Frozen String
+# String เดียวกันใช้ memory เดียวกัน
+str1 = "hello"
+str2 = "hello"
+
+# ใน frozen_string_literal: true mode
+# str1.object_id == str2.object_id => true!
+
+# Performance comparison
+require 'benchmark'
+
+iterations = 1_000_000
+
+Benchmark.bm do |x|
+  x.report("mutable:") {
+    iterations.times { s = "hello"; s << " world" }
+  }
+  x.report("frozen:") {
+    iterations.times { s = "hello"; t = s + " world" }
+  }
+end
+```
+
+---
+
+## Step 39: String Encoding
+
+### 39.1 Encoding Methods
+
+```ruby
+# ดู encoding ของ String
+str_ascii = "Hello"
+str_thai = "สวัสดี"
+
+puts str_ascii.encoding  # => UTF-8
+puts str_thai.encoding   # => UTF-8
+
+# ตรวจสอบ valid encoding
+puts str_ascii.valid_encoding?  # => true
+puts str_thai.valid_encoding?   # => true
+
+# แปลง encoding
+str_utf8 = "สวัสดี"
+# str_iso = str_utf8.encode("ISO-8859-1")  # => จะ raise error เพราะไม่รองรับ Thai
+
+# encode ด้วย options
+# str_safe = str_utf8.encode("ISO-8859-1", invalid: :replace, undef: :replace, replace: "?")
+
+# bytesize vs length
+puts str_thai.length    # => 6 (6 ตัวอักษร)
+puts str_thai.bytesize  # => 18 (6 * 3 bytes per Thai char ใน UTF-8)
+```
+
+```ruby
+# Encoding Aware Operations
+mixed = "Hello สวัสดี World"
+
+# length นับ characters (ไม่ใช่ bytes)
+puts mixed.length    # => 18
+
+# bytes - ดู bytes
+puts "A".bytes.inspect     # => [65]
+puts "ส".bytes.inspect     # => [224, 185, 170] (3 bytes ใน UTF-8)
+
+# encode สำหรับ external systems
+str = "Hello, World!"
+puts str.encode("ASCII")   # => Hello, World!
+puts str.b.encoding        # => ASCII-8BIT (binary encoding)
+```
+
+---
+
+## Step 40: String as Array
+
+### 40.1 การเข้าถึง String ด้วย Index
+
+```ruby
+str = "Hello, Ruby!"
+
+# ใช้ [] operator
+puts str[0]      # => H
+puts str[-1]     # => !
+puts str[7, 4]   # => Ruby (start, length)
+puts str[7..10]  # => Ruby (range)
+puts str[7..]    # => Ruby! (endless range)
+puts str[..4]    # => Hello
+
+# first method
+puts str.slice(0, 5)  # => Hello (เหมือน str[0, 5])
+
+# อ่านไม่พบ
+puts str[100].inspect   # => nil
+
+# each_char - วนลูปแต่ละตัวอักษร
+str.each_char do |char|
+  print "#{char} "
+end
+puts
+```
+
+```ruby
+# String เหมือน Array of Characters
+str = "Ruby"
+
+# แก้ไขด้วย []
+str[0] = "B"
+puts str  # => Buby
+
+str[1..2] = "ir"
+puts str  # => Bird
 
 # insert
-str = "Hello World"
-puts str.insert(5, ",")   # => "Hello, World" (แทรกที่ position 5)
-puts str.insert(-1, "!")  # => "Hello, World!" (แทรกท้าย)
+str.insert(2, "th")
+puts str  # => Birthd
 
-# prepend (เพิ่มหน้า) - แก้ไข in-place!
-str2 = "World"
-str2.prepend("Hello, ")
-puts str2  # => "Hello, World"
-
-# concat / <<
-str3 = "Hello"
-str3 << " World"  # เร็วกว่า += เพราะแก้ in-place
-puts str3  # => "Hello World"
-
-str3.concat("!", " Ruby!")
-puts str3  # => "Hello World! Ruby!"
-```
-
-### Slicing และ Substring
-
-```ruby
-str = "Hello, Ruby World!"
-
-# [] - access by index
-puts str[0]       # => "H"
-puts str[-1]      # => "!"
-puts str[0, 5]    # => "Hello" (index, length)
-puts str[7, 4]    # => "Ruby"
-puts str[7..10]   # => "Ruby" (range)
-puts str[7...11]  # => "Ruby" (exclusive range)
-
-# slice - เหมือน []
-puts str.slice(0, 5)    # => "Hello"
-puts str.slice(/\w+/)   # => "Hello" (regex)
-
-# first/last characters
-puts str[0]      # first char
-puts str[-1]     # last char
-
-# substring check
-puts str[7..10] == "Ruby"  # => true
-
-# Getting parts
-puts str.chars.first(5).join  # => "Hello"
-puts str.chars.last(6).join   # => "orld!"
-
-# each_char
-str.each_char do |char|
-  print char if char =~ /[A-Z]/
-end
-puts  # => HRW
+# slice! - ตัดและคืนค่า
+removed = str.slice!(0, 5)
+puts removed  # => Birth
+puts str      # => d
 ```
 
 ---
 
-## ขั้นตอนที่ 34: Regular Expressions กับ Strings
+## Step 41: String Comparison
 
-### Ruby Regex Basics
+### 41.1 การเปรียบเทียบ String
 
 ```ruby
-# =~ operator - หา match
-if "hello world" =~ /world/
-  puts "Found!"  # => Found!
-  puts $~.inspect   # MatchData
-  puts $~.begin(0)  # position ที่เริ่ม
-end
+# == และ != - ตรวจค่า
+puts "hello" == "hello"   # => true
+puts "hello" == "Hello"   # => false (case sensitive)
+puts "hello" != "world"   # => true
 
-# match method - คืน MatchData หรือ nil
-if m = "John Doe, 25".match(/(\w+) (\w+), (\d+)/)
-  puts "Full name: #{m[1]} #{m[2]}"  # => Full name: John Doe
-  puts "Age: #{m[3]}"                 # => Age: 25
-  puts "Named: #{m.named_captures}"
-end
+# eql? - เหมือน == สำหรับ String
+puts "hello".eql?("hello")  # => true
 
-# Named captures
-if m = "2024-01-15".match(/(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})/)
-  puts "Year: #{m[:year]}"    # => Year: 2024
-  puts "Month: #{m[:month]}"  # => Month: 01
-  puts "Day: #{m[:day]}"      # => Day: 15
-end
+# equal? - ตรวจ object identity (object_id)
+str1 = "hello"
+str2 = "hello"
+puts str1.equal?(str2)    # => false (คนละ object)
+puts str1.equal?(str1)    # => true
 
-# match? - คืน true/false (เร็วกว่า match)
-puts "hello".match?(/ell/)   # => true
-puts "hello".match?(/xyz/)   # => false
+# <=> - Spaceship operator (เปรียบเทียบ lexicographically)
+puts "apple" <=> "banana"  # => -1 (apple น้อยกว่า)
+puts "banana" <=> "apple"  # => 1
+puts "apple" <=> "apple"   # => 0
 
-# Regex patterns ที่ใช้บ่อย
-email_regex = /\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/i
-url_regex = /\Ahttps?:\/\//
-phone_regex = /\A0[0-9]{8,9}\z/
-thai_phone = /\A(0[689]\d{8}|0[2-9]\d{7})\z/
+# เรียงตัวอักษร
+words = %w[cherry apple banana date elderberry]
+puts words.sort.inspect  # => ["apple", "banana", "cherry", "date", "elderberry"]
 
-# ตัวอย่าง validation
-def valid_email?(email)
-  !!(email =~ /\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/i)
-end
+# case-insensitive comparison
+puts "Hello".casecmp("hello")   # => 0 (เท่ากัน)
+puts "Hello".casecmp?("hello")  # => true (Ruby 2.4+)
+```
 
-puts valid_email?("test@example.com")  # => true
-puts valid_email?("invalid-email")     # => false
+---
+
+## Step 42: String Methods รวม
+
+### 42.1 Methods ที่ใช้บ่อย
+
+```ruby
+str = "The quick brown fox jumps over the lazy dog"
 
 # scan - หาทุก match
-text = "Call 086-123-4567 or 02-456-7890 for info"
-phones = text.scan(/\d[\d\-]+\d/)
-puts phones.inspect  # => ["086-123-4567", "02-456-7890"]
+vowels = str.scan(/[aeiou]/)
+puts "สระ: #{vowels.uniq.sort.inspect}"  # => ["a", "e", "i", "o", "u"]
 
-# Extract all emails
-emails_text = "Contact alice@a.com or bob@b.com for help"
-emails = emails_text.scan(/\b[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\b/i)
-puts emails.inspect
+# gsub ด้วย Block
+result = str.gsub(/\b\w+\b/) do |word|
+  word.length > 3 ? word.upcase : word
+end
+puts result
+# => "THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG"
 
-# gsub กับ regex และ block
-"hello world foo bar".gsub(/\b\w/) { |match| match.upcase }
-# => "Hello World Foo Bar"
+# squeeze + strip + downcase สำหรับ normalize
+user_input = "  Hello   WORLD  "
+normalized = user_input.strip.squeeze(" ").downcase
+puts normalized  # => "hello world"
+```
 
-# split กับ regex
-"one1two2three3four".split(/\d/)
-# => ["one", "two", "three", "four"]
+```ruby
+# String Methods ที่น่าสนใจอื่นๆ
+str = "Hello, World!"
+
+# succ / next - ตัวอักษรถัดไป
+puts "a".succ    # => "b"
+puts "z".succ    # => "aa"
+puts "Az".succ   # => "Ba"
+puts "zz".succ   # => "aaa"
+puts "9".succ    # => "10"
+
+# upto - วนซ้ำ
+"a".upto("e") { |c| print "#{c} " }  # => a b c d e
+
+# oct - แปลง Octal String เป็น Integer
+puts "0177".oct   # => 127
+puts "0xFF".hex   # => 255
+
+# unpack - แกะ binary data
+puts "ABC".unpack("C*").inspect  # => [65, 66, 67] (ASCII codes)
+puts [65, 66, 67].pack("C*")    # => "ABC"
+```
+
+```ruby
+# String Multiplication
+puts "Ha" * 3      # => "HaHaHa"
+puts "-" * 40      # => "----------------------------------------"
+puts "=" * 40      # => "========================================"
+
+# เปรียบเทียบ แสดงหัวตาราง
+def divider(char = "-", width = 40)
+  char * width
+end
+
+puts divider("=")
+puts "| รายการ | ราคา | จำนวน |"
+puts divider("=")
+puts "| แอปเปิ้ล | 50 | 100 |"
+puts divider("-")
 ```
 
 ---
 
-## ขั้นตอนที่ 35: String Encoding
+## Step 43: String Utility Methods
+
+### 43.1 Methods เพิ่มเติม
 
 ```ruby
-# Ruby 3.x ใช้ UTF-8 เป็น default
+str = "Hello, World!"
 
-# ตรวจสอบ encoding
-str = "Hello"
-puts str.encoding          # => UTF-8
+# replace - แทนที่ content ทั้งหมด (mutate in place)
+str2 = "Old Content"
+str2.replace("New Content")
+puts str2  # => New Content
 
-thai = "สวัสดีครับ"
-puts thai.encoding         # => UTF-8
-puts thai.length           # => 10 (characters)
-puts thai.bytesize         # => 30 (bytes - 3 bytes/char)
+# clear - เคลียร์ content
+str3 = "Hello"
+str3.clear
+puts str3.empty?  # => true
 
-# เปลี่ยน encoding
-ascii = "Hello".encode("ASCII")
-puts ascii.encoding        # => ASCII
+# encode
+puts "Hello".encode("UTF-8")  # => Hello
 
-# force_encoding vs encode
-binary_str = "\xFF\xFE"
-binary_str.force_encoding("UTF-16LE")  # บอก Ruby ว่า encoding คืออะไร (ไม่แปลง)
-puts binary_str.encoding   # => UTF-16LE
-
-# encode - แปลง encoding จริงๆ
-utf8_str = "Hello สวัสดี"
-begin
-  ascii_str = utf8_str.encode("ASCII")
-rescue Encoding::UndefinedConversionError => e
-  puts "Error: #{e.message}"
-  # ใช้ option เพื่อแทนที่ตัวที่แปลงไม่ได้
-  ascii_str = utf8_str.encode("ASCII", undef: :replace, replace: "?")
-  puts ascii_str  # => Hello ????
+# match - ตรวจ Regex และคืน MatchData
+m = "John 25".match(/(\w+) (\d+)/)
+if m
+  puts m[0]   # => "John 25" (full match)
+  puts m[1]   # => "John" (first capture)
+  puts m[2]   # => "25" (second capture)
 end
 
-# valid_encoding?
-puts "Hello".valid_encoding?  # => true
+# Named Captures
+m2 = "John 25".match(/(?<name>\w+) (?<age>\d+)/)
+if m2
+  puts m2[:name]  # => John
+  puts m2[:age]   # => 25
+end
+```
 
-# scrub - แก้ไข invalid encoding
-invalid = "\xFF\xFE Hello"
-puts invalid.scrub("?")  # แทนที่ invalid bytes ด้วย ?
+```ruby
+# String Predicates
+puts "hello".frozen?     # => false (ถ้าไม่ได้ freeze)
+puts "".empty?           # => true
+puts "hello".include?("ell")  # => true
 
-# String encoding ที่ต้องระวังกับไฟล์
-File.open("thai.txt", "w:UTF-8") do |f|
-  f.write("สวัสดีครับ")
+# ASCII?
+puts "hello".ascii_only?  # => true
+puts "สวัสดี".ascii_only?  # => false
+
+# each_line
+"line1\nline2\nline3".each_line do |line|
+  puts line.chomp
 end
 
-File.open("thai.txt", "r:UTF-8") do |f|
-  content = f.read
-  puts content.encoding  # => UTF-8
-  puts content           # => สวัสดีครับ
-end
-
-# Magic comment ที่บรรทัดแรกของไฟล์
-# # encoding: UTF-8
-# หรือ
-# # -*- coding: UTF-8 -*-
+# String ใน Conditional
+puts "มีค่า" if "hello"  # String เป็น truthy เสมอ
+puts "ว่าง" if !""       # String ว่างก็ยัง truthy!
+puts "nil" if !nil        # nil เป็น falsy
 ```
 
 ---
 
-## ขั้นตอนที่ 36: Frozen String Literal
+## Step 44: Advanced String Operations
+
+### 44.1 Regular Expressions
 
 ```ruby
-# ปกติ String ใน Ruby เป็น mutable
-str = "hello"
-str << " world"   # แก้ไขได้
-puts str          # => hello world
+# match? - เร็วกว่า match เพราะไม่สร้าง MatchData
+puts "hello123".match?(/\d+/)  # => true
 
-# frozen_string_literal: true
-# ใส่ที่บรรทัดแรกของไฟล์ ทำให้ string literals ทั้งหมดถูก freeze
-
-# หลังจากใส่ magic comment:
-# str = "hello"
-# str << " world"  # FrozenError!
-
-# ประโยชน์ของ Frozen String Literals:
-# 1. ประหยัด memory (string เดียวกันใช้ object เดียว)
-# 2. Thread safety
-# 3. ป้องกัน mutation bugs
-
-# ตัวอย่าง memory เปรียบเทียบ
-n = 100_000
-
-# Mutable strings
-mutable_time = Time.now
-n.times { "hello".object_id }  # สร้าง string ใหม่ทุกครั้ง
-mutable_duration = Time.now - mutable_time
-
-# Frozen strings (ใช้ .freeze)
-frozen_time = Time.now
-frozen = "hello".freeze
-n.times { frozen.object_id }   # ใช้ object เดิม
-frozen_duration = Time.now - frozen_time
-
-puts "Mutable: #{mutable_duration.round(4)}s"
-puts "Frozen: #{frozen_duration.round(4)}s"
-
-# String pool - Symbol ทำงานแบบนี้เสมอ
-puts "hello".freeze.object_id == "hello".freeze.object_id  # อาจ true
-
-# การทำ frozen string ที่ยืดหยุ่น
-GREETING = "Hello".freeze  # Constant
-
-def greet(name)
-  "#{GREETING}, #{name}!"  # สร้าง string ใหม่จาก frozen
+# scan with groups
+str = "First: John 25, Second: Jane 22"
+matches = str.scan(/(\w+): (\w+) (\d+)/)
+matches.each do |_, name, age|
+  puts "ชื่อ: #{name}, อายุ: #{age}"
 end
 
-puts greet("Alice")  # => Hello, Alice!
+# gsub with regex and capture groups
+phone = "โทร: 081-234-5678 หรือ 02-123-4567"
+formatted = phone.gsub(/(\d+)-(\d+)-(\d+)/) do |match|
+  "(#{$1}) #{$2}-#{$3}"
+end
+puts formatted
+# => โทร: (081) 234-5678 หรือ (02) 123-4567
 ```
 
----
-
-## ขั้นตอนที่ 37: Format Strings
-
 ```ruby
-# printf format specifiers
-printf("%-10s %5d %8.2f\n", "Alice", 25, 98.5)
-
-# สร้าง table
-def print_table(headers, rows)
-  # คำนวณ widths
-  widths = headers.map.with_index do |h, i|
-    [h.length, rows.map { |r| r[i].to_s.length }.max].max
-  end
-
-  # Header
-  header_row = headers.each_with_index.map { |h, i| h.ljust(widths[i]) }.join(" | ")
-  separator = widths.map { |w| "-" * w }.join("-+-")
-
-  puts header_row
-  puts separator
-
-  # Data rows
-  rows.each do |row|
-    data_row = row.each_with_index.map { |cell, i| cell.to_s.ljust(widths[i]) }.join(" | ")
-    puts data_row
-  end
-end
-
-headers = ["ชื่อ", "อายุ", "เมือง", "คะแนน"]
-data = [
-  ["Alice", 25, "กรุงเทพ", 95.5],
-  ["Bob", 30, "เชียงใหม่", 87.3],
-  ["Charlie", 22, "ภูเก็ต", 92.1],
-  ["Diana", 28, "ขอนแก่น", 89.7]
-]
-
-print_table(headers, data)
-
-# Number formatting
-def format_currency(amount, currency: "฿", decimal_places: 2)
-  formatted = sprintf("%.#{decimal_places}f", amount)
-  integer_part, decimal_part = formatted.split(".")
-  with_commas = integer_part.reverse.gsub(/(\d{3})(?=\d)/, '\1,').reverse
-  "#{currency}#{with_commas}.#{decimal_part}"
-end
-
-puts format_currency(1234567.89)           # => ฿1,234,567.89
-puts format_currency(1234.5, currency: "$")  # => $1,234.50
-puts format_currency(42)                   # => ฿42.00
-```
-
----
-
-## ขั้นตอนที่ 38: String และ Enumerable
-
-```ruby
-# String เป็น Enumerable ผ่าน each_char, each_line, each_byte
-str = "Hello\nWorld\nRuby"
-
-# Iterate ทีละบรรทัด
-str.each_line do |line|
-  puts line.chomp.upcase
-end
-# => HELLO
-# => WORLD
-# => RUBY
-
-# Iterate ทีละ character
-"abc".each_char do |char|
-  print "#{char}-"
-end  # => a-b-c-
-
-# Iterate ทีละ byte
-"Hi".each_byte do |byte|
-  print "#{byte} "
-end  # => 72 105
-
-# lines, chars, bytes - คืน Array
-puts "Hello\nWorld".lines.inspect
-# => ["Hello\n", "World"]
-
-puts "Hello".chars.inspect
-# => ["h", "e", "l", "l", "o"]  (แต่ uppercase เพราะ "Hello")
-# แก้: puts "Hello".chars.inspect
-# => ["H", "e", "l", "l", "o"]
-
-puts "Hi".bytes.inspect
-# => [72, 105]
-
-# ใช้ Enumerable methods บน String
-vowels = "Hello World".chars.select { |c| "aeiouAEIOU".include?(c) }
-puts vowels.inspect  # => ["e", "o", "o"]
-
-uppercase_count = "Hello Ruby World".count("A-Z")
-puts uppercase_count  # => 3
-
-# zip characters
-"hello".chars.zip("world".chars).each do |pair|
-  puts pair.join(" -> ")
-end
-```
-
----
-
-## ขั้นตอนที่ 39: Advanced String Techniques
-
-### String Builder Pattern
-
-```ruby
-# สร้าง String ที่ซับซ้อนด้วย StringIO
-require 'stringio'
-
-def generate_report(data)
-  buffer = StringIO.new
-
-  buffer.puts "=" * 50
-  buffer.puts "SALES REPORT - #{Time.now.strftime('%B %Y')}"
-  buffer.puts "=" * 50
-  buffer.puts
-
-  data.each do |item|
-    buffer.printf("%-20s %10s %10s\n",
-                  item[:name],
-                  "#{item[:qty]} units",
-                  "฿#{format('%.2f', item[:price] * item[:qty])}")
-  end
-
-  buffer.puts "-" * 50
-  total = data.sum { |item| item[:price] * item[:qty] }
-  buffer.printf("%-20s %21s\n", "TOTAL:", "฿#{format('%.2f', total)}")
-
-  buffer.string  # คืน string ทั้งหมด
-end
-
-sales_data = [
-  { name: "Product A", qty: 10, price: 100.0 },
-  { name: "Product B", qty: 5,  price: 250.0 },
-  { name: "Product C", qty: 20, price: 50.0 }
-]
-
-puts generate_report(sales_data)
-
-# Template pattern
+# String Template Engine (ตัวอย่าง)
 class Template
   def initialize(template)
     @template = template
-    @variables = {}
   end
-
-  def set(key, value)
-    @variables[key] = value
-    self  # ให้ chain ได้
-  end
-
-  def render
-    result = @template.dup
-    @variables.each do |key, value|
-      result.gsub!("{{#{key}}}", value.to_s)
+  
+  def render(variables = {})
+    @template.gsub(/\{\{(\w+)\}\}/) do |match|
+      key = $1.to_sym
+      variables[key] || match
     end
-    result
   end
 end
 
 template = Template.new(<<~HTML)
-  <h1>{{title}}</h1>
-  <p>สวัสดี {{name}}!</p>
-  <p>วันที่: {{date}}</p>
+  <h1>สวัสดี {{name}}!</h1>
+  <p>คุณมีอายุ {{age}} ปี</p>
+  <p>สมาชิกตั้งแต่: {{year}}</p>
 HTML
 
-output = template
-  .set(:title, "หน้าแรก")
-  .set(:name, "Alice")
-  .set(:date, "01/01/2024")
-  .render
-
-puts output
+puts template.render(name: "สมชาย", age: 25, year: 2020)
 ```
 
 ---
 
-## ขั้นตอนที่ 40: String Performance
+## Step 45: แบบฝึกหัด
+
+### แบบฝึกหัดที่ 1
+แก้ไข String ให้เป็น Title Case
 
 ```ruby
-require 'benchmark'
-
-n = 100_000
-str = "Hello, World! " * 100
-
-# String concatenation methods
-Benchmark.bm(20) do |x|
-  # + operator (สร้าง object ใหม่ทุกครั้ง - ช้า)
-  x.report("+ operator:") do
-    result = ""
-    n.times { result = result + "x" }
-  end
-
-  # << operator (แก้ไข in-place - เร็วกว่า)
-  x.report("<< operator:") do
-    result = ""
-    n.times { result << "x" }
-  end
-
-  # Array join (มักจะเร็วที่สุด)
-  x.report("Array join:") do
-    parts = []
-    n.times { parts << "x" }
-    result = parts.join
-  end
-
-  # concat method
-  x.report("concat:") do
-    result = ""
-    n.times { result.concat("x") }
-  end
+# เฉลย
+def title_case(str)
+  str.split(" ").map(&:capitalize).join(" ")
 end
 
-# String duplication vs creation
-Benchmark.bm(20) do |x|
-  frozen = "hello world".freeze
+puts title_case("hello world ruby programming")
+# => Hello World Ruby Programming
+```
 
-  x.report("new string:") do
-    n.times { "hello world".upcase }
-  end
+### แบบฝึกหัดที่ 2
+นับตัวอักษรในแต่ละ Category
 
-  x.report("frozen dup:") do
-    n.times { frozen.dup.upcase }
-  end
+```ruby
+# เฉลย
+def analyze_string(str)
+  {
+    total: str.length,
+    uppercase: str.count("A-Z"),
+    lowercase: str.count("a-z"),
+    digits: str.count("0-9"),
+    spaces: str.count(" "),
+    others: str.length - str.count("A-Za-z0-9 ")
+  }
+end
+
+result = analyze_string("Hello, World! 123")
+result.each do |key, value|
+  puts "#{key}: #{value}"
 end
 ```
 
----
-
-## ขั้นตอนที่ 41-45: แบบฝึกหัด 20 ข้อ
-
-### แบบฝึกหัดที่ 1: Word Count Program
+### แบบฝึกหัดที่ 3
+ตรวจสอบ Palindrome
 
 ```ruby
+# เฉลย
+def palindrome?(str)
+  cleaned = str.downcase.gsub(/[^a-z0-9]/, "")
+  cleaned == cleaned.reverse
+end
+
+puts palindrome?("racecar")       # => true
+puts palindrome?("A man a plan a canal Panama")  # => true
+puts palindrome?("hello")         # => false
+```
+
+### แบบฝึกหัดที่ 4
+นับความถี่ของคำ
+
+```ruby
+# เฉลย
 def word_frequency(text)
-  words = text.downcase.gsub(/[^a-z\s]/, '').split
+  words = text.downcase.scan(/\w+/)
   frequency = Hash.new(0)
   words.each { |word| frequency[word] += 1 }
   frequency.sort_by { |_, count| -count }
 end
 
 text = "the quick brown fox jumps over the lazy dog the fox"
-puts "=== ความถี่คำ ==="
 word_frequency(text).first(5).each do |word, count|
-  puts "#{word.ljust(15)} #{count} ครั้ง"
+  puts "#{word}: #{count}"
 end
+# the: 3
+# fox: 2
+# ...
 ```
 
-### แบบฝึกหัดที่ 2: Password Strength Checker
+### แบบฝึกหัดที่ 5
+Format ตัวเลขให้มี Comma
 
 ```ruby
-def password_strength(password)
-  score = 0
-  feedback = []
-
-  if password.length >= 8
-    score += 1
-  else
-    feedback << "ต้องมีอย่างน้อย 8 ตัวอักษร"
-  end
-
-  if password.length >= 12
-    score += 1
-    feedback << "ยาวดี!"
-  end
-
-  if password =~ /[A-Z]/
-    score += 1
-  else
-    feedback << "ควรมีตัวพิมพ์ใหญ่"
-  end
-
-  if password =~ /[a-z]/
-    score += 1
-  else
-    feedback << "ควรมีตัวพิมพ์เล็ก"
-  end
-
-  if password =~ /\d/
-    score += 1
-  else
-    feedback << "ควรมีตัวเลข"
-  end
-
-  if password =~ /[!@#$%^&*(),.?":{}|<>]/
-    score += 1
-  else
-    feedback << "ควรมีตัวอักษรพิเศษ"
-  end
-
-  strength = case score
-             when 0..2 then "อ่อนแอมาก"
-             when 3..4 then "พอใช้"
-             when 5    then "ดี"
-             when 6    then "แข็งแกร่งมาก"
-             end
-
-  { score: score, strength: strength, feedback: feedback }
+# เฉลย
+def format_number(number)
+  number.to_s.reverse.gsub(/(\d{3})(?=\d)/, '\1,').reverse
 end
 
-passwords = ["password", "P@ssw0rd!", "Ruby1234!", "R!uby#2024$Secure"]
-passwords.each do |pwd|
-  result = password_strength(pwd)
-  puts "Password: #{pwd.ljust(20)} ความแข็งแกร่ง: #{result[:strength]}"
-  result[:feedback].each { |f| puts "  - #{f}" }
-  puts
-end
+puts format_number(1234567)   # => 1,234,567
+puts format_number(999)       # => 999
+puts format_number(1234)      # => 1,234
+puts format_number(12345678)  # => 12,345,678
 ```
 
-### แบบฝึกหัดที่ 3: Text Formatter
+### แบบฝึกหัดที่ 6
+Slugify String สำหรับ URL
 
 ```ruby
-class TextFormatter
-  def self.wrap(text, width: 60)
-    words = text.split
-    lines = []
-    current_line = []
-    current_length = 0
-
-    words.each do |word|
-      if current_length + word.length + (current_line.empty? ? 0 : 1) <= width
-        current_line << word
-        current_length += word.length + (current_line.length > 1 ? 1 : 0)
-      else
-        lines << current_line.join(" ")
-        current_line = [word]
-        current_length = word.length
-      end
-    end
-
-    lines << current_line.join(" ") unless current_line.empty?
-    lines.join("\n")
-  end
-
-  def self.center_block(text, width: 60)
-    text.lines.map { |line| line.chomp.center(width) }.join("\n")
-  end
-
-  def self.box(text, width: nil)
-    lines = text.lines.map(&:chomp)
-    max_width = width || lines.map(&:length).max
-    border = "+" + "-" * (max_width + 2) + "+"
-
-    result = [border]
-    lines.each do |line|
-      result << "| #{line.ljust(max_width)} |"
-    end
-    result << border
-    result.join("\n")
-  end
+# เฉลย
+def slugify(str)
+  str.downcase
+     .gsub(/[^\w\s-]/, '')
+     .gsub(/\s+/, '-')
+     .gsub(/-+/, '-')
+     .chomp('-')
+     .sub(/^-/, '')
 end
 
-long_text = "Ruby เป็นภาษาโปรแกรมที่ถูกออกแบบมาเพื่อให้โปรแกรมเมอร์มีความสุขในการเขียนโค้ด ด้วยความสามารถที่หลากหลาย"
-
-puts TextFormatter.wrap(long_text, width: 40)
-puts
-puts TextFormatter.box("Hello\nWorld\nfrom Ruby!")
+puts slugify("Hello, World!")           # => hello-world
+puts slugify("Ruby on Rails Tutorial")  # => ruby-on-rails-tutorial
+puts slugify("  Trim   Spaces  ")       # => trim-spaces
 ```
 
-### แบบฝึกหัดที่ 4: Cipher Program
+### แบบฝึกหัดที่ 7
+ตัด String ยาวและเพิ่ม ...
 
 ```ruby
+# เฉลย
+def truncate(str, length: 50, omission: "...")
+  return str if str.length <= length
+  str[0, length - omission.length] + omission
+end
+
+long_text = "Ruby is a dynamic, open source programming language with a focus on simplicity and productivity."
+puts truncate(long_text, length: 40)
+# => "Ruby is a dynamic, open source prog..."
+puts truncate(long_text, length: 20, omission: "…")
+# => "Ruby is a dynamic, …"
+```
+
+### แบบฝึกหัดที่ 8
+สร้าง Simple Cipher
+
+```ruby
+# เฉลย
 class CaesarCipher
-  def initialize(shift = 3)
-    @shift = shift
+  def initialize(shift)
+    @shift = shift % 26
   end
-
+  
   def encrypt(text)
-    transform(text, @shift)
-  end
-
-  def decrypt(text)
-    transform(text, -@shift)
-  end
-
-  private
-
-  def transform(text, shift)
     text.chars.map do |char|
-      if char =~ /[A-Z]/
-        ((char.ord - 65 + shift) % 26 + 65).chr
-      elsif char =~ /[a-z]/
-        ((char.ord - 97 + shift) % 26 + 97).chr
+      if char =~ /[a-z]/
+        ((char.ord - 97 + @shift) % 26 + 97).chr
+      elsif char =~ /[A-Z]/
+        ((char.ord - 65 + @shift) % 26 + 65).chr
       else
         char
       end
     end.join
   end
+  
+  def decrypt(text)
+    CaesarCipher.new(26 - @shift).encrypt(text)
+  end
 end
 
-cipher = CaesarCipher.new(13)  # ROT13
+cipher = CaesarCipher.new(13)
+encrypted = cipher.encrypt("Hello, World!")
+puts encrypted  # => Uryyb, Jbeyq!
+puts cipher.decrypt(encrypted)  # => Hello, World!
+```
 
-messages = ["Hello, World!", "Ruby is awesome!", "Secret message"]
-messages.each do |msg|
-  encrypted = cipher.encrypt(msg)
-  decrypted = cipher.decrypt(encrypted)
-  puts "Original:  #{msg}"
-  puts "Encrypted: #{encrypted}"
-  puts "Decrypted: #{decrypted}"
-  puts "-" * 40
+### แบบฝึกหัดที่ 9
+Parse CSV String
+
+```ruby
+# เฉลย
+def parse_csv(csv_string, delimiter: ",")
+  lines = csv_string.strip.split("\n")
+  headers = lines.first.split(delimiter).map(&:strip)
+  
+  lines[1..].map do |line|
+    values = line.split(delimiter).map(&:strip)
+    headers.zip(values).to_h
+  end
+end
+
+csv = <<~CSV
+  ชื่อ,อายุ,เมือง
+  สมชาย,25,กรุงเทพ
+  สมหญิง,22,เชียงใหม่
+  สมศรี,30,ภูเก็ต
+CSV
+
+data = parse_csv(csv)
+data.each do |row|
+  puts "#{row['ชื่อ']} อายุ #{row['อายุ']} ปี อยู่ที่ #{row['เมือง']}"
 end
 ```
 
-### แบบฝึกหัดที่ 5: Template Engine
+### แบบฝึกหัดที่ 10
+Validate Email
 
 ```ruby
-class SimpleTemplate
-  VARIABLE_PATTERN = /\{\{(\w+)\}\}/
-  LOOP_START = /\{%\s*for\s+(\w+)\s+in\s+(\w+)\s*%\}/
-  LOOP_END   = /\{%\s*endfor\s*%\}/
-  IF_PATTERN = /\{%\s*if\s+(\w+)\s*%\}/
-  ENDIF_PATTERN = /\{%\s*endif\s*%\}/
-
-  def initialize(template)
-    @template = template
-  end
-
-  def render(context = {})
-    result = @template.dup
-
-    # แทนที่ variables
-    result.gsub!(VARIABLE_PATTERN) do |match|
-      context[$1.to_sym] || context[$1] || ""
-    end
-
-    result
-  end
+# เฉลย
+def valid_email?(email)
+  email.match?(/\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/i)
 end
 
-template = SimpleTemplate.new(<<~TEMPLATE)
-  สวัสดี {{name}}!
-  อายุ: {{age}} ปี
-  Email: {{email}}
-TEMPLATE
-
-output = template.render(
-  name: "Alice",
-  age: 25,
-  email: "alice@example.com"
-)
-
-puts output
-```
-
-### แบบฝึกหัดที่ 6: URL Parser
-
-```ruby
-def parse_url(url)
-  pattern = /\A
-    (?<scheme>[a-z]+):\/\/
-    (?:(?<user>[^:@]+)(?::(?<password>[^@]+))?@)?
-    (?<host>[^\/\?#:]+)
-    (?::(?<port>\d+))?
-    (?<path>\/[^?#]*)?
-    (?:\?(?<query>[^#]*))?
-    (?:#(?<fragment>.*))?
-  \z/xi
-
-  m = url.match(pattern)
-  return nil unless m
-
-  {
-    scheme:   m[:scheme],
-    user:     m[:user],
-    password: m[:password],
-    host:     m[:host],
-    port:     m[:port]&.to_i,
-    path:     m[:path] || "/",
-    query:    parse_query(m[:query]),
-    fragment: m[:fragment]
-  }
-end
-
-def parse_query(query_string)
-  return {} unless query_string
-  query_string.split("&").each_with_object({}) do |pair, hash|
-    key, value = pair.split("=", 2)
-    hash[key] = value
-  end
-end
-
-urls = [
-  "https://www.example.com/path/to/page?name=Alice&age=25#section1",
-  "http://user:pass@db.example.com:5432/mydb",
-  "ftp://files.example.com/downloads/file.zip"
+emails = [
+  "valid@example.com",
+  "user.name@domain.co.th",
+  "invalid@",
+  "no-at-sign.com",
+  "user@domain"
 ]
 
-urls.each do |url|
-  parsed = parse_url(url)
-  puts "URL: #{url}"
-  parsed.each { |key, value| puts "  #{key}: #{value.inspect}" unless value.nil? || value == {} }
-  puts
+emails.each do |email|
+  status = valid_email?(email) ? "ถูกต้อง" : "ไม่ถูกต้อง"
+  puts "#{email}: #{status}"
 end
 ```
 
-### แบบฝึกหัดที่ 7: Markdown to HTML
+### แบบฝึกหัดที่ 11
+String Compression (Run-Length Encoding)
 
 ```ruby
-def simple_markdown_to_html(markdown)
-  html = markdown.dup
-
-  # Headers
-  html.gsub!(/^###### (.+)$/, '<h6>\1</h6>')
-  html.gsub!(/^##### (.+)$/,  '<h5>\1</h5>')
-  html.gsub!(/^#### (.+)$/,   '<h4>\1</h4>')
-  html.gsub!(/^### (.+)$/,    '<h3>\1</h3>')
-  html.gsub!(/^## (.+)$/,     '<h2>\1</h2>')
-  html.gsub!(/^# (.+)$/,      '<h1>\1</h1>')
-
-  # Bold, Italic
-  html.gsub!(/\*\*\*(.+?)\*\*\*/, '<strong><em>\1</em></strong>')
-  html.gsub!(/\*\*(.+?)\*\*/,     '<strong>\1</strong>')
-  html.gsub!(/\*(.+?)\*/,         '<em>\1</em>')
-
-  # Links
-  html.gsub!(/\[(.+?)\]\((.+?)\)/, '<a href="\2">\1</a>')
-
-  # Code
-  html.gsub!(/`(.+?)`/, '<code>\1</code>')
-
-  # Paragraphs
-  paragraphs = html.split(/\n\n+/)
-  paragraphs.map! do |para|
-    if para =~ /^<h[1-6]>/ || para.empty?
-      para
-    else
-      "<p>#{para.gsub("\n", "<br>")}</p>"
-    end
-  end
-
-  paragraphs.join("\n\n")
-end
-
-markdown = <<~MD
-  # Ruby Programming
-
-  Ruby เป็นภาษาที่ **สวยงาม** และ *ทรงพลัง*
-
-  เรียนรู้ได้ที่ [Ruby Official Site](https://www.ruby-lang.org)
-
-  ใช้คำสั่ง `puts "Hello"` เพื่อแสดงผล
-
-  ## ทำไมต้อง Ruby?
-
-  - **เขียนน้อย** ทำได้มาก
-  - *อ่านง่าย* เหมือนภาษาอังกฤษ
-MD
-
-puts simple_markdown_to_html(markdown)
-```
-
-### แบบฝึกหัดที่ 8: String Statistics
-
-```ruby
-def analyze_text(text)
-  # การนับพื้นฐาน
-  chars = text.length
-  words = text.split.length
-  sentences = text.scan(/[.!?]+/).length
-  paragraphs = text.split(/\n\n+/).length
-
-  # ความถี่ตัวอักษร
-  letter_freq = text.downcase.scan(/[a-z]/).each_with_object(Hash.new(0)) do |char, freq|
-    freq[char] += 1
-  end
-  most_common = letter_freq.max_by { |_, count| count }
-
-  # คำที่ไม่ซ้ำ
-  unique_words = text.downcase.scan(/\b\w+\b/).uniq.length
-
-  # ความยาวเฉลี่ยของคำ
-  word_lengths = text.scan(/\b\w+\b/).map(&:length)
-  avg_word_length = word_lengths.sum.to_f / word_lengths.length
-
-  {
-    characters: chars,
-    characters_no_spaces: text.gsub(/\s/, '').length,
-    words: words,
-    unique_words: unique_words,
-    sentences: sentences,
-    paragraphs: paragraphs,
-    most_common_letter: most_common[0],
-    most_common_count: most_common[1],
-    avg_word_length: avg_word_length.round(2)
-  }
-end
-
-text = <<~TEXT
-  Ruby is a dynamic, open source programming language with a focus on simplicity and productivity.
-  It has an elegant syntax that is natural to read and easy to write.
-  Ruby was created by Yukihiro Matsumoto in the 1990s.
-TEXT
-
-stats = analyze_text(text)
-puts "=== Text Statistics ==="
-stats.each do |key, value|
-  puts "#{key.to_s.gsub('_', ' ').capitalize}: #{value}"
-end
-```
-
-### แบบฝึกหัดที่ 9: Name Formatter
-
-```ruby
-class NameFormatter
-  def self.format(full_name, style: :standard)
-    parts = full_name.strip.split(/\s+/)
-
-    case style
-    when :standard
-      parts.map(&:capitalize).join(" ")
-    when :last_first
-      last = parts.last.capitalize
-      first = parts[0..-2].map(&:capitalize).join(" ")
-      "#{last}, #{first}"
-    when :initials
-      parts.map { |p| "#{p[0].upcase}." }.join("")
-    when :first_last_initial
-      first = parts.first.capitalize
-      last_initial = "#{parts.last[0].upcase}."
-      "#{first} #{last_initial}"
-    when :formal
-      salutation = parts.length > 2 ? "" : "Mr./Ms. "
-      "#{salutation}#{parts.map(&:capitalize).join(' ')}"
-    end
-  end
-end
-
-names = [
-  "john doe smith",
-  "alice johnson",
-  "CHARLIE BROWN"
-]
-
-styles = [:standard, :last_first, :initials, :first_last_initial]
-
-names.each do |name|
-  puts "Input: \"#{name}\""
-  styles.each do |style|
-    puts "  #{style}: #{NameFormatter.format(name, style: style)}"
-  end
-  puts
-end
-```
-
-### แบบฝึกหัดที่ 10: Multi-line String Builder
-
-```ruby
-class HtmlBuilder
-  def initialize
-    @elements = []
-    @indent_level = 0
-  end
-
-  def tag(name, content = nil, **attrs, &block)
-    attr_str = attrs.map { |k, v| " #{k}=\"#{v}\"" }.join
-
-    if block
-      @elements << "#{indent}<#{name}#{attr_str}>"
-      @indent_level += 1
-      block.call
-      @indent_level -= 1
-      @elements << "#{indent}</#{name}>"
-    elsif content
-      @elements << "#{indent}<#{name}#{attr_str}>#{content}</#{name}>"
-    else
-      @elements << "#{indent}<#{name}#{attr_str}>"
-    end
-
-    self
-  end
-
-  def text(content)
-    @elements << "#{indent}#{content}"
-    self
-  end
-
-  def to_s
-    @elements.join("\n")
-  end
-
-  private
-
-  def indent
-    "  " * @indent_level
-  end
-end
-
-# Helper methods
-def method_missing(name, *args, **kwargs, &block)
-  super
-end
-
-builder = HtmlBuilder.new
-builder.tag("div", class: "container") do
-  builder.tag("h1", "Welcome to Ruby")
-  builder.tag("p", "Ruby is a beautiful language")
-  builder.tag("ul") do
-    ["Fast", "Elegant", "Powerful"].each do |item|
-      builder.tag("li", item)
-    end
-  end
-end
-
-puts builder.to_s
-```
-
-### แบบฝึกหัดที่ 11: Email Template System
-
-```ruby
-class EmailTemplate
-  TEMPLATES = {
-    welcome: <<~TEMPLATE,
-      เรียน คุณ {{name}},
-
-      ยินดีต้อนรับสู่ {{app_name}}!
-
-      บัญชีของคุณถูกสร้างเรียบร้อยแล้วด้วยรายละเอียดต่อไปนี้:
-        • Email: {{email}}
-        • วันที่สมัคร: {{date}}
-
-      กรุณายืนยัน email ของคุณที่: {{confirm_url}}
-
-      ขอบคุณที่เลือกใช้บริการ,
-      ทีมงาน {{app_name}}
-    TEMPLATE
-
-    reset_password: <<~TEMPLATE
-      เรียน คุณ {{name}},
-
-      เราได้รับคำขอรีเซ็ตรหัสผ่านสำหรับบัญชีของคุณ
-
-      คลิกลิงค์ด้านล่างเพื่อรีเซ็ตรหัสผ่าน:
-      {{reset_url}}
-
-      ลิงค์นี้จะหมดอายุใน {{expiry_hours}} ชั่วโมง
-
-      หากคุณไม่ได้ขอรีเซ็ตรหัสผ่าน กรุณาเพิกเฉยต่ออีเมลนี้
-
-      ขอบคุณ,
-      ทีมงาน {{app_name}}
-    TEMPLATE
-  }
-
-  def self.render(template_name, variables = {})
-    template = TEMPLATES[template_name] or raise "Template not found: #{template_name}"
-
-    result = template.dup
-    variables.each do |key, value|
-      result.gsub!("{{#{key}}}", value.to_s)
-    end
-
-    # ตรวจสอบว่ายังมี placeholder ที่ยังไม่ถูกแทนที่
-    remaining = result.scan(/\{\{\w+\}\}/)
-    raise "Missing variables: #{remaining.join(', ')}" unless remaining.empty?
-
-    result
-  end
-end
-
-email = EmailTemplate.render(:welcome,
-  name: "Alice",
-  app_name: "RubyApp",
-  email: "alice@example.com",
-  date: "01/01/2024",
-  confirm_url: "https://app.com/confirm/abc123"
-)
-
-puts email
-```
-
-### แบบฝึกหัดที่ 12: String Compression
-
-```ruby
-# Run-length encoding
+# เฉลย
 def compress(str)
-  return str if str.empty?
-
-  compressed = ""
-  count = 1
-  (1...str.length).each do |i|
-    if str[i] == str[i-1]
+  result = ""
+  i = 0
+  
+  while i < str.length
+    char = str[i]
+    count = 1
+    
+    while i + count < str.length && str[i + count] == char
       count += 1
-    else
-      compressed += count > 1 ? "#{count}#{str[i-1]}" : str[i-1]
-      count = 1
     end
+    
+    result += count > 1 ? "#{char}#{count}" : char
+    i += count
   end
-  compressed += count > 1 ? "#{count}#{str[-1]}" : str[-1]
-
-  compressed.length < str.length ? compressed : str
+  
+  result.length < str.length ? result : str
 end
 
-def decompress(str)
-  decompressed = ""
-  str.scan(/(\d*)([a-zA-Z])/).each do |count, char|
-    decompressed += char * (count.empty? ? 1 : count.to_i)
-  end
-  decompressed
-end
-
-strings = ["aabbbcccc", "abcdef", "aaaaaaaaaa", "aabbaabb"]
-strings.each do |s|
-  compressed = compress(s)
-  puts "Original:   #{s} (#{s.length} chars)"
-  puts "Compressed: #{compressed} (#{compressed.length} chars)"
-  puts "Decompressed: #{decompress(compressed)}" if compressed != s
-  puts
-end
+puts compress("aabbbccdddd")   # => a2b3c2d4
+puts compress("abcd")          # => abcd (ไม่ compress เพราะยาวขึ้น)
+puts compress("aaabbaaa")      # => a3b2a3
 ```
 
-### แบบฝึกหัดที่ 13: Phone Number Formatter
+### แบบฝึกหัดที่ 12
+Word Wrap
 
 ```ruby
-def format_phone(number)
-  # ลบตัวอักษรพิเศษทั้งหมด
-  digits = number.gsub(/\D/, '')
-
-  case digits.length
-  when 10
-    if digits.start_with?("08", "09", "06")
-      # Mobile: 08X-XXX-XXXX
-      "#{digits[0..2]}-#{digits[3..5]}-#{digits[6..9]}"
+# เฉลย
+def word_wrap(text, line_length: 60)
+  words = text.split(" ")
+  lines = []
+  current_line = ""
+  
+  words.each do |word|
+    if current_line.empty?
+      current_line = word
+    elsif (current_line + " " + word).length <= line_length
+      current_line += " " + word
     else
-      # Landline: 0X-XXX-XXXX or 02-XXX-XXXX
-      if digits.start_with?("02")
-        "#{digits[0..1]}-#{digits[2..5]}-#{digits[6..9]}"
-      else
-        "#{digits[0..2]}-#{digits[3..5]}-#{digits[6..9]}"
+      lines << current_line
+      current_line = word
+    end
+  end
+  
+  lines << current_line unless current_line.empty?
+  lines.join("\n")
+end
+
+long_text = "Ruby is a dynamic, reflective, object-oriented, general-purpose programming language. It was designed and developed in the mid-1990s by Yukihiro Matsumoto in Japan."
+puts word_wrap(long_text, line_length: 50)
+```
+
+### แบบฝึกหัดที่ 13
+String Tokenizer
+
+```ruby
+# เฉลย
+def tokenize(expression)
+  tokens = []
+  i = 0
+  
+  while i < expression.length
+    case expression[i]
+    when /\d/
+      num = ""
+      while i < expression.length && expression[i] =~ /[\d.]/
+        num += expression[i]
+        i += 1
       end
-    end
-  when 9
-    "#{digits[0..1]}-#{digits[2..5]}-#{digits[6..8]}"
-  else
-    number  # คืนค่าเดิมถ้าไม่รู้จัก format
-  end
-end
-
-phone_numbers = [
-  "0812345678",
-  "02-123-4567",
-  "089 876 5432",
-  "(02)5551234",
-  "02.555.6789"
-]
-
-phone_numbers.each do |phone|
-  puts "#{phone.ljust(20)} → #{format_phone(phone)}"
-end
-```
-
-### แบบฝึกหัดที่ 14: Anagram Checker
-
-```ruby
-def anagram?(word1, word2)
-  normalize(word1) == normalize(word2)
-end
-
-def normalize(word)
-  word.downcase.gsub(/[^a-z]/, '').chars.sort.join
-end
-
-def find_anagrams(word, word_list)
-  word_list.select { |w| anagram?(word, w) && w.downcase != word.downcase }
-end
-
-word_pairs = [
-  ["listen", "silent"],
-  ["hello", "world"],
-  ["astronomer", "moon starer"],
-  ["debit card", "bad credit"],
-  ["school master", "the classroom"]
-]
-
-puts "=== Anagram Checker ==="
-word_pairs.each do |w1, w2|
-  result = anagram?(w1, w2)
-  puts "\"#{w1}\" และ \"#{w2}\": #{result ? '✓ เป็น anagram' : '✗ ไม่ใช่ anagram'}"
-end
-
-word_list = ["race", "care", "acre", "nacre", "ocean", "canoe"]
-puts "\nAnagrams ของ 'race' ใน [#{word_list.join(', ')}]:"
-puts find_anagrams("race", word_list).join(", ")
-```
-
-### แบบฝึกหัดที่ 15: Text Statistics Dashboard
-
-```ruby
-def generate_text_report(text)
-  word_count = text.split.length
-  char_count = text.length
-  sentence_count = text.scan(/[.!?]/).length
-  avg_words_per_sentence = (word_count.to_f / [sentence_count, 1].max).round(1)
-  reading_time = (word_count / 200.0).ceil  # ~200 words/minute
-
-  words = text.downcase.scan(/\b[a-z]{3,}\b/)
-  word_freq = words.each_with_object(Hash.new(0)) { |w, h| h[w] += 1 }
-  top_words = word_freq.sort_by { |_, v| -v }.first(5)
-
-  longest_word = text.scan(/\b\w+\b/).max_by(&:length)
-
-  <<~REPORT
-    ╔══════════════════════════════════════╗
-    ║         Text Analysis Report         ║
-    ╚══════════════════════════════════════╝
-
-    📊 Basic Statistics:
-      • Total characters:  #{char_count.to_s.rjust(10)}
-      • Total words:       #{word_count.to_s.rjust(10)}
-      • Total sentences:   #{sentence_count.to_s.rjust(10)}
-      • Unique words:      #{words.uniq.length.to_s.rjust(10)}
-
-    📖 Readability:
-      • Words/sentence:    #{avg_words_per_sentence.to_s.rjust(10)}
-      • Reading time:      #{reading_time.to_s.rjust(9)} min
-      • Longest word:      #{longest_word.rjust(10)}
-
-    🔤 Top 5 Words:
-    #{top_words.map.with_index { |(w, c), i| "    #{i+1}. #{w.ljust(15)} (#{c}x)" }.join("\n")}
-  REPORT
-end
-
-sample_text = <<~TEXT
-  Ruby is a dynamic, open source programming language with a focus on simplicity and productivity.
-  It has an elegant syntax that is natural to read and easy to write.
-  Ruby was created by Yukihiro Matsumoto in the 1990s.
-  Ruby is often used for web development, especially with the Ruby on Rails framework.
-  Many startups and companies around the world use Ruby to build their applications.
-TEXT
-
-puts generate_text_report(sample_text)
-```
-
-### แบบฝึกหัดที่ 16-20: โจทย์เพิ่มเติม
-
-```ruby
-# แบบฝึกหัดที่ 16: Slugify
-def slugify(text)
-  text
-    .downcase
-    .gsub(/[àáâãäåæ]/, 'a')
-    .gsub(/[èéêë]/, 'e')
-    .gsub(/[ìíîï]/, 'i')
-    .gsub(/[òóôõö]/, 'o')
-    .gsub(/[ùúûü]/, 'u')
-    .gsub(/[^a-z0-9\s-]/, '')
-    .gsub(/\s+/, '-')
-    .gsub(/-+/, '-')
-    .gsub(/\A-|-\z/, '')
-end
-
-titles = [
-  "Hello World!",
-  "Ruby on Rails Tutorial",
-  "10 Tips for Better Code",
-  "  Extra  Spaces  "
-]
-
-titles.each { |t| puts "\"#{t}\" → \"#{slugify(t)}\"" }
-
-# แบบฝึกหัดที่ 17: String to Binary
-def to_binary(str)
-  str.bytes.map { |b| b.to_s(2).rjust(8, '0') }.join(' ')
-end
-
-def from_binary(binary)
-  binary.split(' ').map { |b| b.to_i(2).chr }.join
-end
-
-puts to_binary("Hi")
-puts from_binary(to_binary("Ruby"))
-
-# แบบฝึกหัดที่ 18: Truncate with Ellipsis
-def truncate(str, length: 50, omission: "...")
-  return str if str.length <= length
-  "#{str[0, length - omission.length]}#{omission}"
-end
-
-long_text = "Ruby is a dynamic, open source programming language with a focus on simplicity and productivity."
-puts truncate(long_text, length: 40)
-puts truncate(long_text, length: 60)
-
-# แบบฝึกหัดที่ 19: Parse CSV Line
-def parse_csv_line(line, delimiter: ",", quote_char: '"')
-  fields = []
-  current = ""
-  in_quotes = false
-
-  line.each_char do |char|
-    if char == quote_char
-      in_quotes = !in_quotes
-    elsif char == delimiter && !in_quotes
-      fields << current
-      current = ""
+      tokens << { type: :number, value: num.include?(".") ? num.to_f : num.to_i }
+    when /[+\-*\/]/
+      tokens << { type: :operator, value: expression[i] }
+      i += 1
+    when "("
+      tokens << { type: :lparen, value: "(" }
+      i += 1
+    when ")"
+      tokens << { type: :rparen, value: ")" }
+      i += 1
+    when " "
+      i += 1
     else
-      current << char
+      i += 1
     end
   end
-  fields << current
-
-  fields
+  
+  tokens
 end
 
-csv_lines = [
-  'Alice,25,"Bangkok, Thailand",alice@example.com',
-  '"Smith, John",30,New York,john.smith@example.com',
-  'Bob,22,"He said ""Hello""",bob@example.com'
-]
+puts tokenize("3 + 4 * (2 - 1)").inspect
+```
 
-csv_lines.each do |line|
-  fields = parse_csv_line(line)
-  puts fields.inspect
+### แบบฝึกหัดที่ 14
+Levenshtein Distance (Edit Distance)
+
+```ruby
+# เฉลย
+def levenshtein_distance(s, t)
+  m = s.length
+  n = t.length
+  
+  # สร้างตาราง
+  d = Array.new(m + 1) { Array.new(n + 1) }
+  
+  (0..m).each { |i| d[i][0] = i }
+  (0..n).each { |j| d[0][j] = j }
+  
+  (1..m).each do |i|
+    (1..n).each do |j|
+      cost = s[i-1] == t[j-1] ? 0 : 1
+      d[i][j] = [
+        d[i-1][j] + 1,        # deletion
+        d[i][j-1] + 1,        # insertion
+        d[i-1][j-1] + cost    # substitution
+      ].min
+    end
+  end
+  
+  d[m][n]
 end
 
-# แบบฝึกหัดที่ 20: String Diff (simple)
-def highlight_diff(str1, str2)
+puts levenshtein_distance("kitten", "sitting")   # => 3
+puts levenshtein_distance("saturday", "sunday")  # => 3
+puts levenshtein_distance("", "hello")           # => 5
+```
+
+### แบบฝึกหัดที่ 15
+Template Engine ง่ายๆ
+
+```ruby
+# เฉลย
+def render_template(template, variables)
+  template.gsub(/\{\{(\w+)\}\}/) do
+    key = $1
+    variables[key] || variables[key.to_sym] || "{{#{key}}}"
+  end
+end
+
+template = <<~HTML
+  สวัสดี {{name}}!
+  คุณมีอีเมล {{email}}
+  สถานะ: {{status}}
+HTML
+
+puts render_template(template, {
+  "name" => "สมชาย",
+  "email" => "somchai@example.com",
+  "status" => "Active"
+})
+```
+
+### แบบฝึกหัดที่ 16
+String Difference Highlighter
+
+```ruby
+# เฉลย
+def highlight_differences(str1, str2)
+  result = ""
   max_len = [str1.length, str2.length].max
-  diff_positions = (0...max_len).select { |i| str1[i] != str2[i] }
-
-  puts "String 1: #{str1}"
-  puts "String 2: #{str2}"
-  puts "Diff:     #{(0...max_len).map { |i| diff_positions.include?(i) ? '^' : ' ' }.join}"
-  puts "Changed at positions: #{diff_positions.inspect}"
-  puts "Similarity: #{((1 - diff_positions.length.to_f / max_len) * 100).round(1)}%"
+  
+  max_len.times do |i|
+    c1 = str1[i] || " "
+    c2 = str2[i] || " "
+    
+    if c1 == c2
+      result += c1
+    else
+      result += "[#{c1}→#{c2}]"
+    end
+  end
+  
+  result
 end
 
-highlight_diff("hello world", "hello ruby!")
+puts highlight_differences("Hello World", "Hello Ruby!")
+# => Hello [W→R][o→u][r→b][l→y][d→!]
+```
+
+### แบบฝึกหัดที่ 17
+Thai Number to Text
+
+```ruby
+# เฉลย
+def thai_number(n)
+  digits = %w[ศูนย์ หนึ่ง สอง สาม สี่ ห้า หก เจ็ด แปด เก้า]
+  units = ["", "สิบ", "ร้อย", "พัน", "หมื่น", "แสน", "ล้าน"]
+  
+  return digits[0] if n == 0
+  
+  result = ""
+  n.to_s.chars.reverse.each_with_index do |digit, i|
+    d = digit.to_i
+    next if d == 0
+    result = digits[d] + units[i] + result
+  end
+  
+  result
+end
+
+puts thai_number(0)     # => ศูนย์
+puts thai_number(5)     # => ห้า
+puts thai_number(42)    # => สี่สิบสอง
+puts thai_number(1234)  # => หนึ่งพันสองร้อยสามสิบสี่
+```
+
+### แบบฝึกหัดที่ 18
+String Pattern Matching
+
+```ruby
+# เฉลย
+class StringPattern
+  PATTERNS = {
+    email: /\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/i,
+    phone: /\A(\+66|0)\d{8,9}\z/,
+    thai_id: /\A\d{13}\z/,
+    url: /\Ahttps?:\/\/[\w\-.]+\.[a-z]{2,}(\/\S*)?\z/i,
+    ip: /\A(\d{1,3}\.){3}\d{1,3}\z/
+  }
+  
+  def self.validate(value, type)
+    pattern = PATTERNS[type]
+    return "ไม่รู้จัก type: #{type}" unless pattern
+    
+    if value.match?(pattern)
+      "#{value}: ถูกต้อง (#{type})"
+    else
+      "#{value}: ไม่ถูกต้อง (#{type})"
+    end
+  end
+end
+
+puts StringPattern.validate("user@example.com", :email)    # => ถูกต้อง
+puts StringPattern.validate("0812345678", :phone)           # => ถูกต้อง
+puts StringPattern.validate("1234567890123", :thai_id)     # => ถูกต้อง
+puts StringPattern.validate("https://www.ruby-lang.org", :url)  # => ถูกต้อง
+puts StringPattern.validate("192.168.1.1", :ip)            # => ถูกต้อง
+```
+
+### แบบฝึกหัดที่ 19
+Multi-language Greeting
+
+```ruby
+# เฉลย
+GREETINGS = {
+  th: "สวัสดี",
+  en: "Hello",
+  ja: "こんにちは",
+  zh: "你好",
+  ko: "안녕하세요",
+  fr: "Bonjour",
+  de: "Hallo",
+  es: "Hola"
+}.freeze
+
+def greet(name, lang = :th)
+  greeting = GREETINGS[lang] || GREETINGS[:en]
+  "#{greeting}, #{name}!"
+end
+
+GREETINGS.each_key do |lang|
+  puts greet("สมชาย", lang)
+end
+```
+
+### แบบฝึกหัดที่ 20
+String Statistics
+
+```ruby
+# เฉลย
+def string_stats(text)
+  words = text.split(/\s+/).reject(&:empty?)
+  sentences = text.split(/[.!?]/).reject(&:empty?)
+  
+  {
+    characters: text.length,
+    characters_no_spaces: text.gsub(/\s/, "").length,
+    words: words.length,
+    sentences: sentences.length,
+    avg_word_length: words.empty? ? 0 : (words.sum(&:length).to_f / words.length).round(2),
+    avg_sentence_length: sentences.empty? ? 0 : (words.length.to_f / sentences.length).round(2),
+    most_common_word: words.group_by(&:downcase).max_by { |_, v| v.length }&.first,
+    unique_words: words.map(&:downcase).uniq.length
+  }
+end
+
+sample_text = "Ruby is a powerful language. Ruby makes programming fun! Ruby is used in many applications."
+stats = string_stats(sample_text)
+stats.each do |key, value|
+  puts "#{key}: #{value}"
+end
 ```
 
 ---
 
-## สรุปส่วนที่ 3
+## สรุป
 
-ในส่วนนี้เราได้เรียนรู้เรื่อง String อย่างครบถ้วน:
+ในตอนที่ 3 นี้ เราได้เรียนรู้:
 
-1. **String Creation** - single/double quotes, %q/%Q, String.new
-2. **Case Methods** - upcase, downcase, capitalize, swapcase
-3. **Length/Size** - length, bytesize, count, empty?
-4. **String Methods** - reverse, strip, chomp, chop
-5. **Searching** - include?, index, scan, match
-6. **Interpolation** - #{}, expression, methods
-7. **Formatting** - printf, sprintf, %, format
-8. **Heredoc** - <<HEREDOC, <<~HEREDOC, frozen heredoc
-9. **Comparison** - ==, <=>, casecmp, sort
-10. **Manipulation** - gsub, sub, tr, delete, split, join
-11. **Regex** - =~, match, scan, gsub with regex
-12. **Encoding** - UTF-8, encode, bytesize
-13. **Frozen Strings** - freeze, frozen_string_literal
-14. **Performance** - <<, concat, Array join
+1. **การสร้าง String** - Single/Double quotes, %q{}, %Q{}
+2. **String Interpolation** - การใส่ Expression ใน String
+3. **Case Methods** - upcase, downcase, capitalize, swapcase
+4. **Stripping/Padding** - strip, ljust, rjust, center
+5. **Searching** - include?, index, rindex, scan, match
+6. **Replacing** - sub, gsub ด้วย String, Regex, และ Block
+7. **Splitting/Joining** - split, chars, bytes, lines, join
+8. **Formatting** - %, sprintf, format, heredoc
+9. **Frozen Strings** - freeze, frozen_string_literal
+10. **Encoding** - encoding, bytesize, valid_encoding?
+11. **String as Array** - [], slice, each_char
+12. **Comparison** - ==, <=>, casecmp
+
+ในตอนต่อไปเราจะเรียนรู้เรื่อง **Numbers และ Math** ในเชิงลึก
 
 ---
 
-*เอกสารนี้เป็นส่วนหนึ่งของคอร์ส Ruby on Rails สำหรับผู้เริ่มต้น*
+*ตอนที่ 3 จบแล้ว - ไปต่อตอนที่ 4: Numbers และ Math*
