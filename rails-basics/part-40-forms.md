@@ -753,24 +753,484 @@ async function createArticle(data) {
 
 ---
 
-## สรุป Part 40
+## ขั้นตอนที่ 891: Custom Form Builder
 
-ในบทนี้เราได้เรียนรู้:
+### สร้าง Custom FormBuilder
 
-1. **form_with** - helper หลักสำหรับสร้าง forms ใน Rails 7
-2. **Text Fields** - text, email, password, search, tel, url, number, range, hidden, textarea
-3. **Checkboxes และ Radio Buttons** - check_box, radio_button, collection_check_boxes, collection_radio_buttons
-4. **Select Fields** - select, collection_select, grouped_collection_select
-5. **Date/Time Fields** - date_field, time_field, datetime_local_field, date_select, time_select
-6. **File Upload** - file_field กับ Active Storage
-7. **Nested Forms** - fields_for กับ accepts_nested_attributes_for
-8. **CSRF Protection** - authenticity_token, skip_forgery_protection
-9. **Error Handling** - แสดง errors ใน form
-10. **Turbo Integration** - form กับ Turbo Drive, Turbo Streams (Rails 7)
-11. **Custom FormBuilder** - สร้าง reusable form builder
+```ruby
+# app/form_builders/bootstrap_form_builder.rb
+class BootstrapFormBuilder < ActionView::Helpers::FormBuilder
+  def text_field(attribute, options = {})
+    with_label_and_error(attribute) do
+      options[:class] = ["form-control", error_class(attribute), options[:class]].compact.join(" ")
+      super(attribute, options)
+    end
+  end
 
-Forms เป็นส่วนสำคัญที่เชื่อม user interface กับ server-side logic การเข้าใจ form helpers อย่างลึกซึ้งจะช่วยให้พัฒนา web applications ได้รวดเร็วและมีประสิทธิภาพ
+  def email_field(attribute, options = {})
+    with_label_and_error(attribute) do
+      options[:class] = ["form-control", error_class(attribute), options[:class]].compact.join(" ")
+      super(attribute, options)
+    end
+  end
+
+  def password_field(attribute, options = {})
+    with_label_and_error(attribute) do
+      options[:class] = ["form-control", error_class(attribute), options[:class]].compact.join(" ")
+      super(attribute, options)
+    end
+  end
+
+  def text_area(attribute, options = {})
+    with_label_and_error(attribute) do
+      options[:class] = ["form-control", error_class(attribute), options[:class]].compact.join(" ")
+      super(attribute, options)
+    end
+  end
+
+  def select(attribute, choices, options = {}, html_options = {})
+    with_label_and_error(attribute) do
+      html_options[:class] = ["form-select", error_class(attribute), html_options[:class]].compact.join(" ")
+      super(attribute, choices, options, html_options)
+    end
+  end
+
+  def check_box(attribute, options = {}, checked_value = "1", unchecked_value = "0")
+    @template.content_tag(:div, class: "mb-3 form-check") do
+      super_result = super(attribute, options.merge(class: "form-check-input"), checked_value, unchecked_value)
+      label_result = label(attribute, options[:label], class: "form-check-label")
+      error_result = error_message(attribute)
+      super_result + label_result + error_result
+    end
+  end
+
+  def submit(value = nil, options = {})
+    options[:class] = ["btn btn-primary", options[:class]].compact.join(" ")
+    super(value, options)
+  end
+
+  private
+
+  def with_label_and_error(attribute, &block)
+    @template.content_tag(:div, class: "mb-3") do
+      label_result = label(attribute, class: "form-label")
+      input_result = yield
+      error_result = error_message(attribute)
+      label_result + input_result + error_result
+    end
+  end
+
+  def error_message(attribute)
+    errors = object.errors[attribute]
+    if errors.any?
+      @template.content_tag(:div, errors.first, class: "invalid-feedback d-block text-danger")
+    else
+      "".html_safe
+    end
+  end
+
+  def error_class(attribute)
+    object.errors[attribute].any? ? "is-invalid" : nil
+  end
+end
+
+# ใช้ใน view
+<%= form_with(model: @post, builder: BootstrapFormBuilder) do |f| %>
+  <%= f.text_field :title %>
+  <%= f.email_field :email %>
+  <%= f.text_area :body %>
+  <%= f.submit "บันทึก" %>
+<% end %>
+
+# กำหนด default builder ทั่ว application
+# config/application.rb
+config.action_view.default_form_builder = "BootstrapFormBuilder"
+```
 
 ---
 
-*จบ Rails Basics (Part 31-40)*
+## ขั้นตอนที่ 892: Form Accessibility
+
+### HTML5 Accessibility Attributes
+
+```erb
+<%= form_with(model: @user) do |f| %>
+  <%# aria-label สำหรับ screen readers %>
+  <div class="mb-3">
+    <%= f.label :email, "อีเมล", for: "user_email" %>
+    <%= f.email_field :email,
+        id: "user_email",
+        aria: { describedby: "email-help", required: true },
+        required: true,
+        autocomplete: "email" %>
+    <div id="email-help" class="form-text">
+      เราจะไม่เผยแพร่อีเมลของคุณ
+    </div>
+    <% if @user.errors[:email].any? %>
+      <div class="invalid-feedback" role="alert">
+        <%= @user.errors[:email].first %>
+      </div>
+    <% end %>
+  </div>
+
+  <%# fieldset สำหรับ related inputs %>
+  <fieldset>
+    <legend>ที่อยู่จัดส่ง</legend>
+    <div class="mb-3">
+      <%= f.label :address_line1, "บ้านเลขที่/อาคาร" %>
+      <%= f.text_field :address_line1, required: true %>
+    </div>
+    <div class="mb-3">
+      <%= f.label :city, "เมือง" %>
+      <%= f.text_field :city %>
+    </div>
+  </fieldset>
+
+  <%# ปุ่ม submit พร้อม loading state %>
+  <%= f.submit "บันทึก",
+      data: { disable_with: "กำลังบันทึก..." },
+      aria: { label: "บันทึกข้อมูลผู้ใช้" } %>
+<% end %>
+```
+
+---
+
+## ขั้นตอนที่ 893: Multi-step Form (Wizard)
+
+### Implement Wizard Form
+
+```ruby
+# app/models/registration_wizard.rb
+class RegistrationWizard
+  include ActiveModel::Model
+
+  STEPS = %w[account profile preferences confirmation].freeze
+
+  attr_accessor :current_step, :user_data
+
+  def initialize(params = {})
+    @current_step = params[:step] || STEPS.first
+    @user_data = params[:user_data] || {}
+  end
+
+  def next_step
+    current_index = STEPS.index(current_step)
+    STEPS[current_index + 1]
+  end
+
+  def previous_step
+    current_index = STEPS.index(current_step)
+    current_index > 0 ? STEPS[current_index - 1] : nil
+  end
+
+  def first_step?
+    current_step == STEPS.first
+  end
+
+  def last_step?
+    current_step == STEPS.last
+  end
+
+  def valid_for_step?
+    case current_step
+    when "account"
+      user_data[:email].present? && user_data[:password].present?
+    when "profile"
+      user_data[:name].present?
+    else
+      true
+    end
+  end
+end
+
+# app/controllers/registrations_controller.rb
+class RegistrationsController < ApplicationController
+  def new
+    @wizard = RegistrationWizard.new
+    session[:registration_data] = {}
+  end
+
+  def create
+    step = params[:step]
+    @wizard = RegistrationWizard.new(
+      step: step,
+      user_data: session[:registration_data].merge(registration_params)
+    )
+
+    session[:registration_data] = @wizard.user_data
+
+    if @wizard.valid_for_step?
+      if @wizard.last_step?
+        complete_registration
+      else
+        redirect_to new_registration_path(step: @wizard.next_step)
+      end
+    else
+      render "registrations/steps/#{step}"
+    end
+  end
+
+  private
+
+  def complete_registration
+    user = User.create!(session[:registration_data])
+    session.delete(:registration_data)
+    sign_in user
+    redirect_to root_path, notice: "ลงทะเบียนสำเร็จ!"
+  end
+end
+```
+
+```erb
+<%# app/views/registrations/steps/account.html.erb %>
+<div class="wizard-steps">
+  <div class="step active">1. บัญชี</div>
+  <div class="step">2. โปรไฟล์</div>
+  <div class="step">3. ความชอบ</div>
+  <div class="step">4. ยืนยัน</div>
+</div>
+
+<%= form_with(url: registrations_path, method: :post) do |f| %>
+  <%= hidden_field_tag :step, "account" %>
+
+  <div class="mb-3">
+    <%= label_tag :email, "อีเมล" %>
+    <%= email_field_tag :email, session[:registration_data][:email],
+        class: "form-control", required: true %>
+  </div>
+
+  <div class="mb-3">
+    <%= label_tag :password, "รหัสผ่าน" %>
+    <%= password_field_tag :password, nil, class: "form-control", required: true %>
+  </div>
+
+  <%= submit_tag "ถัดไป →", class: "btn btn-primary" %>
+<% end %>
+```
+
+---
+
+## ขั้นตอนที่ 894: Form Testing
+
+### Request Spec สำหรับ Form
+
+```ruby
+# spec/requests/posts_spec.rb
+require "rails_helper"
+
+RSpec.describe "Post Forms", type: :request do
+  let(:user) { create(:user) }
+
+  describe "POST /posts (create)" do
+    before { sign_in user }
+
+    context "with valid parameters" do
+      let(:valid_params) do
+        {
+          post: {
+            title: "My Test Post",
+            body: "This is the body of my test post with enough content.",
+            published: true,
+            category_id: create(:category).id
+          }
+        }
+      end
+
+      it "creates a new post" do
+        expect {
+          post posts_path, params: valid_params
+        }.to change(Post, :count).by(1)
+      end
+
+      it "redirects to the new post" do
+        post posts_path, params: valid_params
+        expect(response).to redirect_to(post_path(Post.last))
+      end
+
+      it "sets the correct attributes" do
+        post posts_path, params: valid_params
+        created_post = Post.last
+        expect(created_post.title).to eq("My Test Post")
+        expect(created_post.published).to be true
+      end
+    end
+
+    context "with invalid parameters" do
+      let(:invalid_params) do
+        { post: { title: "", body: "" } }
+      end
+
+      it "does not create a post" do
+        expect {
+          post posts_path, params: invalid_params
+        }.not_to change(Post, :count)
+      end
+
+      it "renders new template with errors" do
+        post posts_path, params: invalid_params
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.body).to include("ไม่สามารถบันทึกได้")
+      end
+    end
+  end
+
+  describe "PATCH /posts/:id (update)" do
+    let(:post_record) { create(:post, user: user, title: "Original Title") }
+
+    before { sign_in user }
+
+    it "updates the post" do
+      patch post_path(post_record), params: {
+        post: { title: "Updated Title" }
+      }
+      expect(post_record.reload.title).to eq("Updated Title")
+    end
+
+    it "handles nested attributes" do
+      tag = create(:tag, name: "ruby")
+      patch post_path(post_record), params: {
+        post: {
+          title: "Updated",
+          tags_attributes: [{ name: "new-tag" }]
+        }
+      }
+      expect(post_record.reload.tags.map(&:name)).to include("new-tag")
+    end
+  end
+end
+```
+
+### System Spec สำหรับ Form UI
+
+```ruby
+# spec/system/post_creation_spec.rb
+require "rails_helper"
+
+RSpec.describe "Post Creation", type: :system do
+  let(:user) { create(:user) }
+  let!(:category) { create(:category, name: "Ruby") }
+
+  before { sign_in user }
+
+  it "can create a post with all fields" do
+    visit new_post_path
+
+    fill_in "หัวข้อ", with: "My New Post"
+    fill_in "เนื้อหา", with: "This is detailed content for my post."
+    select "Ruby", from: "หมวดหมู่"
+    check "เผยแพร่บทความ"
+
+    expect {
+      click_button "สร้างบทความ"
+    }.to change(Post, :count).by(1)
+
+    expect(page).to have_content("บทความถูกสร้างแล้ว")
+    expect(page).to have_content("My New Post")
+  end
+
+  it "shows validation errors on blank submission" do
+    visit new_post_path
+    click_button "สร้างบทความ"
+
+    expect(page).to have_content("กรุณากรอกหัวข้อ")
+    expect(current_path).to eq(posts_path)  # stay on form page
+  end
+
+  it "can upload an image", js: true do
+    visit new_post_path
+    fill_in "หัวข้อ", with: "Post with Image"
+    fill_in "เนื้อหา", with: "Content here"
+    attach_file "รูปภาพหลัก", Rails.root.join("spec/fixtures/test_image.jpg")
+    click_button "สร้างบทความ"
+
+    expect(page).to have_css("img[src*='test_image']")
+  end
+end
+```
+
+---
+
+## ขั้นตอนที่ 895: Select กับ Dynamic Options
+
+### Dependent Selects
+
+```erb
+<%# Country → State → City via Turbo %>
+<%= form_with(model: @user) do |f| %>
+  <div class="mb-3">
+    <%= f.label :country_id, "ประเทศ" %>
+    <%= f.collection_select :country_id,
+        Country.all, :id, :name,
+        { include_blank: "เลือกประเทศ" },
+        { class: "form-select",
+          data: {
+            action: "change->dependent-select#loadStates",
+            turbo_frame: "states_frame"
+          } } %>
+  </div>
+
+  <%= turbo_frame_tag "states_frame" do %>
+    <div class="mb-3">
+      <%= f.label :state_id, "จังหวัด" %>
+      <% if @user.country_id.present? %>
+        <%= f.collection_select :state_id,
+            State.where(country_id: @user.country_id),
+            :id, :name,
+            { include_blank: "เลือกจังหวัด" },
+            { class: "form-select" } %>
+      <% else %>
+        <select class="form-select" disabled>
+          <option>กรุณาเลือกประเทศก่อน</option>
+        </select>
+      <% end %>
+    </div>
+  <% end %>
+
+  <%= f.submit "บันทึก" %>
+<% end %>
+```
+
+```ruby
+# app/controllers/states_controller.rb
+class StatesController < ApplicationController
+  def index
+    @states = State.where(country_id: params[:country_id])
+
+    render partial: "states/select_options",
+           locals: { states: @states }
+  end
+end
+```
+
+---
+
+## สรุปตอนที่ 40
+
+ในตอนนี้เราเรียนรู้ Forms อย่างครบถ้วน:
+
+| หัวข้อ | สิ่งสำคัญ |
+|--------|-----------|
+| form_with | model-backed vs URL, options |
+| Input Types | text, email, password, number, date, file, check_box, radio |
+| Select Helpers | select, collection_select, grouped, multiple |
+| File Upload | file_field + Active Storage + validation |
+| Nested Forms | accepts_nested_attributes_for + fields_for |
+| CSRF | authenticity_token, protect_from_forgery |
+| Turbo | Turbo Stream responses, Turbo Frame |
+| Error Display | Bootstrap integration, inline errors |
+| Form Object | สำหรับ complex multi-model forms |
+| Custom Builder | BootstrapFormBuilder |
+| Accessibility | aria attributes, fieldset, legend |
+| Wizard Forms | Multi-step form pattern |
+| Testing | Request specs + System specs |
+
+**Rails 7 Form Best Practices:**
+1. ใช้ `form_with` เสมอ (ไม่ใช้ `form_for` หรือ `form_tag`)
+2. ใช้ Strong Parameters ใน controller เสมอ
+3. CSRF protection เปิดใช้ default ไม่ต้องตั้งค่าเพิ่ม
+4. Turbo ทำ AJAX อัตโนมัติ ไม่ต้องเขียน JS เพิ่ม
+5. ใช้ `data: { disable_with: "..." }` ป้องกัน double submit
+6. ใช้ Form Object สำหรับ registration, checkout และ forms ที่ซับซ้อน
+7. เขียน system spec ครอบคลุม happy path และ error cases
+
+ตอนถัดไป: **ตอนที่ 41** - Sessions and Cookies

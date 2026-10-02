@@ -618,3 +618,525 @@ Post ที่มี has_many_attached :images พร้อม validation
 3. ใช้ Direct Upload สำหรับไฟล์ขนาดใหญ่
 4. สร้าง variants ไว้ล่วงหน้าเพื่อประสิทธิภาพ
 5. ใช้ Cloud Storage (S3/GCS) ใน production
+
+---
+
+## Step 1131: Image Processing Pipeline
+
+### Background Processing
+
+```ruby
+# app/jobs/process_avatar_job.rb
+class ProcessAvatarJob < ApplicationJob
+  queue_as :default
+  
+  def perform(user_id)
+    user = User.find(user_id)
+    return unless user.avatar.attached?
+    
+    # Pre-generate commonly used variants
+    variants_to_process = [
+      { resize_to_fill: [50, 50], format: :webp, quality: 80 },
+      { resize_to_fill: [100, 100], format: :webp, quality: 85 },
+      { resize_to_limit: [300, 300], format: :webp, quality: 90 },
+      { resize_to_limit: [600, 600], format: :jpeg, quality: 90 }
+    ]
+    
+    variants_to_process.each do |opts|
+      user.avatar.variant(opts).processed  # Pre-process and cache
+    end
+    
+    Rails.logger.info "Processed avatar variants for user #{user_id}"
+  rescue => e
+    Rails.logger.error "Failed to process avatar for user #{user_id}: #{e.message}"
+  end
+end
+```
+
+### Batch Image Processing
+
+```ruby
+# app/jobs/batch_process_images_job.rb
+class BatchProcessImagesJob < ApplicationJob
+  queue_as :low
+  
+  def perform(article_id)
+    article = Article.find(article_id)
+    return unless article.photos.attached?
+    
+    article.photos.each_with_index do |photo, index|
+      next unless photo.content_type.start_with?('image/')
+      
+      begin
+        # Generate multiple sizes
+        [
+          { resize_to_limit: [800, 600] },
+          { resize_to_fill: [400, 300] },
+          { resize_to_fill: [200, 150] }
+        ].each { |opts| photo.variant(opts).processed }
+        
+        Rails.logger.info "Processed photo #{index + 1} of #{article.photos.count}"
+      rescue => e
+        Rails.logger.warn "Could not process photo #{index + 1}: #{e.message}"
+      end
+    end
+  end
+end
+```
+
+---
+
+## Step 1132: ActiveStorage กับ Shrine Migration
+
+### Migration จาก Shrine ไป ActiveStorage
+
+```ruby
+# lib/tasks/migrate_attachments.rake
+namespace :attachments do
+  desc "Migrate attachments from Shrine to ActiveStorage"
+  task migrate: :environment do
+    User.find_each do |user|
+      next unless user.avatar_data.present?
+      
+      begin
+        shrine_data = JSON.parse(user.avatar_data)
+        file_path = shrine_data.dig('id')
+        
+        user.avatar.attach(
+          io: URI.open("https://old-storage.example.com/#{file_path}"),
+          filename: File.basename(file_path),
+          content_type: shrine_data.dig('metadata', 'mime_type')
+        )
+        
+        puts "Migrated avatar for user #{user.id}"
+      rescue => e
+        puts "Failed for user #{user.id}: #{e.message}"
+      end
+    end
+  end
+end
+```
+
+---
+
+## Step 1133: File Upload API Endpoint
+
+```ruby
+# app/controllers/api/v1/uploads_controller.rb
+module Api
+  module V1
+    class UploadsController < BaseController
+      def create
+        uploader = FileUploaderService.new(
+          file: upload_params[:file],
+          user: current_user,
+          context: upload_params[:context]
+        )
+        
+        if uploader.valid?
+          result = uploader.upload!
+          render json: {
+            success: true,
+            data: {
+              id: result[:attachment].id,
+              url: url_for(result[:attachment]),
+              filename: result[:attachment].filename.to_s,
+              content_type: result[:attachment].content_type,
+              byte_size: result[:attachment].byte_size
+            }
+          }, status: :created
+        else
+          render json: { 
+            success: false, 
+            errors: uploader.errors 
+          }, status: :unprocessable_entity
+        end
+      end
+      
+      def destroy
+        attachment = ActiveStorage::Attachment.find(params[:id])
+        
+        unless can_delete?(attachment)
+          return render json: { error: "Forbidden" }, status: :forbidden
+        end
+        
+        attachment.purge_later
+        head :no_content
+      end
+      
+      private
+      
+      def upload_params
+        params.permit(:file, :context)
+      end
+      
+      def can_delete?(attachment)
+        case attachment.record
+        when User then attachment.record == current_user
+        when Article then attachment.record.user == current_user
+        else false
+        end
+      end
+    end
+  end
+end
+```
+
+---
+
+## Step 1134: Virus Scanning
+
+```ruby
+# Gemfile
+# gem 'clamby'  # ClamAV integration
+
+# app/services/virus_scanner_service.rb
+class VirusScannerService
+  def self.scan(blob)
+    return true unless Rails.env.production?
+    
+    blob.open do |file|
+      result = `clamscan --no-summary #{file.path}`
+      $?.exitstatus == 0  # 0 = clean, 1 = virus found, 2 = error
+    end
+  rescue => e
+    Rails.logger.error "Virus scan error: #{e.message}"
+    true  # Allow on error (fail open) - adjust based on security requirements
+  end
+end
+
+# app/jobs/scan_attachment_job.rb
+class ScanAttachmentJob < ApplicationJob
+  queue_as :default
+  
+  def perform(blob_id)
+    blob = ActiveStorage::Blob.find(blob_id)
+    
+    unless VirusScannerService.scan(blob)
+      Rails.logger.warn "Virus detected in blob #{blob_id}, purging"
+      blob.purge
+      
+      # Notify admin
+      AdminMailer.virus_detected(blob_id).deliver_later
+    end
+  end
+end
+```
+
+---
+
+## Step 1135: Storage Cleanup Jobs
+
+```ruby
+# app/jobs/cleanup_unattached_blobs_job.rb
+class CleanupUnattachedBlobsJob < ApplicationJob
+  queue_as :low
+  
+  def perform
+    # ลบ blobs ที่ไม่มี attachment ที่เก่ากว่า 2 วัน
+    unattached_blobs = ActiveStorage::Blob.unattached.where("active_storage_blobs.created_at <= ?", 2.days.ago)
+    count = unattached_blobs.count
+    
+    unattached_blobs.find_each(&:purge)
+    
+    Rails.logger.info "Purged #{count} unattached blobs"
+  end
+end
+```
+
+```yaml
+# config/sidekiq.yml
+:schedule:
+  cleanup_blobs:
+    cron: '0 3 * * *'  # 3:00 AM daily
+    class: CleanupUnattachedBlobsJob
+    queue: low
+```
+
+---
+
+## Step 1136: Content Delivery Network (CDN)
+
+```ruby
+# config/environments/production.rb
+config.asset_host = ENV['CDN_HOST']  # "https://cdn.example.com"
+
+# ActiveStorage URL proxy through CDN
+config.active_storage.service_urls_expire_in = 1.week
+
+# Custom URL generation
+# app/helpers/storage_helper.rb
+module StorageHelper
+  def cdn_url_for(attachment)
+    return nil unless attachment.attached?
+    
+    if Rails.env.production? && ENV['CDN_HOST'].present?
+      blob_url = Rails.application.routes.url_helpers.rails_blob_url(
+        attachment,
+        host: ENV['APP_HOST']
+      )
+      blob_url.sub(ENV['APP_HOST'], ENV['CDN_HOST'])
+    else
+      url_for(attachment)
+    end
+  end
+  
+  def responsive_image_tag(attachment, **options)
+    return "" unless attachment.attached?
+    
+    sizes = options.delete(:sizes) || [300, 600, 900, 1200]
+    
+    srcset = sizes.map { |w|
+      variant = attachment.variant(resize_to_limit: [w, nil])
+      "#{url_for(variant)} #{w}w"
+    }.join(", ")
+    
+    image_tag(
+      url_for(attachment.variant(resize_to_limit: [600, nil])),
+      srcset: srcset,
+      sizes: options.delete(:responsive_sizes) || "(max-width: 600px) 300px, 600px",
+      loading: "lazy",
+      **options
+    )
+  end
+end
+```
+
+---
+
+## Step 1137: Complete Upload Form with Preview
+
+```erb
+<%# app/views/articles/_form.html.erb %>
+<%= form_with model: @article, multipart: true, data: { controller: "file-upload" } do |form| %>
+  
+  <%# Featured Image with Preview %>
+  <div class="upload-section">
+    <label class="upload-label">รูปหน้าปก</label>
+    
+    <div class="upload-area" 
+         data-file-upload-target="dropzone"
+         data-action="dragover->file-upload#dragover dragenter->file-upload#dragenter dragleave->file-upload#dragleave drop->file-upload#drop">
+      
+      <% if @article.featured_image.attached? %>
+        <div class="current-image">
+          <%= image_tag @article.featured_image.variant(resize_to_limit: [400, 300]),
+                        class: "preview", 
+                        data: { "file-upload-target": "preview" } %>
+          <button type="button" class="remove-btn" data-action="click->file-upload#removeImage">×</button>
+        </div>
+      <% else %>
+        <div class="upload-placeholder" data-file-upload-target="placeholder">
+          <div class="upload-icon">📸</div>
+          <p>ลากรูปมาวาง หรือคลิกเพื่อเลือกรูป</p>
+          <p class="hint">รองรับ JPEG, PNG, WebP ขนาดไม่เกิน 10MB</p>
+        </div>
+        <img data-file-upload-target="preview" style="display:none; max-width: 400px;">
+      <% end %>
+    </div>
+    
+    <%= form.file_field :featured_image,
+                        accept: "image/jpeg,image/png,image/webp",
+                        class: "file-input",
+                        data: { 
+                          "file-upload-target": "input",
+                          action: "change->file-upload#previewImage"
+                        } %>
+  </div>
+  
+  <%# Multiple Photos %>
+  <div class="upload-section">
+    <label>รูปภาพประกอบ (สูงสุด 10 รูป)</label>
+    
+    <div class="photos-grid" data-file-upload-target="photosGrid">
+      <% @article.photos.each do |photo| %>
+        <div class="photo-item" data-blob-id="<%= photo.id %>">
+          <%= image_tag photo.variant(resize_to_fill: [200, 150]), class: "photo-thumb" %>
+          <button type="button" 
+                  class="remove-photo"
+                  data-action="click->file-upload#removePhoto"
+                  data-blob-id="<%= photo.id %>">×</button>
+        </div>
+      <% end %>
+    </div>
+    
+    <%= form.file_field :photos,
+                        multiple: true,
+                        accept: "image/*",
+                        class: "file-input",
+                        data: { action: "change->file-upload#previewPhotos" } %>
+  </div>
+  
+  <%# Upload Progress %>
+  <div class="upload-progress" data-file-upload-target="progress" hidden>
+    <div class="progress-bar">
+      <div class="progress-fill" data-file-upload-target="progressFill" style="width: 0%"></div>
+    </div>
+    <span data-file-upload-target="progressText">Uploading...</span>
+  </div>
+  
+  <%= form.submit "บันทึก", class: "btn btn-primary" %>
+<% end %>
+```
+
+---
+
+## Step 1138: Testing File Uploads
+
+```ruby
+# spec/requests/api/v1/uploads_spec.rb
+require 'rails_helper'
+
+RSpec.describe "Uploads API", type: :request do
+  let(:user) { create(:user) }
+  let(:headers) { auth_headers(user) }
+  
+  describe "POST /api/v1/uploads" do
+    let(:image_file) do
+      fixture_file_upload(
+        Rails.root.join('spec', 'fixtures', 'files', 'test_image.jpg'),
+        'image/jpeg'
+      )
+    end
+    
+    it "uploads a file successfully" do
+      post "/api/v1/uploads",
+           params: { file: image_file, context: 'avatar' },
+           headers: headers
+      
+      expect(response).to have_http_status(:created)
+      expect(json_response[:success]).to be true
+      expect(json_response[:data][:url]).to be_present
+    end
+    
+    it "rejects files that are too large" do
+      large_file = create_large_file(11.megabytes)
+      
+      post "/api/v1/uploads",
+           params: { file: large_file },
+           headers: headers
+      
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+    
+    it "rejects non-image files" do
+      pdf_file = fixture_file_upload(
+        Rails.root.join('spec', 'fixtures', 'files', 'document.pdf'),
+        'application/pdf'
+      )
+      
+      post "/api/v1/uploads",
+           params: { file: pdf_file, context: 'avatar' },
+           headers: headers
+      
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+  end
+end
+```
+
+---
+
+## Step 1139: Storage Analytics
+
+```ruby
+# app/models/concerns/trackable_attachment.rb
+module TrackableAttachment
+  extend ActiveSupport::Concern
+  
+  included do
+    after_create_commit :track_attachment_created
+    before_destroy :track_attachment_deleted
+  end
+  
+  private
+  
+  def track_attachment_created
+    StorageMetric.create!(
+      event: 'attachment_created',
+      user_id: record.respond_to?(:user_id) ? record.user_id : nil,
+      blob_key: blob.key,
+      content_type: blob.content_type,
+      byte_size: blob.byte_size,
+      record_type: record_type,
+      record_id: record_id
+    )
+  end
+  
+  def track_attachment_deleted
+    StorageMetric.create!(
+      event: 'attachment_deleted',
+      blob_key: blob.key,
+      byte_size: blob.byte_size
+    )
+  end
+end
+
+ActiveStorage::Attachment.include(TrackableAttachment)
+```
+
+---
+
+## Step 1140: S3 Presigned URLs
+
+```ruby
+# app/services/presigned_url_service.rb
+class PresignedUrlService
+  def self.for_upload(filename:, content_type:, max_size: 10.megabytes)
+    s3 = Aws::S3::Client.new(region: ENV['AWS_REGION'])
+    
+    presigner = Aws::S3::Presigner.new(client: s3)
+    
+    key = "uploads/#{SecureRandom.uuid}/#{filename}"
+    
+    url = presigner.presigned_url(
+      :put_object,
+      bucket: ENV['AWS_BUCKET'],
+      key: key,
+      expires_in: 3600,  # 1 hour
+      content_type: content_type,
+      content_length_range: 1..max_size
+    )
+    
+    { url: url, key: key }
+  end
+  
+  def self.for_download(key:, filename: nil)
+    s3 = Aws::S3::Client.new(region: ENV['AWS_REGION'])
+    presigner = Aws::S3::Presigner.new(client: s3)
+    
+    presigner.presigned_url(
+      :get_object,
+      bucket: ENV['AWS_BUCKET'],
+      key: key,
+      expires_in: 1800,
+      response_content_disposition: filename ? "attachment; filename=\"#{filename}\"" : nil
+    )
+  end
+end
+```
+
+```ruby
+# app/controllers/api/v1/presigned_urls_controller.rb
+module Api
+  module V1
+    class PresignedUrlsController < BaseController
+      def create
+        result = PresignedUrlService.for_upload(
+          filename: params[:filename],
+          content_type: params[:content_type],
+          max_size: 50.megabytes
+        )
+        
+        render json: {
+          success: true,
+          data: {
+            upload_url: result[:url],
+            storage_key: result[:key]
+          }
+        }
+      end
+    end
+  end
+end
+```
