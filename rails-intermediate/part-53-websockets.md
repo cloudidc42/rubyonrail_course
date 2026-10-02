@@ -628,3 +628,612 @@ rails generate channel Chat speak
 3. Turbo Streams ทำงานร่วมกับ Action Cable
 4. ทดสอบ channel ด้วย `stub_connection`
 5. Monitor WebSocket connections ใน production
+
+---
+
+## Step 1171: WebSocket Authentication ด้วย JWT
+
+```ruby
+# app/channels/application_cable/connection.rb
+module ApplicationCable
+  class Connection < ActionCable::Connection::Base
+    identified_by :current_user
+    
+    def connect
+      self.current_user = find_verified_user
+    end
+    
+    private
+    
+    def find_verified_user
+      # Option 1: Cookie-based
+      if (user_id = cookies.encrypted[:user_id])
+        User.find_by(id: user_id) || reject_unauthorized_connection
+      # Option 2: JWT token in query string
+      elsif (token = request.params[:token])
+        verify_jwt_token(token)
+      # Option 3: Session
+      elsif (user_id = env["warden"]&.user&.id)
+        User.find_by(id: user_id) || reject_unauthorized_connection
+      else
+        reject_unauthorized_connection
+      end
+    end
+    
+    def verify_jwt_token(token)
+      payload = JWT.decode(
+        token,
+        Rails.application.secret_key_base,
+        true,
+        algorithm: 'HS256'
+      ).first
+      
+      User.find_by(id: payload['user_id']) || reject_unauthorized_connection
+    rescue JWT::DecodeError
+      reject_unauthorized_connection
+    end
+  end
+end
+```
+
+```javascript
+// app/javascript/cable.js - เชื่อม WebSocket พร้อม JWT
+import { createConsumer } from "@rails/actioncable"
+
+function getAuthToken() {
+  return document.querySelector('meta[name="jwt-token"]')?.content
+}
+
+// สร้าง consumer พร้อม token
+export default createConsumer(() => {
+  const token = getAuthToken()
+  return token ? `/cable?token=${token}` : "/cable"
+})
+```
+
+---
+
+## Step 1172: Rate Limiting WebSocket Connections
+
+```ruby
+# app/channels/application_cable/channel.rb
+module ApplicationCable
+  class Channel < ActionCable::Channel::Base
+    private
+    
+    def rate_limit!(action, limit: 10, period: 60)
+      key = "rate_limit:#{current_user.id}:#{action}"
+      count = Redis.current.incr(key)
+      Redis.current.expire(key, period) if count == 1
+      
+      if count > limit
+        transmit({ error: "Rate limit exceeded. Please slow down." })
+        throw :abort
+      end
+    end
+  end
+end
+
+# app/channels/chat_channel.rb
+class ChatChannel < ApplicationCable::Channel
+  def speak(data)
+    rate_limit!(:speak, limit: 20, period: 60)
+    
+    Message.create!(
+      body: data['message'],
+      user: current_user,
+      chat_room: @room
+    )
+  end
+end
+```
+
+---
+
+## Step 1173: Action Cable กับ Sidekiq
+
+```ruby
+# app/jobs/broadcast_notification_job.rb
+class BroadcastNotificationJob < ApplicationJob
+  queue_as :cable
+  
+  def perform(user_id, payload)
+    user = User.find(user_id)
+    
+    ActionCable.server.broadcast(
+      "notifications_user_#{user_id}",
+      payload
+    )
+    
+    # Log the broadcast
+    NotificationLog.create!(
+      user: user,
+      payload: payload,
+      broadcast_at: Time.current
+    )
+  end
+end
+
+# เรียกใช้
+BroadcastNotificationJob.perform_later(user.id, {
+  type: 'alert',
+  message: 'คุณมีข้อความใหม่',
+  url: '/messages'
+})
+```
+
+---
+
+## Step 1174: Turbo Streams กับ Rails 7
+
+```ruby
+# config/routes.rb
+resources :posts do
+  resources :comments
+end
+
+# app/models/comment.rb
+class Comment < ApplicationRecord
+  belongs_to :post
+  belongs_to :user
+  
+  after_create_commit -> {
+    broadcast_append_to(
+      post,
+      target: "comments",
+      partial: "comments/comment",
+      locals: { comment: self }
+    )
+  }
+  
+  after_update_commit -> {
+    broadcast_replace_to(
+      post,
+      target: self,
+      partial: "comments/comment",
+      locals: { comment: self }
+    )
+  }
+  
+  after_destroy_commit -> {
+    broadcast_remove_to(post, target: self)
+  }
+end
+
+# app/controllers/comments_controller.rb
+class CommentsController < ApplicationController
+  before_action :authenticate_user!
+  
+  def create
+    @post = Post.find(params[:post_id])
+    @comment = @post.comments.build(comment_params)
+    @comment.user = current_user
+    
+    if @comment.save
+      # broadcast จะเกิดขึ้นอัตโนมัติจาก after_create_commit
+      respond_to do |format|
+        format.turbo_stream
+        format.html { redirect_to @post }
+      end
+    else
+      render :new, status: :unprocessable_entity
+    end
+  end
+  
+  private
+  
+  def comment_params
+    params.require(:comment).permit(:body)
+  end
+end
+```
+
+```erb
+<%# app/views/posts/show.html.erb %>
+<%= turbo_stream_from @post %>
+
+<div id="post_<%= @post.id %>">
+  <h1><%= @post.title %></h1>
+  <p><%= @post.body %></p>
+</div>
+
+<div id="comments">
+  <%= render @post.comments %>
+</div>
+
+<%= turbo_frame_tag "new_comment" do %>
+  <%= render "comments/form", post: @post, comment: Comment.new %>
+<% end %>
+```
+
+```erb
+<%# app/views/comments/_comment.html.erb %>
+<%= turbo_frame_tag comment do %>
+  <div class="comment" id="comment_<%= comment.id %>">
+    <strong><%= comment.user.name %></strong>
+    <p><%= comment.body %></p>
+    <small><%= time_ago_in_words(comment.created_at) %> ที่แล้ว</small>
+    
+    <% if can?(:destroy, comment) %>
+      <%= button_to "ลบ", post_comment_path(@post, comment),
+          method: :delete,
+          data: { turbo_confirm: "แน่ใจหรือไม่?" } %>
+    <% end %>
+  </div>
+<% end %>
+```
+
+---
+
+## Step 1175: Real-time Dashboard
+
+```ruby
+# app/channels/dashboard_channel.rb
+class DashboardChannel < ApplicationCable::Channel
+  def subscribed
+    return reject unless current_user.admin?
+    
+    stream_from "admin_dashboard"
+    
+    # ส่งข้อมูลเริ่มต้น
+    transmit(current_stats)
+  end
+  
+  private
+  
+  def current_stats
+    {
+      type: 'stats',
+      users_count: User.count,
+      orders_today: Order.today.count,
+      revenue_today: Order.today.sum(:total).to_f,
+      online_users: Redis.current.scard("online_users")
+    }
+  end
+end
+
+# app/jobs/dashboard_update_job.rb
+class DashboardUpdateJob < ApplicationJob
+  queue_as :default
+  
+  def perform
+    stats = {
+      type: 'stats',
+      users_count: User.count,
+      orders_today: Order.today.count,
+      revenue_today: Order.today.sum(:total).to_f,
+      online_users: Redis.current.scard("online_users"),
+      updated_at: Time.current.strftime("%H:%M:%S")
+    }
+    
+    ActionCable.server.broadcast("admin_dashboard", stats)
+  end
+end
+
+# config/initializers/scheduled_jobs.rb
+# รัน dashboard update ทุก 30 วินาที
+# (ใช้ sidekiq-cron หรือ whenever)
+```
+
+```javascript
+// app/javascript/dashboard.js
+import consumer from "./cable"
+
+const dashboardChannel = consumer.subscriptions.create("DashboardChannel", {
+  received(data) {
+    if (data.type === 'stats') {
+      document.getElementById('users-count').textContent = data.users_count
+      document.getElementById('orders-today').textContent = data.orders_today
+      document.getElementById('revenue-today').textContent = 
+        `฿${data.revenue_today.toLocaleString()}`
+      document.getElementById('online-users').textContent = data.online_users
+    }
+  }
+})
+```
+
+---
+
+## Step 1176: WebSocket Reconnection Logic
+
+```javascript
+// app/javascript/cable_manager.js
+import { createConsumer } from "@rails/actioncable"
+
+class CableManager {
+  constructor() {
+    this.consumer = null
+    this.subscriptions = new Map()
+    this.reconnectAttempts = 0
+    this.maxReconnectAttempts = 5
+  }
+  
+  connect() {
+    this.consumer = createConsumer()
+    this.consumer.connection.monitor.reconnectDelay = (retries) => {
+      // Exponential backoff: 1s, 2s, 4s, 8s, 16s
+      return Math.min(Math.pow(2, retries) * 1000, 30000)
+    }
+    return this.consumer
+  }
+  
+  subscribe(channelName, params, callbacks) {
+    const subscription = this.consumer.subscriptions.create(
+      { channel: channelName, ...params },
+      {
+        connected: () => {
+          this.reconnectAttempts = 0
+          callbacks.connected?.()
+          this.showConnectionStatus('connected')
+        },
+        disconnected: () => {
+          callbacks.disconnected?.()
+          this.showConnectionStatus('disconnected')
+          this.attemptReconnect(channelName, params, callbacks)
+        },
+        received: callbacks.received
+      }
+    )
+    
+    this.subscriptions.set(channelName, subscription)
+    return subscription
+  }
+  
+  attemptReconnect(channelName, params, callbacks) {
+    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+      this.reconnectAttempts++
+      const delay = Math.min(Math.pow(2, this.reconnectAttempts) * 1000, 30000)
+      
+      setTimeout(() => {
+        if (!this.consumer.connection.isOpen()) {
+          this.consumer.connect()
+        }
+      }, delay)
+    }
+  }
+  
+  showConnectionStatus(status) {
+    const el = document.getElementById('connection-status')
+    if (!el) return
+    
+    el.className = `connection-status ${status}`
+    el.textContent = status === 'connected' ? '● เชื่อมต่อแล้ว' : '○ ขาดการเชื่อมต่อ'
+  }
+}
+
+export default new CableManager()
+```
+
+---
+
+## Step 1177: Multiple Consumers
+
+```javascript
+// app/javascript/channels/consumer.js
+import { createConsumer } from "@rails/actioncable"
+export const consumer = createConsumer()
+
+// สร้าง channel แยกแต่ละ feature
+// app/javascript/channels/chat_channel.js
+import { consumer } from "./consumer"
+
+export function createChatSubscription(roomId, handlers) {
+  return consumer.subscriptions.create(
+    { channel: "ChatChannel", room_id: roomId },
+    {
+      connected() { handlers.onConnect?.() },
+      disconnected() { handlers.onDisconnect?.() },
+      received(data) { handlers.onMessage?.(data) }
+    }
+  )
+}
+
+// app/javascript/channels/notifications_channel.js
+import { consumer } from "./consumer"
+
+export function createNotificationsSubscription(handlers) {
+  return consumer.subscriptions.create("NotificationsChannel", {
+    received(data) { handlers.onNotification?.(data) }
+  })
+}
+```
+
+---
+
+## Step 1178: WebSocket Performance
+
+```ruby
+# config/cable.yml - tuning สำหรับ production
+production:
+  adapter: redis
+  url: <%= ENV.fetch("REDIS_URL") %>
+  channel_prefix: <%= ENV.fetch("APP_NAME", "myapp") %>_production
+
+# Puma configuration สำหรับ Action Cable
+# config/puma.rb
+workers Integer(ENV.fetch('WEB_CONCURRENCY', 2))
+threads_count = Integer(ENV.fetch('RAILS_MAX_THREADS', 5))
+threads threads_count, threads_count
+
+# Action Cable ต้องการ thread-safe configuration
+preload_app!
+
+# app/config/initializers/action_cable.rb
+ActionCable.server.config.worker_pool_size = 4
+
+# ตรวจสอบ connections
+ActionCable.server.config.log_tags = [:action_cable]
+```
+
+```ruby
+# ลด memory ด้วยการ limit connections
+# config/initializers/action_cable.rb
+module ActionCable
+  module Server
+    class Configuration
+      def max_connections
+        ENV.fetch('ACTION_CABLE_MAX_CONNECTIONS', 1000).to_i
+      end
+    end
+  end
+end
+```
+
+---
+
+## Step 1179: Monitoring WebSockets
+
+```ruby
+# app/channels/application_cable/channel.rb
+module ApplicationCable
+  class Channel < ActionCable::Channel::Base
+    def subscribe_to_stream(stream_name)
+      stream_from stream_name
+      
+      # Log subscription
+      Rails.logger.info "[ActionCable] #{current_user.id} subscribed to #{stream_name}"
+      
+      # Monitor via StatsD
+      StatsD.increment("cable.subscriptions.#{self.class.name.underscore}")
+      StatsD.gauge("cable.connections.active", ActionCable.server.connections.length)
+    end
+  end
+end
+```
+
+---
+
+## Step 1180: แบบฝึกหัดเพิ่มเติม
+
+### ข้อ 1: ระบบ Collaborative Editing
+
+```ruby
+# app/channels/document_channel.rb
+class DocumentChannel < ApplicationCable::Channel
+  def subscribed
+    @document = Document.find(params[:document_id])
+    reject unless @document.can_edit?(current_user)
+    
+    stream_for @document
+    
+    # แจ้งผู้ร่วมแก้ไขว่ามีคนเข้ามา
+    DocumentChannel.broadcast_to(@document, {
+      type: 'user_joined',
+      user: { id: current_user.id, name: current_user.name }
+    })
+  end
+  
+  def update(data)
+    @document.update!(content: data['content'])
+    
+    DocumentChannel.broadcast_to(@document, {
+      type: 'content_update',
+      content: data['content'],
+      updated_by: current_user.name,
+      cursor_position: data['cursor_position']
+    })
+  end
+  
+  def cursor_moved(data)
+    DocumentChannel.broadcast_to(@document, {
+      type: 'cursor_moved',
+      user_id: current_user.id,
+      user_name: current_user.name,
+      position: data['position'],
+      color: current_user.cursor_color
+    })
+  end
+end
+```
+
+### ข้อ 2: Stock Price Updates
+
+```ruby
+# app/jobs/stock_price_update_job.rb
+class StockPriceUpdateJob < ApplicationJob
+  queue_as :realtime
+  
+  def perform
+    StockSymbol.active.each do |stock|
+      price = fetch_price(stock.symbol)
+      stock.update!(current_price: price, updated_at: Time.current)
+      
+      ActionCable.server.broadcast("stock_#{stock.symbol}", {
+        symbol: stock.symbol,
+        price: price,
+        change: price - stock.previous_close,
+        change_percent: ((price - stock.previous_close) / stock.previous_close * 100).round(2)
+      })
+    end
+  end
+  
+  private
+  
+  def fetch_price(symbol)
+    # เรียก external API
+    response = HTTP.get("https://api.stockdata.com/#{symbol}")
+    response.parse['price']
+  end
+end
+```
+
+### ข้อ 3: Game Channel
+
+```ruby
+# app/channels/game_channel.rb
+class GameChannel < ApplicationCable::Channel
+  GAME_TIMEOUT = 30.minutes
+  
+  def subscribed
+    @game = Game.find(params[:game_id])
+    reject unless @game.can_join?(current_user)
+    
+    stream_for @game
+    @game.add_player!(current_user)
+    
+    GameChannel.broadcast_to(@game, {
+      type: 'player_joined',
+      player: { id: current_user.id, name: current_user.name },
+      players_count: @game.players.count
+    })
+  end
+  
+  def make_move(data)
+    result = @game.make_move!(
+      player: current_user,
+      move: data['move']
+    )
+    
+    GameChannel.broadcast_to(@game, {
+      type: 'move_made',
+      move: data['move'],
+      player: current_user.name,
+      board_state: result[:board],
+      game_over: result[:game_over],
+      winner: result[:winner]&.name
+    })
+  end
+end
+```
+
+---
+
+## สรุป Action Cable ขั้นสูง
+
+| Pattern | Use Case |
+|---------|----------|
+| stream_for | Object-specific streams |
+| stream_from | String key streams |
+| broadcast_to | Send to object stream |
+| ActionCable.server.broadcast | Send to string stream |
+| after_create_commit | Auto-broadcast on model create |
+| Turbo Streams | Rails 7 real-time HTML updates |
+
+**Best Practices:**
+1. ใช้ JWT สำหรับ authentication เมื่อไม่มี session cookies
+2. Rate limit เพื่อป้องกัน WebSocket flooding
+3. ใช้ Redis adapter ใน production เสมอ
+4. Monitor จำนวน connections ด้วย StatsD/Prometheus
+5. Test channels ด้วย `stub_connection` helper
+6. ใช้ Sidekiq job สำหรับ broadcasting หนัก
+7. Implement exponential backoff สำหรับ reconnection
