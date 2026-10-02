@@ -1,650 +1,596 @@
-# Ruby & Rails Interview Questions
+# Ruby และ Ruby on Rails Interview Questions
 
-## คู่มือเตรียมสัมภาษณ์งาน Ruby on Rails
-
-ครอบคลุมระดับ Junior, Mid-level, Senior
+คู่มือเตรียมตัวสัมภาษณ์งาน Ruby/Rails ครอบคลุมทุกระดับตั้งแต่ Junior ถึง Senior
 
 ---
 
-# ส่วนที่ 1: Ruby Interview Questions (50 ข้อ)
+## สารบัญ
+
+1. [คำถาม Ruby ระดับ Junior](#ruby-junior)
+2. [คำถาม Ruby ระดับ Mid-Level](#ruby-mid)
+3. [คำถาม Ruby ระดับ Senior](#ruby-senior)
+4. [คำถาม Rails ระดับ Junior](#rails-junior)
+5. [คำถาม Rails ระดับ Mid-Level](#rails-mid)
+6. [คำถาม Rails ระดับ Senior](#rails-senior)
+7. [System Design Questions](#system-design)
+8. [Coding Challenges พร้อมเฉลย](#coding-challenges)
+9. [Behavioral Questions](#behavioral)
 
 ---
 
-## Junior Level (ข้อ 1-20)
+## คำถาม Ruby ระดับ Junior {#ruby-junior}
 
-### ข้อ 1: Ruby คืออะไร และมีจุดเด่นอะไรบ้าง?
+### 1. อธิบายความแตกต่างระหว่าง `nil`, `false`, และ `0` ใน Ruby
 
-**คำตอบ:**
-Ruby เป็นภาษา scripting แบบ interpreted, dynamic, object-oriented ที่สร้างโดย Yukihiro "Matz" Matsumoto ในปี 1995
-
-จุดเด่น:
-- **Everything is an Object** - ทุกอย่างเป็น object รวมถึง primitives
-- **Dynamic typing** - ไม่ต้องประกาศ type
-- **Blocks, Procs, Lambdas** - First-class functions
-- **Duck typing** - ดูพฤติกรรม ไม่ใช่ type
-- **Open classes** - สามารถ extend class ที่มีอยู่แล้วได้
-- **Convention over Configuration** - หลักการที่ Rails ยืม
+**เฉลย:**
 
 ```ruby
-# ทุกอย่างเป็น object
-1.class        # => Integer
-true.class     # => TrueClass
-nil.class      # => NilClass
-"hello".class  # => String
+# nil คือ "ไม่มีค่า" หรือ "ว่างเปล่า" - เป็น object ของ NilClass
+nil.class       # => NilClass
+nil.nil?        # => true
+nil.to_i        # => 0
+nil.to_s        # => ""
+nil.to_a        # => []
 
-# Integers มี methods
-5.times { print "Hello " }
--3.abs  # => 3
+# false คือค่า boolean false - เป็น object ของ FalseClass
+false.class     # => FalseClass
+false.nil?      # => false
+
+# 0 คือตัวเลขศูนย์ - เป็น object ของ Integer
+0.class         # => Integer
+0.nil?          # => false
+0.zero?         # => true
+
+# ใน Ruby มีเพียง nil และ false เท่านั้นที่เป็น "falsy"
+# ทุกอย่างอื่น รวมถึง 0, "", [], {} ล้วนเป็น "truthy"
+puts "nil เป็น falsy" unless nil    # พิมพ์ออกมา
+puts "false เป็น falsy" unless false # พิมพ์ออกมา
+puts "0 เป็น truthy" if 0           # พิมพ์ออกมา
+puts "'' เป็น truthy" if ""         # พิมพ์ออกมา
+puts "[] เป็น truthy" if []         # พิมพ์ออกมา
 ```
 
+**ประเด็นสำคัญ:** ใน Ruby ตัวเลข 0 และ string ว่างเปล่า ถือเป็น truthy ซึ่งต่างจากภาษาอื่นเช่น JavaScript หรือ PHP
+
 ---
 
-### ข้อ 2: อธิบาย Symbol ใน Ruby และความแตกต่างจาก String
+### 2. อธิบาย Symbol ใน Ruby และความแตกต่างกับ String
 
-**คำตอบ:**
-- **Symbol** (`:name`) - immutable, stored once ใน memory, ใช้เป็น identifier
-- **String** (`"name"`) - mutable, สร้าง object ใหม่ทุกครั้ง
+**เฉลย:**
 
 ```ruby
-# Symbol - stored ครั้งเดียวใน memory
-:hello.object_id == :hello.object_id  # => true
+# Symbol คือ identifier ที่ immutable และเก็บใน memory pool
+:hello.class    # => Symbol
+:hello.object_id == :hello.object_id  # => true (เป็น object เดียวกัน)
 
-# String - สร้าง object ใหม่ทุกครั้ง
-"hello".object_id == "hello".object_id  # => false
+# String แต่ละครั้งสร้าง object ใหม่
+"hello".object_id == "hello".object_id  # => false (คนละ object)
 
-# เมื่อใช้ Symbol
-user = { name: "Alice", age: 30 }  # keys เป็น symbols
-user[:name]  # => "Alice"
-
-# แปลงระหว่างกัน
-"hello".to_sym  # => :hello
+# การแปลง
 :hello.to_s     # => "hello"
+"hello".to_sym  # => :hello
 
-# ใช้ Symbol เมื่อ: ชื่อ method, hash keys, identifiers
-# ใช้ String เมื่อ: text ที่เปลี่ยนแปลงได้, user input
+# ใช้ Symbol เป็น hash key แทน String เพราะเร็วกว่า
+person_with_symbol = { name: "Alice", age: 30 }
+person_with_string = { "name" => "Alice", "age" => 30 }
+
+# Symbol ใช้ memory น้อยกว่า เพราะเก็บเพียงครั้งเดียว
+symbols = Array.new(100) { :same_symbol }
+strings = Array.new(100) { "same_string" }
+# symbols ทั้ง 100 ชี้ไปที่ object เดียว
+# strings สร้าง 100 objects ใหม่
+
+# ตั้งแต่ Ruby 2.2 Symbols ที่สร้างจาก dynamic string จะถูก GC เก็บได้
+dynamic_sym = "hello_#{rand}".to_sym
+# symbol นี้จะถูกเก็บโดย GC เมื่อไม่ใช้แล้ว
 ```
 
 ---
 
-### ข้อ 3: อธิบาย nil, false, และ truthy/falsy ใน Ruby
+### 3. อธิบาย Array methods ที่ใช้บ่อย
 
-**คำตอบ:**
-ใน Ruby มีค่าที่ falsy เพียง 2 ค่า: `nil` และ `false`
-ทุกค่าอื่น รวมถึง `0` และ `""` เป็น truthy
+**เฉลย:**
 
 ```ruby
-# Falsy ใน Ruby
-if nil;   puts "nil is falsy"   end  # prints
-if false; puts "false is falsy" end  # prints
+numbers = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3]
 
-# Truthy ทุกอย่างอื่น
-if 0;    puts "0 is truthy"    end  # prints!
-if "";   puts "empty is truthy" end  # prints!
-if [];   puts "[] is truthy"   end  # prints!
+# map/collect - แปลงแต่ละ element
+doubled = numbers.map { |n| n * 2 }
+# => [6, 2, 8, 2, 10, 18, 4, 12, 10, 6]
 
-# nil vs false
-nil.nil?    # => true
-false.nil?  # => false
-nil == false # => false
+# select/filter - กรอง element ที่ผ่านเงื่อนไข
+evens = numbers.select { |n| n.even? }
+# => [4, 2, 6]
 
-# Safe navigation operator
-user = nil
-user&.name  # => nil (ไม่ raise NoMethodError)
+# reject - กรอง element ที่ไม่ผ่านเงื่อนไข
+odds = numbers.reject { |n| n.even? }
+# => [3, 1, 1, 5, 9, 5, 3]
+
+# reduce/inject - รวมทุก element เป็นค่าเดียว
+sum = numbers.reduce(0) { |acc, n| acc + n }
+# => 39
+
+# each_with_object - สะสมผลลัพธ์ใน object
+grouped = numbers.each_with_object({}) do |n, hash|
+  hash[n] = (hash[n] || 0) + 1
+end
+# => {3=>2, 1=>2, 4=>1, 5=>2, 9=>1, 2=>1, 6=>1}
+
+# flat_map - map แล้ว flatten หนึ่งระดับ
+nested = [[1, 2], [3, 4], [5, 6]]
+flat = nested.flat_map { |arr| arr.map { |n| n * 2 } }
+# => [2, 4, 6, 8, 10, 12]
+
+# zip - รวม arrays เข้าด้วยกัน
+names = ["Alice", "Bob"]
+ages = [30, 25]
+pairs = names.zip(ages)
+# => [["Alice", 30], ["Bob", 25]]
+
+# each_slice - แบ่ง array เป็นกลุ่มๆ
+numbers.each_slice(3) { |group| puts group.inspect }
+# [3, 1, 4]
+# [1, 5, 9]
+# [2, 6, 5]
+# [3]
+
+# uniq - ลบค่าซ้ำ
+unique = numbers.uniq
+# => [3, 1, 4, 5, 9, 2, 6]
+
+# sort_by - เรียงลำดับตาม criteria
+words = ["banana", "apple", "cherry", "date"]
+sorted = words.sort_by { |w| w.length }
+# => ["date", "apple", "banana", "cherry"]
 ```
 
 ---
 
-### ข้อ 4: อธิบาย Array methods ที่สำคัญ
+### 4. อธิบาย Hash methods ที่สำคัญ
 
-**คำตอบ:**
+**เฉลย:**
 
 ```ruby
-arr = [3, 1, 4, 1, 5, 9, 2, 6]
+person = { name: "Alice", age: 30, city: "Bangkok" }
 
-# Transformation
-arr.map { |n| n * 2 }     # => [6, 2, 8, 2, 10, 18, 4, 12]
-arr.select { |n| n > 3 }  # => [4, 5, 9, 6]
-arr.reject { |n| n > 3 }  # => [3, 1, 1, 2]
-arr.reduce(:+)             # => 31
+# เข้าถึงค่า
+person[:name]           # => "Alice"
+person.fetch(:name)     # => "Alice"
+person.fetch(:email, "N/A")  # => "N/A" (default value)
+person.fetch(:email) { |k| "No #{k} found" }  # => "No email found"
 
-# Sorting
-arr.sort                   # => [1, 1, 2, 3, 4, 5, 6, 9]
-arr.sort_by { |n| -n }     # => [9, 6, 5, 4, 3, 2, 1, 1]
+# แก้ไขค่า
+person[:age] = 31
+person.merge!(email: "alice@example.com")
 
-# Searching
-arr.find { |n| n > 4 }     # => 5 (first match)
-arr.any? { |n| n > 8 }     # => true
-arr.all? { |n| n > 0 }     # => true
-arr.none? { |n| n > 10 }   # => true
-arr.count { |n| n > 3 }    # => 4
-arr.min                    # => 1
-arr.max                    # => 9
+# ตรวจสอบ
+person.key?(:name)      # => true
+person.value?("Alice")  # => true
+person.include?(:age)   # => true
 
-# Manipulation
-arr.flatten                # สำหรับ nested arrays
-arr.compact                # ลบ nil elements
-arr.uniq                   # ลบ duplicates => [3, 1, 4, 5, 9, 2, 6]
-arr.zip([1,2,3])           # => [[3,1],[1,2],[4,3],...]
+# วนลูป
+person.each { |key, value| puts "#{key}: #{value}" }
+person.each_with_object([]) { |(k, v), arr| arr << "#{k}=#{v}" }
 
-# each_with_object
-arr.each_with_object({}) do |n, hash|
-  hash[n] = n ** 2
-end
-# => {3=>9, 1=>1, 4=>16, 5=>25, 9=>81, 2=>4, 6=>36}
+# แปลง
+person.keys             # => [:name, :age, :city, :email]
+person.values           # => ["Alice", 31, "Bangkok", "alice@example.com"]
+person.to_a             # => [[:name, "Alice"], [:age, 31], ...]
+
+# กรองและแปลง
+adults = person.select { |k, v| v.is_a?(Integer) && v >= 18 }
+# => {:age=>31}
+
+stringified = person.transform_keys(&:to_s)
+# => {"name"=>"Alice", "age"=>31, ...}
+
+upcased = person.transform_values { |v| v.to_s.upcase }
+# => {:name=>"ALICE", :age=>"31", ...}
+
+# merge - รวม hashes
+defaults = { role: "user", active: true }
+merged = defaults.merge(person)
+# person values overwrite defaults when keys conflict
+
+# slice - ดึงเฉพาะบาง keys
+subset = person.slice(:name, :age)
+# => {:name=>"Alice", :age=>31}
 ```
 
 ---
 
-### ข้อ 5: อธิบาย Hash ใน Ruby
+### 5. อธิบาย Object-Oriented Programming ใน Ruby
 
-**คำตอบ:**
-
-```ruby
-# สร้าง Hash
-h = { name: "Alice", age: 30, city: "Bangkok" }
-
-# Access
-h[:name]              # => "Alice"
-h.fetch(:name)        # => "Alice"
-h.fetch(:email, nil)  # => nil (default ถ้าไม่เจอ)
-
-# Manipulation
-h.merge({ email: "alice@example.com" })  # สร้าง hash ใหม่
-h.merge!({ email: "alice@example.com" }) # แก้ไข in-place
-
-# Iteration
-h.each { |key, value| puts "#{key}: #{value}" }
-h.map { |key, value| [key, value.to_s] }.to_h
-h.select { |_, v| v.is_a?(String) }
-h.reject { |k, _| k == :age }
-
-# Transform
-h.transform_values { |v| v.to_s }
-h.transform_keys    { |k| k.to_s }
-
-# Useful methods
-h.keys     # => [:name, :age, :city]
-h.values   # => ["Alice", 30, "Bangkok"]
-h.to_a     # => [[:name, "Alice"], [:age, 30], ...]
-h.size     # => 3
-h.empty?   # => false
-h.key?(:name)   # => true
-h.value?("Alice") # => true
-
-# Default value
-counts = Hash.new(0)
-"hello world".chars.each { |c| counts[c] += 1 }
-# => {"h"=>1, "e"=>1, "l"=>3, "o"=>2, " "=>1, "w"=>1, "r"=>1, "d"=>1}
-```
-
----
-
-### ข้อ 6: อธิบาย Blocks, Procs, และ Lambdas
-
-**คำตอบ:**
+**เฉลย:**
 
 ```ruby
-# Block - ไม่ใช่ object, ส่ง inline
-[1, 2, 3].each { |n| puts n }
-[1, 2, 3].each do |n|
-  puts n
-end
-
-# yield - เรียก block ที่ส่งมา
-def greet
-  puts "Before"
-  yield("Alice") if block_given?
-  puts "After"
-end
-
-greet { |name| puts "Hello, #{name}!" }
-# Before
-# Hello, Alice!
-# After
-
-# Proc - Block ที่เก็บใน variable
-doubler = Proc.new { |n| n * 2 }
-# หรือ
-doubler = proc { |n| n * 2 }
-
-doubler.call(5)  # => 10
-doubler.(5)      # => 10 (shorthand)
-doubler[5]       # => 10 (shorthand)
-
-[1, 2, 3].map(&doubler)  # => [2, 4, 6]
-
-# Lambda - Proc ที่เข้มงวดกว่า
-multiplier = lambda { |n, factor| n * factor }
-# หรือ (stabby lambda)
-multiplier = ->(n, factor) { n * factor }
-
-multiplier.call(5, 3)  # => 15
-
-# ความแตกต่าง Proc vs Lambda
-# 1. Argument checking
-p = Proc.new { |a, b| [a, b] }
-l = lambda  { |a, b| [a, b] }
-
-p.call(1)        # => [1, nil] (ไม่ error)
-# l.call(1)      # => ArgumentError!
-
-# 2. Return behavior
-def test_proc
-  p = Proc.new { return "from proc" }
-  p.call
-  "from method"  # ไม่ถึงบรรทัดนี้
-end
-
-def test_lambda
-  l = lambda { return "from lambda" }
-  l.call
-  "from method"  # ถึงบรรทัดนี้
-end
-
-test_proc   # => "from proc"
-test_lambda # => "from method"
-```
-
----
-
-### ข้อ 7: อธิบาย Inheritance และ Modules
-
-**คำตอบ:**
-
-```ruby
-# Inheritance - is-a relationship
+# Class definition
 class Animal
-  attr_reader :name
+  # Class variable (shared across all instances)
+  @@count = 0
 
-  def initialize(name)
-    @name = name
+  # Class method
+  def self.count
+    @@count
   end
 
+  # Accessor methods
+  attr_accessor :name
+  attr_reader :species
+
+  # Initialize (constructor)
+  def initialize(name, species)
+    @name = name      # Instance variable
+    @species = species
+    @@count += 1
+  end
+
+  # Instance method
   def speak
-    raise NotImplementedError, "Subclass must implement speak"
+    "..."
   end
 
   def to_s
-    "#{self.class.name}: #{name}"
+    "#{@name} (#{@species})"
+  end
+
+  protected
+
+  def secret_method
+    "This is protected"
+  end
+
+  private
+
+  def internal_method
+    "This is private"
   end
 end
 
+# Inheritance
 class Dog < Animal
+  def initialize(name)
+    super(name, "Canis lupus familiaris")
+    @tricks = []
+  end
+
+  # Override parent method
   def speak
-    "#{name} says: Woof!"
+    "Woof!"
+  end
+
+  def learn_trick(trick)
+    @tricks << trick
+  end
+
+  def show_tricks
+    @tricks.join(", ")
   end
 end
 
 class Cat < Animal
-  def speak
-    "#{name} says: Meow!"
+  def initialize(name)
+    super(name, "Felis catus")
   end
-end
-
-# super - เรียก method จาก parent
-class GuideDog < Dog
-  def initialize(name, owner)
-    super(name)  # เรียก Dog#initialize
-    @owner = owner
-  end
-end
-
-# Modules - Mixins (has-a behavior)
-module Swimmable
-  def swim
-    "#{name} is swimming!"
-  end
-end
-
-module Flyable
-  def fly
-    "#{name} is flying!"
-  end
-end
-
-class Duck < Animal
-  include Swimmable
-  include Flyable
 
   def speak
-    "Quack!"
+    "Meow!"
   end
 end
 
-donald = Duck.new("Donald")
-donald.swim   # => "Donald is swimming!"
-donald.fly    # => "Donald is flying!"
+# การใช้งาน
+dog = Dog.new("Rex")
+cat = Cat.new("Whiskers")
 
-# Mixins vs Inheritance
-# - Ruby ไม่มี multiple inheritance
-# - ใช้ Modules เมื่อต้องการ share behavior
-# - ใช้ Inheritance เมื่อมีความสัมพันธ์ is-a
+puts dog.speak     # => "Woof!"
+puts cat.speak     # => "Meow!"
+puts Animal.count  # => 2
+
+dog.learn_trick("sit")
+dog.learn_trick("shake")
+puts dog.show_tricks  # => "sit, shake"
+
+# Polymorphism
+animals = [dog, cat]
+animals.each { |animal| puts "#{animal.name} says: #{animal.speak}" }
 ```
 
 ---
 
-### ข้อ 8: อธิบาย attr_accessor, attr_reader, attr_writer
+### 6. อธิบาย Blocks ใน Ruby
 
-**คำตอบ:**
-
-```ruby
-class Person
-  # attr_reader - สร้าง getter method
-  attr_reader :name
-
-  # attr_writer - สร้าง setter method
-  attr_writer :email
-
-  # attr_accessor - สร้างทั้ง getter และ setter
-  attr_accessor :age
-
-  def initialize(name, age, email)
-    @name  = name
-    @age   = age
-    @email = email
-  end
-end
-
-person = Person.new("Alice", 30, "alice@example.com")
-
-# getter
-person.name   # => "Alice"
-person.age    # => 30
-
-# setter
-person.age   = 31   # ได้
-person.email = "newemail@example.com"  # ได้
-
-# person.name = "Bob"  # NoMethodError! ไม่มี name setter
-
-# เทียบเท่าเขียนมือ
-class Person
-  def name
-    @name
-  end
-
-  def age
-    @age
-  end
-
-  def age=(value)
-    @age = value
-  end
-end
-```
-
----
-
-### ข้อ 9: อธิบาย Enumerable module
-
-**คำตอบ:**
+**เฉลย:**
 
 ```ruby
-# Enumerable ให้ collection methods เมื่อ implement each
-class NumberCollection
-  include Enumerable
+# Block คือ anonymous function ที่ส่งเข้าไปใน method
 
-  def initialize(*numbers)
-    @numbers = numbers
-  end
+# การส่ง block ด้วย {}
+[1, 2, 3].each { |n| puts n }
 
-  def each(&block)
-    @numbers.each(&block)
-  end
+# การส่ง block ด้วย do...end (ใช้เมื่อ block มีหลายบรรทัด)
+[1, 2, 3].each do |n|
+  squared = n ** 2
+  puts "#{n} squared is #{squared}"
 end
 
-nc = NumberCollection.new(3, 1, 4, 1, 5, 9, 2, 6)
+# yield - เรียกใช้ block จากภายใน method
+def greet
+  puts "Before block"
+  yield if block_given?
+  puts "After block"
+end
 
-# Enumerable methods ทำงานได้ทันที
-nc.sort          # => [1, 1, 2, 3, 4, 5, 6, 9]
-nc.min           # => 1
-nc.max           # => 9
-nc.sum           # => 31
-nc.select { |n| n > 3 }  # => [4, 5, 9, 6]
-nc.map { |n| n * 2 }     # => [6, 2, 8, 2, 10, 18, 4, 12]
-nc.each_with_index.map { |n, i| "#{i}: #{n}" }
-nc.group_by { |n| n > 3 ? :big : :small }
-nc.partition { |n| n.even? }  # => [[4, 2, 6], [3, 1, 1, 5, 9]]
-nc.flat_map { |n| [n, -n] }
-nc.zip(nc.map { |n| n**2 })
-nc.chunk { |n| n > 5 }.to_a
-```
+greet { puts "Hello from block!" }
+# Before block
+# Hello from block!
+# After block
 
----
+greet  # ไม่มี block ก็รันได้เพราะใช้ block_given?
 
-### ข้อ 10: อธิบาย Exception Handling
-
-**คำตอบ:**
-
-```ruby
-# begin/rescue/ensure/else
-def divide(a, b)
-  begin
-    result = a / b
-  rescue ZeroDivisionError => e
-    puts "Error: #{e.message}"
-    result = nil
-  rescue TypeError => e
-    puts "Type Error: #{e.message}"
-    result = nil
-  else
-    puts "Success! Result: #{result}"
-  ensure
-    puts "This always runs"
-  end
-
+# ส่งค่าไปให้ block
+def calculate(x, y)
+  result = yield(x, y) if block_given?
   result
 end
 
-# raise custom exception
-class InsufficientFundsError < StandardError
-  def initialize(amount, balance)
-    super("Cannot withdraw #{amount}. Balance: #{balance}")
-    @amount  = amount
-    @balance = balance
-  end
+sum = calculate(3, 4) { |a, b| a + b }    # => 7
+product = calculate(3, 4) { |a, b| a * b } # => 12
+
+# Block สามารถเข้าถึง local variables
+multiplier = 3
+[1, 2, 3].map { |n| n * multiplier }  # => [3, 6, 9]
+
+# Explicit block parameter ด้วย &
+def save_block(&block)
+  @saved_block = block
 end
 
-def withdraw(amount, balance)
-  raise ArgumentError, "Amount must be positive" unless amount > 0
-  raise InsufficientFundsError.new(amount, balance) if amount > balance
-
-  balance - amount
+def execute_saved_block
+  @saved_block.call if @saved_block
 end
 
-# retry
-attempts = 0
-begin
-  attempts += 1
-  raise "Network error" if attempts < 3
-  puts "Success after #{attempts} attempts"
-rescue => e
-  retry if attempts < 3
-  raise
-end
+save_block { puts "Saved block executed!" }
+execute_saved_block  # => "Saved block executed!"
 ```
 
 ---
 
-### ข้อ 11-15: Intermediate Ruby Questions
+## คำถาม Ruby ระดับ Mid-Level {#ruby-mid}
 
-### ข้อ 11: Method Missing และ Respond To Missing
+### 7. อธิบายความแตกต่างระหว่าง Proc และ Lambda
+
+**เฉลย:**
 
 ```ruby
-class DynamicClass
+# Proc - ไม่ strict เรื่อง arguments, return ออกจาก enclosing method
+my_proc = Proc.new { |x, y| puts "#{x} and #{y}" }
+my_proc.call(1, 2)     # => "1 and 2"
+my_proc.call(1)        # => "1 and " (ไม่ error แม้ส่ง argument ไม่ครบ)
+my_proc.call(1, 2, 3)  # => "1 and 2" (ไม่ error แม้ส่งเกิน)
+
+# Lambda - strict เรื่อง arguments, return ออกจากแค่ lambda เอง
+my_lambda = lambda { |x, y| puts "#{x} and #{y}" }
+# หรือใช้ stabby lambda syntax
+my_lambda = ->(x, y) { puts "#{x} and #{y}" }
+
+my_lambda.call(1, 2)     # => "1 and 2"
+# my_lambda.call(1)      # => ArgumentError!
+# my_lambda.call(1, 2, 3) # => ArgumentError!
+
+# ความแตกต่างสำคัญ: พฤติกรรม return
+def proc_return_demo
+  my_proc = Proc.new { return "from proc" }
+  my_proc.call
+  "after proc"  # ไม่ถึงบรรทัดนี้!
+end
+
+def lambda_return_demo
+  my_lambda = lambda { return "from lambda" }
+  my_lambda.call
+  "after lambda"  # ถึงบรรทัดนี้!
+end
+
+puts proc_return_demo    # => "from proc"
+puts lambda_return_demo  # => "after lambda"
+
+# ตรวจสอบว่าเป็น lambda หรือ proc
+my_proc.lambda?    # => false
+my_lambda.lambda?  # => true
+
+# arity
+my_proc.arity    # => 2
+my_lambda.arity  # => 2
+
+proc_with_optional = Proc.new { |x, y = 10| x + y }
+proc_with_optional.arity  # => -2 (negative หมายความว่ามี optional args)
+```
+
+---
+
+### 8. อธิบาย Modules และ Mixins
+
+**เฉลย:**
+
+```ruby
+# Module ใช้ใน 3 วัตถุประสงค์หลัก:
+# 1. Namespace - ป้องกัน name collision
+# 2. Mixins - แชร์ behavior ระหว่าง classes
+# 3. Collection ของ methods ที่ไม่เกี่ยวข้องกับ class
+
+# 1. Namespace
+module Geometry
+  class Circle
+    def initialize(radius)
+      @radius = radius
+    end
+
+    def area
+      Math::PI * @radius ** 2
+    end
+  end
+
+  class Rectangle
+    def initialize(width, height)
+      @width = width
+      @height = height
+    end
+
+    def area
+      @width * @height
+    end
+  end
+end
+
+circle = Geometry::Circle.new(5)
+circle.area  # => 78.53981633974483
+
+# 2. Mixins ด้วย include (instance methods)
+module Greetable
+  def greet
+    "Hello, I'm #{name}"
+  end
+
+  def farewell
+    "Goodbye from #{name}"
+  end
+end
+
+module Serializable
+  def to_json_string
+    vars = instance_variables.map do |var|
+      key = var.to_s.delete('@')
+      value = instance_variable_get(var)
+      "\"#{key}\": \"#{value}\""
+    end
+    "{ #{vars.join(', ')} }"
+  end
+end
+
+class Person
+  include Greetable
+  include Serializable
+
+  attr_reader :name, :age
+
+  def initialize(name, age)
+    @name = name
+    @age = age
+  end
+end
+
+alice = Person.new("Alice", 30)
+puts alice.greet          # => "Hello, I'm Alice"
+puts alice.to_json_string # => '{ "name": "Alice", "age": "30" }'
+
+# 3. extend - เพิ่ม module methods เป็น class methods
+module ClassInfo
+  def describe
+    "This is #{self.name} class"
+  end
+end
+
+class Dog
+  extend ClassInfo
+end
+
+Dog.describe  # => "This is Dog class"
+
+# Method Resolution Order (MRO)
+class A
+  def hello
+    "Hello from A"
+  end
+end
+
+module B
+  def hello
+    "Hello from B, " + super
+  end
+end
+
+module C
+  def hello
+    "Hello from C, " + super
+  end
+end
+
+class D < A
+  include B
+  include C  # C included last, so C is checked first
+end
+
+puts D.new.hello  # => "Hello from C, Hello from B, Hello from A"
+puts D.ancestors  # => [D, C, B, A, Object, Kernel, BasicObject]
+```
+
+---
+
+### 9. อธิบาย Metaprogramming ใน Ruby
+
+**เฉลย:**
+
+```ruby
+# Metaprogramming คือการเขียน code ที่สร้างหรือแก้ไข code อื่นในเวลา runtime
+
+# 1. define_method - สร้าง method แบบ dynamic
+class Calculator
+  [:add, :subtract, :multiply].each_with_index do |operation, i|
+    define_method("perform_#{operation}") do |a, b|
+      case operation
+      when :add      then a + b
+      when :subtract then a - b
+      when :multiply then a * b
+      end
+    end
+  end
+end
+
+calc = Calculator.new
+calc.perform_add(3, 4)       # => 7
+calc.perform_subtract(10, 3) # => 7
+calc.perform_multiply(3, 4)  # => 12
+
+# 2. method_missing - จัดการ method calls ที่ไม่มีอยู่
+class DynamicProxy
+  def initialize(target)
+    @target = target
+  end
+
   def method_missing(method_name, *args, &block)
-    if method_name.to_s.start_with?("find_by_")
-      attribute = method_name.to_s.sub("find_by_", "")
-      puts "Finding by #{attribute} with value #{args.first}"
+    if @target.respond_to?(method_name)
+      puts "Delegating #{method_name} to target"
+      @target.send(method_name, *args, &block)
     else
-      super  # IMPORTANT: delegate to parent
+      super  # ส่งต่อให้ parent จัดการ (ทำให้เกิด NoMethodError)
     end
   end
 
   def respond_to_missing?(method_name, include_private = false)
-    method_name.to_s.start_with?("find_by_") || super
+    @target.respond_to?(method_name) || super
   end
 end
 
-d = DynamicClass.new
-d.find_by_name("Alice")   # Finding by name with value Alice
-d.respond_to?(:find_by_anything)  # => true
-```
+proxy = DynamicProxy.new([1, 2, 3])
+proxy.length  # => "Delegating length to target" แล้ว => 3
+proxy.map { |n| n * 2 }  # => [2, 4, 6]
 
----
-
-### ข้อ 12: Comparable Module
-
-```ruby
-class Temperature
-  include Comparable
-
-  attr_reader :degrees
-
-  def initialize(degrees)
-    @degrees = degrees
+# 3. open classes - เพิ่ม method ให้ existing classes
+class Integer
+  def factorial
+    return 1 if self <= 1
+    self * (self - 1).factorial
   end
 
-  # ต้อง implement <=> เท่านั้น
-  def <=>(other)
-    degrees <=> other.degrees
-  end
-
-  def to_s
-    "#{degrees}°C"
-  end
-end
-
-temps = [Temperature.new(30), Temperature.new(20), Temperature.new(25)]
-temps.sort          # => [20°C, 25°C, 30°C]
-temps.min           # => 20°C
-temps.max           # => 30°C
-Temperature.new(25).between?(Temperature.new(20), Temperature.new(30))  # => true
-Temperature.new(25).clamp(Temperature.new(22), Temperature.new(28))     # => 25°C
-```
-
----
-
-### ข้อ 13: Frozen Objects และ Immutability
-
-```ruby
-# freeze - ทำให้ object ไม่เปลี่ยนได้
-str = "hello".freeze
-str << " world"  # RuntimeError: can't modify frozen String
-
-# frozen? check
-str.frozen?  # => true
-
-# dup vs clone
-str2 = str.dup    # dup สร้าง copy ที่ไม่ frozen
-str3 = str.clone  # clone รักษา frozen state
-
-str2.frozen?  # => false
-str3.frozen?  # => true
-
-# Ruby 3.x: frozen string literals
-# frozen_string_literal: true
-
-# ทำไมต้อง freeze?
-# 1. ป้องกัน mutation bugs
-# 2. Performance - frozen strings สามารถ share ใน memory
-# 3. Thread safety
-
-CONSTANT_HASH = { key: "value" }.freeze
-# CONSTANT_HASH[:new] = "value"  # => RuntimeError
-
-# Deep freeze (recursively)
-deep_frozen = { a: [1, 2, 3], b: { c: "hello" } }
-deep_frozen.each_value { |v| v.freeze if v.respond_to?(:freeze) }
-deep_frozen.freeze
-```
-
----
-
-### ข้อ 14: Closures และ Scope
-
-```ruby
-# Closure - function ที่จำ scope ที่สร้างมา
-x = 10
-
-multiply = lambda { |n| n * x }
-multiply.call(5)  # => 50
-
-x = 20
-multiply.call(5)  # => 100 (ใช้ x ค่าใหม่!)
-
-# Local Scope
-def outer
-  x = "outer"
-
-  inner = lambda do
-    y = "inner"
-    puts x  # สามารถ access outer x
-  end
-
-  inner.call
-  # puts y  # NameError! y ไม่อยู่ใน scope นี้
-end
-
-# Instance vs Class vs Local Variables
-class Counter
-  @@total_count = 0  # Class variable
-
-  def initialize
-    @count = 0          # Instance variable
-    @@total_count += 1
-  end
-
-  def increment
-    count = 0          # Local variable (shadow!)
-    count += 1
-    @count += 1
-  end
-
-  def self.total = @@total_count
-  def count      = @count
-end
-```
-
----
-
-### ข้อ 15: Metaprogramming Basics
-
-```ruby
-# define_method - สร้าง method แบบ dynamic
-class Person
-  ATTRIBUTES = [:name, :age, :email].freeze
-
-  ATTRIBUTES.each do |attr|
-    define_method(attr) do
-      instance_variable_get("@#{attr}")
-    end
-
-    define_method("#{attr}=") do |value|
-      instance_variable_set("@#{attr}", value)
+  def times_do_with_index
+    each_with_object([]) do |i, arr|
+      arr << yield(i)
     end
   end
 end
 
-# send - เรียก method ด้วยชื่อเป็น string/symbol
-obj = "hello"
-obj.send(:upcase)          # => "HELLO"
-obj.send(:[], 0)           # => "h"
+5.factorial  # => 120
 
-# public_send - เรียกได้เฉพาะ public methods
-class Secret
-  private
-
-  def hidden
-    "secret"
-  end
-end
-
-s = Secret.new
-# s.send(:hidden)         # => "secret" (bypass!)
-# s.public_send(:hidden)  # => NoMethodError
-
-# class_eval / module_eval - เพิ่ม method ใน runtime
+# 4. class_eval / module_eval - evaluate code ใน context ของ class
 String.class_eval do
   def palindrome?
     self == self.reverse
@@ -654,1766 +600,1487 @@ end
 "racecar".palindrome?  # => true
 "hello".palindrome?    # => false
 
-# instance_eval - เปลี่ยน self ในส่วนนั้น
-obj = Object.new
-obj.instance_eval do
-  def hello
-    "Hello from instance!"
-  end
-end
+# 5. instance_variable_get/set - เข้าถึง instance variables
+class Config
+  SETTINGS = %w[host port database]
 
-obj.hello  # => "Hello from instance!"
-```
+  SETTINGS.each do |setting|
+    define_method(setting) do
+      instance_variable_get("@#{setting}")
+    end
 
----
-
-## Mid-Level Questions (ข้อ 16-35)
-
-### ข้อ 16: Memoization
-
-```ruby
-# Simple memoization ด้วย ||=
-class Calculator
-  def expensive_computation
-    @result ||= begin
-      puts "Computing..."
-      sleep(1)
-      42
+    define_method("#{setting}=") do |value|
+      instance_variable_set("@#{setting}", value)
     end
   end
 end
 
-calc = Calculator.new
-calc.expensive_computation  # Computing... => 42
-calc.expensive_computation  # => 42 (ไม่คำนวณใหม่)
+config = Config.new
+config.host = "localhost"
+config.port = 5432
+puts config.host  # => "localhost"
+puts config.port  # => 5432
 
-# Memoize ด้วย parameter
-class Fibonacci
-  def initialize
-    @cache = {}
-  end
+# 6. attr_accessor implementation
+class MyModule
+  def self.my_attr_accessor(*names)
+    names.each do |name|
+      define_method(name) do
+        instance_variable_get("@#{name}")
+      end
 
-  def compute(n)
-    return n if n <= 1
-    @cache[n] ||= compute(n - 1) + compute(n - 2)
-  end
-end
-
-# อย่าใช้ ||= กับ false/nil values
-class Config
-  def debug_mode
-    @debug_mode = fetch_from_env  # ถูก!
-    # @debug_mode ||= fetch_from_env  # ผิด! จะ refetch ถ้า false
-  end
-
-  def debug_mode
-    return @debug_mode if defined?(@debug_mode)  # ถูก!
-    @debug_mode = fetch_from_env
+      define_method("#{name}=") do |value|
+        instance_variable_set("@#{name}", value)
+      end
+    end
   end
 end
+
+class Person
+  extend MyModule
+  my_attr_accessor :name, :age
+end
+
+p = Person.new
+p.name = "Alice"
+p.age = 30
+puts p.name  # => "Alice"
 ```
 
 ---
 
-### ข้อ 17: Struct ใน Ruby
+### 10. อธิบาย Comparable และ Enumerable modules
+
+**เฉลย:**
 
 ```ruby
-# Struct - lightweight class สำหรับ data
-Point = Struct.new(:x, :y)
-p = Point.new(3, 4)
-p.x    # => 3
-p.y    # => 4
-p.to_a # => [3, 4]
+# Comparable - ให้ class สามารถเปรียบเทียบได้
+class Temperature
+  include Comparable
 
-# เพิ่ม methods
-Point = Struct.new(:x, :y) do
-  def distance_to(other)
-    Math.sqrt((x - other.x)**2 + (y - other.y)**2)
+  attr_reader :degrees
+
+  def initialize(degrees)
+    @degrees = degrees
+  end
+
+  # ต้องกำหนด <=> operator เพียงอย่างเดียว
+  def <=>(other)
+    @degrees <=> other.degrees
   end
 
   def to_s
-    "(#{x}, #{y})"
+    "#{@degrees}°"
   end
 end
 
-p1 = Point.new(0, 0)
-p2 = Point.new(3, 4)
-p1.distance_to(p2)  # => 5.0
+temps = [
+  Temperature.new(100),
+  Temperature.new(0),
+  Temperature.new(37),
+  Temperature.new(-10)
+]
 
-# keyword_init: true (Ruby 2.5+)
-Person = Struct.new(:name, :age, keyword_init: true)
-alice = Person.new(name: "Alice", age: 30)
+puts temps.min    # => -10°
+puts temps.max    # => 100°
+puts temps.sort   # => [-10°, 0°, 37°, 100°]
 
-# Data (Ruby 3.2+) - immutable struct
-Point = Data.define(:x, :y)
-p = Point.new(x: 1, y: 2)
-# p.x = 3  # NoMethodError! frozen
+t1 = Temperature.new(20)
+t2 = Temperature.new(30)
+puts t1 < t2     # => true
+puts t1 > t2     # => false
+puts t1.between?(Temperature.new(10), Temperature.new(25))  # => true
+puts t1.clamp(Temperature.new(25), Temperature.new(35))     # => 25°
+
+# Enumerable - ให้ class ทำงานกับ collection methods
+class NumberList
+  include Enumerable
+
+  def initialize(*numbers)
+    @numbers = numbers
+  end
+
+  # ต้องกำหนด each method เพียงอย่างเดียว
+  def each(&block)
+    @numbers.each(&block)
+  end
+end
+
+list = NumberList.new(3, 1, 4, 1, 5, 9, 2, 6)
+
+puts list.min        # => 1
+puts list.max        # => 9
+puts list.sum        # => 31
+puts list.sort.inspect      # => [1, 1, 2, 3, 4, 5, 6, 9]
+puts list.select(&:odd?).inspect    # => [3, 1, 1, 5, 9]
+puts list.map { |n| n * 2 }.inspect # => [6, 2, 8, 2, 10, 18, 4, 12]
+puts list.first(3).inspect   # => [3, 1, 4]
+puts list.include?(5)        # => true
+puts list.count              # => 8
+puts list.group_by(&:odd?).inspect
+# => {true=>[3, 1, 1, 5, 9], false=>[4, 2, 6]}
 ```
 
 ---
 
-### ข้อ 18: Enumerable ขั้นสูง
+### 11. อธิบาย Exception Handling
+
+**เฉลย:**
 
 ```ruby
-numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+# begin/rescue/ensure/raise
+def divide(a, b)
+  begin
+    result = a / b
+    puts "Result: #{result}"
+  rescue ZeroDivisionError => e
+    puts "Cannot divide by zero: #{e.message}"
+    -1  # return value
+  rescue TypeError => e
+    puts "Type error: #{e.message}"
+    nil
+  ensure
+    puts "This always runs"
+  end
+end
 
-# each_slice - แบ่งเป็นกลุ่ม
-numbers.each_slice(3).to_a
-# => [[1, 2, 3], [4, 5, 6], [7, 8, 9], [10]]
+divide(10, 2)   # Result: 5 / This always runs
+divide(10, 0)   # Cannot divide by zero: divided by 0 / This always runs
+divide("a", 2)  # Type error: ... / This always runs
 
-# each_cons - sliding window
-numbers.each_cons(3).to_a
-# => [[1,2,3], [2,3,4], [3,4,5], ...]
+# Custom exceptions
+class ApplicationError < StandardError; end
 
-# flat_map
-[[1, 2], [3, 4], [5, 6]].flat_map { |a| a.map { |n| n * 2 } }
-# => [2, 4, 6, 8, 10, 12]
+class DatabaseError < ApplicationError
+  def initialize(msg = "Database operation failed")
+    super(msg)
+  end
+end
 
-# group_by
-numbers.group_by { |n| n % 3 }
-# => {1=>[1, 4, 7, 10], 2=>[2, 5, 8], 0=>[3, 6, 9]}
+class RecordNotFound < DatabaseError
+  attr_reader :record_id
 
-# tally (Ruby 2.7+)
-["a", "b", "a", "c", "b", "a"].tally
-# => {"a"=>3, "b"=>2, "c"=>1}
+  def initialize(record_id)
+    @record_id = record_id
+    super("Record #{record_id} not found")
+  end
+end
 
-# filter_map (Ruby 2.7+)
-numbers.filter_map { |n| n * 2 if n.odd? }
-# => [2, 6, 10, 14, 18]
+begin
+  raise RecordNotFound.new(42)
+rescue RecordNotFound => e
+  puts "#{e.message}, ID: #{e.record_id}"
+  # => "Record 42 not found, ID: 42"
+rescue DatabaseError => e
+  puts "Database error: #{e.message}"
+rescue ApplicationError => e
+  puts "Application error: #{e.message}"
+end
 
-# sum with initial value
-numbers.sum(100)  # => 155
+# retry
+def connect_to_database(attempts: 3)
+  retries = 0
+  begin
+    # Simulated connection
+    raise "Connection failed" if retries < 2
+    puts "Connected successfully!"
+  rescue => e
+    retries += 1
+    if retries < attempts
+      puts "Attempt #{retries} failed, retrying..."
+      retry
+    else
+      raise "Could not connect after #{attempts} attempts: #{e.message}"
+    end
+  end
+end
 
-# minmax
-numbers.minmax     # => [1, 10]
-numbers.minmax_by { |n| n.to_s }  # lexicographic
+connect_to_database
+# Attempt 1 failed, retrying...
+# Attempt 2 failed, retrying...
+# Connected successfully!
 
-# chunk_while
-[1, 2, 3, 5, 6, 10, 11, 12].chunk_while { |i, j| j - i == 1 }.to_a
-# => [[1, 2, 3], [5, 6], [10, 11, 12]]
+# raise with message vs raise with exception class
+raise "Something went wrong"        # raises RuntimeError
+raise RuntimeError, "Custom message"
+raise ArgumentError.new("Bad arg")
 
-# lazy evaluation
-(1..Float::INFINITY).lazy.select { |n| n.odd? }.first(5)
-# => [1, 3, 5, 7, 9]
+# rescue ใน method body โดยไม่ต้องมี begin
+def safe_divide(a, b)
+  a / b
+rescue ZeroDivisionError
+  Float::INFINITY
+end
 ```
 
 ---
 
-### ข้อ 19: Refinements
+## คำถาม Ruby ระดับ Senior {#ruby-senior}
+
+### 12. อธิบาย Fiber และ Concurrency ใน Ruby
+
+**เฉลย:**
 
 ```ruby
-# Refinements - extend class เฉพาะใน scope
-module StringExtensions
-  refine String do
-    def palindrome?
-      self == self.reverse
-    end
+# Fiber คือ lightweight concurrency primitive ใน Ruby
+# ต่างจาก Thread ตรงที่ต้องสลับ (yield) ด้วยตัวเอง
 
-    def word_count
-      split.size
-    end
-  end
-end
-
-# ใช้เฉพาะใน file/module ที่ using
-module MyApp
-  using StringExtensions
-
-  def self.check(str)
-    str.palindrome?
-  end
-end
-
-MyApp.check("racecar")  # => true
-# "racecar".palindrome?  # => NoMethodError! ใช้นอก scope ไม่ได้
-```
-
----
-
-### ข้อ 20: Thread Safety
-
-```ruby
-# Mutex - lock เพื่อ thread safety
-require 'thread'
-
-class BankAccount
-  def initialize(balance)
-    @balance = balance
-    @mutex   = Mutex.new
-  end
-
-  def deposit(amount)
-    @mutex.synchronize do
-      @balance += amount
-    end
-  end
-
-  def withdraw(amount)
-    @mutex.synchronize do
-      raise "Insufficient funds" if @balance < amount
-      @balance -= amount
-    end
-  end
-
-  def balance
-    @mutex.synchronize { @balance }
-  end
-end
-
-# Thread-safe operations
-account = BankAccount.new(1000)
-
-threads = 10.times.map do
-  Thread.new { account.deposit(100) }
-end
-threads.each(&:join)
-
-account.balance  # => 2000 (ไม่ใช่ random ค่า)
-
-# ปัญหา race condition
-counter = 0
-# without mutex:
-threads = 10.times.map do
-  Thread.new { 1000.times { counter += 1 } }  # UNSAFE!
-end
-threads.each(&:join)
-# counter อาจไม่ใช่ 10000
-```
-
----
-
-## Senior Level (ข้อ 21-35)
-
-### ข้อ 21: Fiber ใน Ruby
-
-```ruby
-# Fiber - cooperative concurrency
+# Basic Fiber usage
 fiber = Fiber.new do
   puts "Step 1"
-  Fiber.yield
+  Fiber.yield  # หยุดและส่งคืน control
   puts "Step 2"
   Fiber.yield
   puts "Step 3"
 end
 
-fiber.resume  # Step 1
-fiber.resume  # Step 2
-fiber.resume  # Step 3
-# fiber.resume  # FiberError: dead fiber called
+fiber.resume  # => "Step 1"
+fiber.resume  # => "Step 2"
+fiber.resume  # => "Step 3"
 
-# Fiber ที่รับและส่งค่า
-producer = Fiber.new do
-  5.times do |i|
-    Fiber.yield(i * 2)
-  end
-  nil
-end
-
-loop do
-  value = producer.resume
-  break if value.nil?
-  puts value
-end
-# 0, 2, 4, 6, 8
-
-# Enumerator ใช้ Fiber ภายใน
-enum = Enumerator.new do |yielder|
-  yielder << 1
-  yielder << 2
-  yielder << 3
-end
-
-enum.next  # => 1
-enum.next  # => 2
-```
-
----
-
-### ข้อ 22: ObjectSpace
-
-```ruby
-require 'objspace'
-
-# ดู objects ทั้งหมดใน memory
-ObjectSpace.each_object(String).count  # จำนวน String objects
-
-# หา object ด้วย id
-obj_id = "hello".object_id
-ObjectSpace._id2ref(obj_id)  # => "hello"
-
-# GC statistics
-GC.stat
-# => { count: 1, heap_allocated_pages: 93, ... }
-
-# Trace object allocation
-ObjectSpace.trace_object_allocations_start
-# ... code ที่ต้องการ trace ...
-ObjectSpace.trace_object_allocations_stop
-
-# Memory profile
-str = String.new
-puts ObjectSpace.memsize_of(str)  # bytes ที่ใช้
-```
-
----
-
-### ข้อ 23: Pattern Matching (Ruby 3.x)
-
-```ruby
-# Case/in pattern matching
-case { name: "Alice", age: 30, role: :admin }
-in { name: String => name, role: :admin }
-  puts "Admin: #{name}"
-in { name: String => name }
-  puts "User: #{name}"
-end
-# => "Admin: Alice"
-
-# Array pattern
-case [1, 2, 3, 4, 5]
-in [Integer => first, Integer => second, *rest]
-  puts "First: #{first}, Second: #{second}, Rest: #{rest}"
-end
-# => "First: 1, Second: 2, Rest: [3, 4, 5]"
-
-# Find pattern
-case [1, 2, "three", 4, 5]
-in [*, String => str, *]
-  puts "Found string: #{str}"
-end
-# => "Found string: three"
-
-# Deconstruct keys
-class Point
-  attr_reader :x, :y
-
-  def initialize(x, y)
-    @x = x
-    @y = y
-  end
-
-  def deconstruct_keys(keys)
-    { x: @x, y: @y }
-  end
-end
-
-case Point.new(1, 2)
-in { x: 0..5 => x, y: 0..5 => y }
-  puts "In range: (#{x}, #{y})"
-end
-```
-
----
-
-### ข้อ 24: Ractor (Ruby 3.x Experimental)
-
-```ruby
-# Ractor - truly parallel Ruby (experimental)
-r1 = Ractor.new do
-  Ractor.yield(1 + 1)
-end
-
-r2 = Ractor.new(r1) do |r|
-  value = r.take
-  value * 10
-end
-
-r2.take  # => 20
-
-# Parallel processing
-workers = 4.times.map do
-  Ractor.new do
+# Fiber สำหรับสร้าง infinite sequence
+def fibonacci_generator
+  Fiber.new do
+    a, b = 0, 1
     loop do
-      job = Ractor.receive
-      Ractor.yield(job * 2)
-    end
-  end
-end
-```
-
----
-
-### ข้อ 25: Memory Management และ GC
-
-```ruby
-# Ruby GC ใช้ tri-color mark-and-sweep algorithm
-
-# ปรับ GC parameters
-GC::Profiler.enable
-# ... run code ...
-GC::Profiler.report
-GC::Profiler.disable
-
-# GC tuning environment variables
-# RUBY_GC_HEAP_INIT_SLOTS=10000
-# RUBY_GC_HEAP_FREE_SLOTS=4096
-# RUBY_GC_HEAP_GROWTH_FACTOR=1.8
-# RUBY_GC_MALLOC_LIMIT=16MB
-
-# Weak references
-require 'weakref'
-
-obj = Object.new
-weak = WeakRef.new(obj)
-weak.weakref_alive?  # => true
-
-obj = nil
-GC.start
-weak.weakref_alive?  # => false
-
-# ObjectSpace::WeakMap
-cache = ObjectSpace::WeakMap.new
-key = Object.new
-cache[key] = "value"
-# key ถูก GC ได้เมื่อไม่มี strong reference อื่น
-```
-
----
-
-### ข้อ 26-30: Ruby Performance Questions
-
-### ข้อ 26: String Performance
-
-```ruby
-# String concatenation - ช้า
-result = ""
-1000.times { |i| result += i.to_s }  # สร้าง object ใหม่ทุกครั้ง!
-
-# ใช้ << แทน (เร็วกว่า 10x)
-result = ""
-1000.times { |i| result << i.to_s }
-
-# ใช้ Array join (เร็วที่สุด)
-parts = []
-1000.times { |i| parts << i.to_s }
-result = parts.join
-
-# frozen_string_literal: true
-# ป้องกัน String allocation ซ้ำ
-str1 = "hello"  # ไม่สร้าง object ใหม่ถ้า frozen
-str2 = "hello"  # อ้างถึง object เดิม
-
-# String.new vs literal
-mutable = String.new("hello")  # ไม่ frozen
-frozen  = "hello"              # frozen ถ้า frozen_string_literal: true
-```
-
----
-
-### ข้อ 27: Benchmark
-
-```ruby
-require 'benchmark'
-
-n = 1_000_000
-
-Benchmark.bm(20) do |x|
-  x.report("Array#map:") do
-    n.times { [1, 2, 3].map { |i| i * 2 } }
-  end
-
-  x.report("Array#each:") do
-    n.times do
-      result = []
-      [1, 2, 3].each { |i| result << i * 2 }
-    end
-  end
-end
-```
-
----
-
-### ข้อ 28-30: Advanced Ruby Concepts
-
-### ข้อ 28: Eigenclass / Singleton Class
-
-```ruby
-class MyClass
-  class << self
-    def singleton_method
-      "I'm a singleton method"
+      Fiber.yield(a)
+      a, b = b, a + b
     end
   end
 end
 
-# หรือ
-obj = Object.new
-def obj.special_method
-  "Only this object has this method"
+fib = fibonacci_generator
+10.times { print "#{fib.resume} " }
+# => 0 1 1 2 3 5 8 13 21 34
+
+# Fiber with data passing
+fiber = Fiber.new do |first_value|
+  received = Fiber.yield(first_value * 2)
+  Fiber.yield(received + 10)
 end
 
-# Eigenclass
-obj.singleton_class          # => #<Class:#<Object:...>>
-obj.singleton_class.ancestors
+puts fiber.resume(5)   # => 10 (5 * 2)
+puts fiber.resume(3)   # => 13 (3 + 10)
 
-# เทียบกับ class method
-class Dog
-  def self.breed_info    # เพิ่มใน Dog's eigenclass
-    "I'm a dog"
-  end
-end
-```
+# Threads ใน Ruby (GIL/GVL limitation)
+require 'thread'
 
----
+mutex = Mutex.new
+counter = 0
 
-### ข้อ 29: Method Lookup Path (MRO)
-
-```ruby
-module A
-  def hello
-    "A#hello " + (super rescue "")
-  end
-end
-
-module B
-  def hello
-    "B#hello " + (super rescue "")
+threads = 10.times.map do
+  Thread.new do
+    1000.times do
+      mutex.synchronize { counter += 1 }
+    end
   end
 end
 
-class C
-  include A
-  include B  # B ถูก include หลัง จะค้นหาก่อน
+threads.each(&:join)
+puts counter  # => 10000 (ถูกต้องเพราะใช้ mutex)
 
-  def hello
-    "C#hello " + super
-  end
-end
-
-C.ancestors
-# => [C, B, A, Object, Kernel, BasicObject]
-
-C.new.hello
-# => "C#hello B#hello A#hello "
-
-# prepend - insert ก่อน class
-module Logging
-  def hello
-    puts "Calling hello..."
-    result = super
-    puts "Called!"
-    result
-  end
-end
-
-class D
-  prepend Logging
-
-  def hello
-    "D#hello"
-  end
-end
-
-D.ancestors
-# => [Logging, D, Object, ...]
-D.new.hello
-# Calling hello...
-# Called!
-# => "D#hello"
-```
-
----
-
-### ข้อ 30: Concurrent Ruby Patterns
-
-```ruby
-require 'concurrent-ruby'
-
-# Future
-future = Concurrent::Future.execute do
-  sleep(1)
-  "Result"
-end
-
-future.value   # blocks until complete => "Result"
-future.value!  # raises if exception occurred
-
-# Promise
-Concurrent::Promise.execute { 1 + 1 }
-                   .then { |v| v * 10 }
-                   .then { |v| "Result: #{v}" }
-                   .value  # => "Result: 20"
-
-# Atom - thread-safe mutable reference
-atom = Concurrent::Atom.new(0)
-10.times { atom.swap { |n| n + 1 } }
-atom.value  # => 10
-
-# IVar - single-assignment variable
-ivar = Concurrent::IVar.new
-Thread.new { sleep(0.5); ivar.set("computed value") }
-ivar.value  # blocks => "computed value"
-```
-
----
-
-# ส่วนที่ 2: Rails Interview Questions (50 ข้อ)
-
----
-
-## Junior Rails (ข้อ 31-45)
-
-### ข้อ 31: MVC Pattern ใน Rails คืออะไร?
-
-**คำตอบ:**
-
-```
-Model (M) - Business Logic, Database interaction
-View  (V) - Presentation, HTML templates
-Controller (C) - Orchestration, handles HTTP requests
-
-Request Flow:
-Browser → Router → Controller → Model → Controller → View → Browser
-```
-
-```ruby
-# Router
-# config/routes.rb
-get '/articles/:id', to: 'articles#show'
-resources :articles  # CRUD routes
-
-# Controller
-class ArticlesController < ApplicationController
-  def show
-    @article = Article.find(params[:id])  # delegate to model
-  end
-end
-
-# Model
-class Article < ApplicationRecord
-  validates :title, presence: true
-  belongs_to :user
-  has_many :comments
-end
-
-# View (app/views/articles/show.html.erb)
-# <h1><%= @article.title %></h1>
-```
-
----
-
-### ข้อ 32: ActiveRecord Associations
-
-**คำตอบ:**
-
-```ruby
-class User < ApplicationRecord
-  # has_many - user มีหลาย posts
-  has_many :posts, dependent: :destroy
-
-  # has_one - user มี profile เดียว
-  has_one :profile, dependent: :destroy
-
-  # has_many :through - many-to-many ผ่าน join table
-  has_many :memberships
-  has_many :groups, through: :memberships
-
-  # has_and_belongs_to_many - many-to-many ไม่มี model กลาง
-  has_and_belongs_to_many :tags
-
-  # polymorphic
-  has_many :comments, as: :commentable
-end
-
-class Post < ApplicationRecord
-  # belongs_to
-  belongs_to :user
-
-  # belongs_to optional
-  belongs_to :category, optional: true
-
-  # polymorphic belongs_to
-  belongs_to :commentable, polymorphic: true
-end
-
-class Profile < ApplicationRecord
-  belongs_to :user
-  # inverse_of สำหรับ bidirectional
-  # belongs_to :user, inverse_of: :profile
-end
-
-# Query ผ่าน associations
-user = User.first
-user.posts             # => all posts
-user.posts.published   # => scope on association
-user.posts.count       # => SQL COUNT
-user.posts.build(title: "New")  # build ไม่ save
-user.posts.create!(title: "New")  # create และ save
-```
-
----
-
-### ข้อ 33: ActiveRecord Validations
-
-```ruby
-class User < ApplicationRecord
-  # Presence
-  validates :name,  presence: true
-  validates :email, presence: true
-
-  # Uniqueness
-  validates :email, uniqueness: true
-  validates :email, uniqueness: { scope: :company_id, case_sensitive: false }
-
-  # Format
-  validates :email, format: { with: URI::MailTo::EMAIL_REGEXP }
-
-  # Length
-  validates :username, length: { minimum: 3, maximum: 20 }
-  validates :bio,      length: { maximum: 500 }
-
-  # Numericality
-  validates :age, numericality: { greater_than: 0, less_than: 150 }
-  validates :score, numericality: { only_integer: true }
-
-  # Inclusion/Exclusion
-  validates :status, inclusion: { in: %w[active inactive banned] }
-  validates :username, exclusion: { in: %w[admin root superuser] }
-
-  # Conditional
-  validates :company_name, presence: true, if: :business_account?
-
-  # Custom
-  validate :email_domain_not_blocked
-
-  private
-
-  def email_domain_not_blocked
-    blocked = ["spam.com", "temp.org"]
-    domain  = email&.split('@')&.last
-    errors.add(:email, "domain is blocked") if domain.in?(blocked)
-  end
-end
-
-# Check validity
-user = User.new(name: "Alice", email: "invalid")
-user.valid?    # => false
-user.errors.full_messages  # => ["Email is invalid"]
-user.errors[:email]        # => ["is invalid"]
-
-# ข้ามบาง validations
-user.save(validate: false)  # อันตราย!
-```
-
----
-
-### ข้อ 34: ActiveRecord Callbacks
-
-```ruby
-class Order < ApplicationRecord
-  # Before callbacks
-  before_validation :normalize_data
-  before_create     :set_order_number
-  before_save       :calculate_total
-  before_destroy    :check_can_destroy
-
-  # After callbacks
-  after_create  :send_confirmation_email
-  after_update  :notify_status_change, if: :saved_change_to_status?
-  after_destroy :cleanup_files
-  after_commit  :update_search_index
-  after_rollback :handle_failure
-
-  # Around callbacks
-  around_save :log_save_duration
-
-  private
-
-  def normalize_data
-    self.email = email&.downcase&.strip
+# Ractor (Ruby 3.0+) - true parallelism
+if defined?(Ractor)
+  ractor1 = Ractor.new do
+    "Hello from Ractor 1"
   end
 
-  def set_order_number
-    self.number = "ORD-#{Time.current.to_i}"
+  ractor2 = Ractor.new do
+    "Hello from Ractor 2"
   end
 
-  def check_can_destroy
-    throw(:abort) if status == 'processing'
-    # throw :abort หยุดการ destroy
-  end
-
-  def around_save
-    start = Time.current
-    yield
-    duration = Time.current - start
-    Rails.logger.info "Save took #{duration}s"
-  end
+  puts ractor1.take
+  puts ractor2.take
 end
 
-# Callbacks ทำงานเมื่อ?
-# save, create, update, destroy, validate
-# ไม่ทำงานเมื่อ: update_column, update_all, delete, delete_all
-```
-
----
-
-### ข้อ 35: N+1 Query Problem
-
-```ruby
-# ปัญหา N+1
-users = User.all
-users.each { |u| puts u.posts.count }
-# Query 1: SELECT * FROM users
-# Query 2..N: SELECT COUNT(*) FROM posts WHERE user_id = ?
-
-# แก้ด้วย includes
-users = User.includes(:posts)
-users.each { |u| puts u.posts.size }
-# Query 1: SELECT * FROM users
-# Query 2: SELECT * FROM posts WHERE user_id IN (1,2,3,...)
-
-# includes vs eager_load vs preload
-User.includes(:posts)   # Rails เลือก preload หรือ LEFT OUTER JOIN
-User.preload(:posts)    # แยก query เสมอ
-User.eager_load(:posts) # LEFT OUTER JOIN เสมอ (ใช้ WHERE ได้)
-
-# ใช้กับ WHERE
-User.eager_load(:posts).where(posts: { published: true })
-
-# counter_cache - เก็บ count ใน parent
-class Post < ApplicationRecord
-  belongs_to :user, counter_cache: true
-end
-# users table ต้องมี column posts_count
-
-# Bullet gem - detect N+1
-# config/environments/development.rb
-# config.after_initialize do
-#   Bullet.enable = true
-#   Bullet.alert = true
+# Async Ruby ด้วย async gem (ถ้ามี)
+# require 'async'
+# Async do
+#   10.times.map { |i|
+#     Async { puts "Task #{i}" }
+#   }.each(&:wait)
 # end
 ```
 
 ---
 
-### ข้อ 36: ActiveRecord Scopes
+### 13. อธิบาย Ruby Object Model อย่างลึก
+
+**เฉลย:**
 
 ```ruby
+# ทุกอย่างใน Ruby เป็น Object
+42.class          # => Integer
+42.is_a?(Object)  # => true
+
+# Classes ก็เป็น Objects ของ Class class
+String.class      # => Class
+Class.class       # => Class
+Class.superclass  # => Module
+Module.class      # => Class
+Module.superclass # => Object
+Object.class      # => Class
+Object.superclass # => BasicObject
+
+# Singleton classes (eigenclasses)
+class Dog
+  def bark
+    "Woof!"
+  end
+end
+
+dog1 = Dog.new
+dog2 = Dog.new
+
+# เพิ่ม method ให้เฉพาะ dog1
+def dog1.special_trick
+  "Roll over!"
+end
+
+dog1.special_trick  # => "Roll over!"
+# dog2.special_trick  # => NoMethodError
+
+# Singleton class ของ dog1 อยู่ใน lookup chain
+puts dog1.singleton_class  # => #<Class:#<Dog:...>>
+puts dog1.singleton_class.superclass  # => Dog
+
+# Method lookup order (MRO)
+class A
+  def method_a
+    "A"
+  end
+end
+
+module M1
+  def method_m1
+    "M1"
+  end
+end
+
+module M2
+  def method_m2
+    "M2"
+  end
+end
+
+class B < A
+  include M1
+  include M2
+end
+
+b = B.new
+puts b.class.ancestors
+# => [B, M2, M1, A, Object, Kernel, BasicObject]
+
+# Object#send vs public_send
+class SecretClass
+  private
+
+  def secret_method
+    "I'm secret!"
+  end
+end
+
+obj = SecretClass.new
+obj.send(:secret_method)         # => "I'm secret!" (bypass access control)
+# obj.public_send(:secret_method) # => NoMethodError
+
+# ObjectSpace - สำรวจ objects ใน memory
+require 'objspace'
+
+before = ObjectSpace.count_objects[:T_STRING]
+arr = Array.new(1000) { "hello" }
+after = ObjectSpace.count_objects[:T_STRING]
+puts "New strings created: #{after - before}"
+
+# Frozen objects
+str = "hello".freeze
+str << " world"  # => FrozenError: can't modify frozen String
+
+# Ruby 3.0+ frozen string literals
+# frozen_string_literal: true
+```
+
+---
+
+### 14. อธิบาย Memory Management และ Garbage Collection ใน Ruby
+
+**เฉลย:**
+
+```ruby
+# Ruby ใช้ mark-and-sweep GC (แบบ tri-color incremental ตั้งแต่ Ruby 2.x)
+
+# GC configuration
+puts GC::OPTS  # ดู available options
+
+# GC tuning via environment variables
+# RUBY_GC_HEAP_INIT_SLOTS=10000
+# RUBY_GC_HEAP_FREE_SLOTS=4096
+# RUBY_GC_HEAP_GROWTH_FACTOR=1.8
+# RUBY_GC_HEAP_GROWTH_MAX_SLOTS=100000
+# RUBY_GC_MALLOC_LIMIT=16MB
+# RUBY_GC_OLDMALLOC_LIMIT=16MB
+
+# Monitoring GC
+GC.stat.each { |key, value| puts "#{key}: #{value}" }
+# heap_allocated_pages, heap_sorted_length, heap_allocatable_pages,
+# heap_available_slots, heap_live_slots, heap_free_slots, etc.
+
+# สร้าง objects และดู GC behavior
+def allocate_objects(count)
+  count.times.map { "hello" * 100 }
+end
+
+before_gc = GC.stat[:count]
+allocate_objects(100_000)
+after_gc = GC.stat[:count]
+puts "GC ran #{after_gc - before_gc} times"
+
+# ObjectSpace::WeakMap - weak references
+require 'objspace'
+
+weak_map = ObjectSpace::WeakMap.new
+key = Object.new
+value = "important data"
+weak_map[key] = value
+
+puts weak_map[key]  # => "important data"
+# เมื่อ key ถูก GC, entry จะหายไปจาก weak_map
+
+# Memory profiling pattern
+def measure_memory
+  before = `ps -o rss= -p #{Process.pid}`.to_i
+  yield
+  after = `ps -o rss= -p #{Process.pid}`.to_i
+  puts "Memory used: #{after - before} KB"
+end
+
+measure_memory do
+  large_array = Array.new(1_000_000, "hello")
+end
+
+# Avoiding memory leaks
+# Pattern 1: ใช้ local variables แทน instance variables เมื่อไม่จำเป็น
+
+# Pattern 2: ระวัง closures ที่ capture variables ขนาดใหญ่
+large_data = "x" * 1_000_000
+small_proc = proc { "small result" }  # ไม่ capture large_data - ดี
+large_proc = proc { large_data.length }  # capture large_data - ระวัง!
+
+# Pattern 3: ใช้ freeze สำหรับ immutable values
+CONSTANT = "hello".freeze  # frozen ดีกว่า mutable
+```
+
+---
+
+## คำถาม Rails ระดับ Junior {#rails-junior}
+
+### 15. อธิบาย MVC Architecture ใน Rails
+
+**เฉลย:**
+
+```
+Request → Router → Controller → Model ↔ Database
+                      ↓
+                    View → Response
+```
+
+```ruby
+# Model - จัดการ data และ business logic
+# app/models/article.rb
 class Article < ApplicationRecord
-  scope :published,  -> { where(published: true) }
-  scope :recent,     -> { order(created_at: :desc) }
-  scope :by_author,  ->(author) { where(author: author) }
-  scope :popular,    -> { where('views_count > ?', 100) }
+  belongs_to :user
+  has_many :comments, dependent: :destroy
+  has_many :tags, through: :article_tags
 
-  # Scope ที่ chainable
-  scope :search, ->(query) {
-    where("title ILIKE ? OR body ILIKE ?", "%#{query}%", "%#{query}%")
-  }
+  validates :title, presence: true, length: { minimum: 5, maximum: 100 }
+  validates :body, presence: true
 
-  # default_scope (ใช้ระวัง!)
-  default_scope { order(created_at: :desc) }
+  scope :published, -> { where(published: true) }
+  scope :recent, -> { order(created_at: :desc).limit(10) }
 
-  # unscoped - ลบ default_scope
-  def self.all_unordered
-    unscoped.all
-  end
-end
+  before_save :generate_slug
 
-# Chain scopes
-Article.published.recent.by_author("Alice").limit(10)
-
-# นิยมใช้ scope vs class method
-# Class method ยืดหยุ่นกว่าเมื่อ logic ซับซ้อน
-def self.popular_in(category)
-  return popular if category.nil?
-  popular.where(category: category)
-end
-```
-
----
-
-### ข้อ 37: Migrations
-
-```ruby
-# สร้าง migration
-rails generate migration CreateProducts name:string price:decimal{10,2}
-
-# Migration DSL
-class CreateProducts < ActiveRecord::Migration[7.1]
-  def change
-    create_table :products do |t|
-      t.string  :name,        null: false
-      t.decimal :price,       precision: 10, scale: 2
-      t.text    :description
-      t.integer :stock,       default: 0
-      t.boolean :published,   default: false
-      t.references :category, foreign_key: true
-
-      t.timestamps
-    end
-
-    add_index :products, :name
-    add_index :products, [:category_id, :published]
-  end
-end
-
-# Reversible migration
-class AddColumnToUsers < ActiveRecord::Migration[7.1]
-  def up
-    add_column :users, :role, :string, default: 'user'
-  end
-
-  def down
-    remove_column :users, :role
-  end
-end
-
-# Strong migrations - ป้องกัน ลด downtime
-class AddIndexConcurrently < ActiveRecord::Migration[7.1]
-  disable_ddl_transaction!
-
-  def change
-    add_index :users, :email, algorithm: :concurrently
-  end
-end
-```
-
----
-
-### ข้อ 38: Strong Parameters
-
-```ruby
-class UsersController < ApplicationController
-  def create
-    @user = User.new(user_params)
-    # ...
-  end
-
-  def update
-    @user = User.find(params[:id])
-    @user.update(user_params)
-    # ...
+  def reading_time
+    words = body.split.length
+    (words / 200.0).ceil  # 200 words per minute
   end
 
   private
 
-  def user_params
-    params.require(:user).permit(
-      :name,
-      :email,
-      :password,
-      :password_confirmation,
-      profile_attributes: [:bio, :website, :avatar],
-      roles: []
-    )
+  def generate_slug
+    self.slug = title.parameterize
   end
 end
 
-# Nested attributes
-class UserController
-  def user_params
-    params.require(:user).permit(
-      :name,
-      addresses_attributes: [:id, :street, :city, :_destroy]
-    )
+# Controller - จัดการ HTTP requests
+# app/controllers/articles_controller.rb
+class ArticlesController < ApplicationController
+  before_action :authenticate_user!, except: [:index, :show]
+  before_action :set_article, only: [:show, :edit, :update, :destroy]
+  before_action :authorize_article!, only: [:edit, :update, :destroy]
+
+  def index
+    @articles = Article.published.recent.includes(:user)
+  end
+
+  def show
+    @comment = Comment.new
+  end
+
+  def new
+    @article = Article.new
+  end
+
+  def create
+    @article = current_user.articles.build(article_params)
+    if @article.save
+      redirect_to @article, notice: "Article created successfully"
+    else
+      render :new, status: :unprocessable_entity
+    end
+  end
+
+  def edit; end
+
+  def update
+    if @article.update(article_params)
+      redirect_to @article, notice: "Article updated successfully"
+    else
+      render :edit, status: :unprocessable_entity
+    end
+  end
+
+  def destroy
+    @article.destroy
+    redirect_to articles_path, notice: "Article deleted"
+  end
+
+  private
+
+  def set_article
+    @article = Article.find(params[:id])
+  end
+
+  def article_params
+    params.require(:article).permit(:title, :body, :published, tag_ids: [])
+  end
+
+  def authorize_article!
+    redirect_to root_path, alert: "Not authorized" unless @article.user == current_user
   end
 end
 
-# Dynamic permitted params
-def article_params
-  permitted = [:title, :body]
-  permitted << :published if current_user.admin?
-  params.require(:article).permit(*permitted)
-end
+# View - แสดงผล HTML
+# app/views/articles/index.html.erb
+# <%= @articles.each do |article| %>
+#   <h2><%= link_to article.title, article_path(article) %></h2>
+#   <p>By <%= article.user.name %> - <%= article.reading_time %> min read</p>
+# <% end %>
 ```
 
 ---
 
-### ข้อ 39: Rails Routing
+### 16. อธิบาย ActiveRecord Associations
+
+**เฉลย:**
+
+```ruby
+# belongs_to - "หนึ่งในหลาย" ฝั่งที่มี foreign key
+class Comment < ApplicationRecord
+  belongs_to :article   # comments.article_id
+  belongs_to :user      # comments.user_id
+
+  # Options:
+  belongs_to :author, class_name: "User", foreign_key: :user_id
+  belongs_to :parent_comment, class_name: "Comment", optional: true
+end
+
+# has_many - "หนึ่งมีหลาย"
+class Article < ApplicationRecord
+  has_many :comments, dependent: :destroy
+  has_many :commenters, through: :comments, source: :user
+  has_many :approved_comments, -> { where(approved: true) }, class_name: "Comment"
+
+  # Polymorphic association
+  has_many :attachments, as: :attachable
+end
+
+# has_one - "หนึ่งมีหนึ่ง"
+class User < ApplicationRecord
+  has_one :profile, dependent: :destroy
+  has_one :subscription
+
+  accepts_nested_attributes_for :profile
+end
+
+# has_many :through - ผ่าน join table
+class Doctor < ApplicationRecord
+  has_many :appointments
+  has_many :patients, through: :appointments
+end
+
+class Patient < ApplicationRecord
+  has_many :appointments
+  has_many :doctors, through: :appointments
+end
+
+class Appointment < ApplicationRecord
+  belongs_to :doctor
+  belongs_to :patient
+end
+
+# has_and_belongs_to_many (HABTM) - ไม่มี join model
+class Article < ApplicationRecord
+  has_and_belongs_to_many :categories
+end
+# ต้องมี articles_categories table
+
+# Polymorphic associations
+class Attachment < ApplicationRecord
+  belongs_to :attachable, polymorphic: true
+end
+
+class Photo < ApplicationRecord
+  has_many :attachments, as: :attachable
+end
+
+class Document < ApplicationRecord
+  has_many :attachments, as: :attachable
+end
+
+# attachments table: attachable_id, attachable_type
+
+# Self-referential associations
+class Employee < ApplicationRecord
+  belongs_to :manager, class_name: "Employee", optional: true
+  has_many :subordinates, class_name: "Employee", foreign_key: :manager_id
+end
+
+ceo = Employee.create!(name: "CEO")
+manager = Employee.create!(name: "Manager", manager: ceo)
+employee = Employee.create!(name: "Employee", manager: manager)
+
+puts ceo.subordinates  # => [manager]
+puts manager.manager   # => ceo
+```
+
+---
+
+### 17. อธิบาย Rails Routing
+
+**เฉลย:**
 
 ```ruby
 # config/routes.rb
+
 Rails.application.routes.draw do
-  # CRUD routes
+  # RESTful resources - สร้าง 7 routes โดยอัตโนมัติ
+  resources :articles
+
+  # GET    /articles          => articles#index
+  # GET    /articles/new      => articles#new
+  # POST   /articles          => articles#create
+  # GET    /articles/:id      => articles#show
+  # GET    /articles/:id/edit => articles#edit
+  # PATCH  /articles/:id      => articles#update
+  # DELETE /articles/:id      => articles#destroy
+
+  # Nested resources
   resources :articles do
     resources :comments, only: [:create, :destroy]
-
     member do
       post :publish
-      delete :unpublish
+      post :unpublish
     end
-
     collection do
       get :search
-      get :popular
+      get :trending
     end
   end
 
-  # Nested routes
-  resources :users do
-    resource :profile, only: [:show, :edit, :update]
+  # Limiting routes
+  resources :users, only: [:index, :show, :create]
+  resources :sessions, only: [:new, :create, :destroy]
+
+  # Singular resource (ไม่มี :id เพราะมีแค่อันเดียว)
+  resource :profile  # สร้าง 6 routes (ไม่มี index)
+  resource :session  # สร้าง 5 routes
+
+  # Namespace - เพิ่ม prefix ให้ URL และ module
+  namespace :admin do
+    resources :users
+    resources :articles
   end
+  # => /admin/users, AdminController::UsersController
+
+  # Scope - เพิ่ม prefix แค่ URL
+  scope :api do
+    resources :users
+  end
+  # => /api/users, UsersController
+
+  # Module scope
+  scope module: :api do
+    resources :users
+  end
+  # => /users, Api::UsersController
+
+  # Named routes
+  get '/about', to: 'pages#about', as: :about
+  # => about_path, about_url
+
+  # Root
+  root 'home#index'
 
   # Custom routes
-  get  '/about',     to: 'pages#about', as: :about
-  post '/login',     to: 'sessions#create'
-  delete '/logout',  to: 'sessions#destroy'
+  get '/search', to: 'search#index'
+  post '/webhooks/stripe', to: 'webhooks#stripe'
+
+  # Catch-all (ต้องอยู่ท้ายสุด)
+  match '*path', to: 'errors#not_found', via: :all
+
+  # Constraints
+  resources :articles, constraints: { id: /[A-Z][A-Z][0-9]+/ }
 
   # Redirect
   get '/old-path', to: redirect('/new-path')
-
-  # Constraints
-  constraints(subdomain: 'api') do
-    namespace :api, path: '' do
-      resources :v1 do
-        # ...
-      end
-    end
-  end
-
-  # Namespace
-  namespace :admin do
-    resources :users
-    resources :reports
-  end
-
-  root to: 'home#index'
+  get '/users/:id', to: redirect('/profiles/%{id}')
 end
 ```
 
 ---
 
-### ข้อ 40: Caching ใน Rails
+## คำถาม Rails ระดับ Mid-Level {#rails-mid}
+
+### 18. อธิบาย ActiveRecord Query Interface
+
+**เฉลย:**
 
 ```ruby
-# Fragment caching
-# app/views/articles/show.html.erb
-# <% cache @article do %>
-#   <h1><%= @article.title %></h1>
-# <% end %>
+# Basic queries
+User.all                        # SELECT * FROM users
+User.first                      # SELECT * FROM users LIMIT 1
+User.last                       # SELECT * FROM users ORDER BY id DESC LIMIT 1
+User.find(1)                    # SELECT * FROM users WHERE id = 1
+User.find_by(email: "a@b.com")  # LIMIT 1
+User.where(active: true)        # WHERE active = TRUE
 
-# Russian doll caching
-# <% cache @article do %>
-#   <% @article.comments.each do |comment| %>
-#     <% cache comment do %>
-#       ...
+# Chaining queries
+User.where(active: true)
+    .where("age > ?", 18)
+    .order(name: :asc)
+    .limit(10)
+    .offset(20)
+
+# Joins
+User.joins(:articles)
+    .where(articles: { published: true })
+
+# Includes (eager loading - แก้ N+1 problem)
+User.includes(:articles, :profile)
+    .where(active: true)
+
+# Preload vs Eager Load vs Includes
+# preload: แยก query เสมอ
+# eager_load: JOIN เสมอ
+# includes: อัจฉริยะ (ใช้ JOIN ถ้า filter บ่าย, แยก query ถ้าไม่)
+
+# Group and aggregate
+User.group(:city).count
+# => {"Bangkok"=>10, "Chiang Mai"=>5}
+
+User.group(:role)
+    .select("role, COUNT(*) as count, AVG(age) as avg_age")
+
+Article.group("DATE(created_at)")
+       .count
+
+# Having (ใช้กับ group)
+User.group(:city)
+    .having("COUNT(*) > ?", 5)
+    .count
+
+# Pluck - ดึงเฉพาะ columns (เร็วกว่า select ทั้ง model)
+User.pluck(:name)          # => ["Alice", "Bob", ...]
+User.pluck(:id, :name)     # => [[1, "Alice"], [2, "Bob"], ...]
+
+# Select
+User.select(:id, :name)
+
+# Scopes
+class Article < ApplicationRecord
+  scope :published, -> { where(published: true) }
+  scope :recent, -> { order(created_at: :desc) }
+  scope :by_author, ->(user) { where(user: user) }
+  scope :from_last_week, -> { where("created_at > ?", 1.week.ago) }
+
+  # default_scope (ใช้ด้วยความระวัง!)
+  default_scope { order(created_at: :desc) }
+end
+
+# Scopes สามารถ chain ได้
+Article.published.recent.by_author(current_user).limit(5)
+
+# find_or_create_by, find_or_initialize_by
+user = User.find_or_create_by(email: "new@example.com") do |u|
+  u.name = "New User"
+  u.role = "user"
+end
+
+# update_all, delete_all (ไม่ผ่าน callbacks!)
+User.where(active: false).update_all(role: "inactive")
+OldLog.where("created_at < ?", 1.year.ago).delete_all
+
+# destroy_all (ผ่าน callbacks)
+User.where(test_account: true).destroy_all
+
+# Transactions
+ActiveRecord::Base.transaction do
+  account1.update!(balance: account1.balance - 100)
+  account2.update!(balance: account2.balance + 100)
+end
+
+# Raw SQL
+User.find_by_sql("SELECT * FROM users WHERE age > 18")
+User.where("name LIKE ?", "%#{query}%")
+User.where("created_at BETWEEN ? AND ?", start_date, end_date)
+```
+
+---
+
+### 19. อธิบาย Rails Callbacks
+
+**เฉลย:**
+
+```ruby
+class Order < ApplicationRecord
+  belongs_to :user
+  has_many :order_items
+
+  # Before callbacks
+  before_validation :normalize_data
+  before_create :generate_order_number
+  before_save :calculate_total
+  before_update :check_cancellable
+  before_destroy :cancel_payment
+
+  # After callbacks
+  after_create :send_confirmation_email
+  after_create_commit :notify_warehouse
+  after_update :update_user_stats, if: :status_changed?
+  after_destroy :release_inventory
+
+  # Around callbacks
+  around_save :log_changes
+
+  # Conditional callbacks
+  after_save :notify_admin, if: :high_value_order?
+  after_save :send_invoice, unless: :draft?
+
+  # Callback ด้วย method name
+  before_save :do_something
+
+  # Callback ด้วย block
+  before_save do
+    self.name = name.downcase.strip
+  end
+
+  private
+
+  def normalize_data
+    self.email = email&.downcase&.strip
+    self.phone = phone&.gsub(/\D/, '')
+  end
+
+  def generate_order_number
+    self.order_number = "ORD-#{SecureRandom.hex(6).upcase}"
+  end
+
+  def calculate_total
+    self.total = order_items.sum { |item| item.price * item.quantity }
+  end
+
+  def check_cancellable
+    if status_changed? && status == "cancelled" && completed?
+      throw(:abort)  # หยุด callback chain
+    end
+  end
+
+  def send_confirmation_email
+    OrderMailer.confirmation(self).deliver_later
+  end
+
+  def log_changes
+    old_attrs = changes.dup
+    yield  # ทำการ save
+    Rails.logger.info "Order #{id} changed: #{old_attrs}"
+  end
+
+  def high_value_order?
+    total > 10_000
+  end
+end
+
+# Skipping callbacks (ใช้อย่างระวัง!)
+order.save(validate: false)
+Order.skip_callback(:save, :before, :calculate_total) do
+  order.save!
+end
+
+# Observer pattern (แยก concern ออกจาก model)
+# ใช้ ActiveSupport::Callbacks หรือ gem เช่น wisper
+```
+
+---
+
+### 20. อธิบาย Performance: N+1 Queries และวิธีแก้
+
+**เฉลย:**
+
+```ruby
+# N+1 Problem - รัน query 1+N ครั้ง
+# ปัญหา:
+users = User.all
+users.each do |user|
+  puts user.articles.count  # รัน query 1 ครั้งต่อ user!
+end
+# SQL:
+# SELECT * FROM users
+# SELECT COUNT(*) FROM articles WHERE user_id = 1
+# SELECT COUNT(*) FROM articles WHERE user_id = 2
+# ... N queries
+
+# วิธีแก้ 1: counter_cache
+class Article < ApplicationRecord
+  belongs_to :user, counter_cache: true  # users.articles_count
+end
+# จะ auto-update users.articles_count เมื่อ article ถูก create/destroy
+
+class User < ApplicationRecord
+  has_many :articles
+end
+# users.articles_count  # ไม่ต้อง query!
+
+# วิธีแก้ 2: includes (N+1 สำหรับ associations)
+# ปัญหา:
+posts = Post.all
+posts.each { |p| puts p.author.name }  # N+1!
+
+# แก้ด้วย includes
+posts = Post.includes(:author).all
+posts.each { |p| puts p.author.name }  # 2 queries เท่านั้น
+
+# วิธีแก้ 3: joins กับ select
+Post.joins(:author)
+    .select("posts.*, users.name as author_name")
+    .each { |p| puts p.author_name }
+
+# วิธีแก้ 4: eager_load สำหรับ filtering
+Post.eager_load(:author)
+    .where(users: { active: true })
+
+# Bullet gem - ตรวจหา N+1 อัตโนมัติ
+# config/environments/development.rb
+# config.after_initialize do
+#   Bullet.enable = true
+#   Bullet.alert = true
+#   Bullet.rails_logger = true
+# end
+
+# ตรวจสอบ queries ด้วย to_sql
+Post.includes(:author).where(published: true).to_sql
+# => "SELECT posts.*, users.* FROM posts LEFT OUTER JOIN users ..."
+
+# ตรวจสอบ query count ใน tests
+expect {
+  get :index
+}.to make_database_queries(count: 2)  # ด้วย db-query-matchers gem
+
+# Lazy loading vs Eager loading
+# Lazy (default): query เมื่อถูกใช้งาน
+articles = Article.all
+# ยังไม่ query...
+articles.each { |a| puts a.title }  # query ตอนนี้
+
+# Eager: query ทันที
+articles = Article.all.load
+# query ทันที
+
+# บ่อยครั้ง cache ช่วยได้
+Rails.cache.fetch("users/#{user.id}/article_count", expires_in: 1.hour) do
+  user.articles.count
+end
+```
+
+---
+
+## คำถาม Rails ระดับ Senior {#rails-senior}
+
+### 21. อธิบาย Rails Security Best Practices
+
+**เฉลย:**
+
+```ruby
+# 1. Mass Assignment Protection
+# Strong Parameters ใน Controller
+def user_params
+  params.require(:user).permit(:name, :email, :password)
+  # NEVER permit(:admin) โดยไม่จำเป็น
+end
+
+# 2. SQL Injection Prevention
+# ผิด - vulnerable!
+User.where("name = '#{params[:name]}'")
+
+# ถูก - parameterized queries
+User.where("name = ?", params[:name])
+User.where(name: params[:name])
+
+# 3. XSS Prevention
+# Rails auto-escapes HTML in views
+<%= user.name %>        # escaped ✓
+<%= raw user.content %> # NOT escaped - อันตราย!
+<%= user.content.html_safe %> # NOT escaped - อันตราย!
+
+# ใช้ sanitize helper
+<%= sanitize user.content, tags: %w[p br b i], attributes: %w[href] %>
+
+# 4. CSRF Protection
+# ApplicationController มี protect_from_forgery โดย default
+# ใช้ authenticity_token ใน forms
+# Rails form helpers include this automatically
+
+# 5. Authentication
+# ใช้ Devise หรือ implement เอง
+class User < ApplicationRecord
+  has_secure_password  # ต้องการ bcrypt gem
+
+  # ป้องกัน timing attacks
+  def self.find_and_authenticate(email, password)
+    user = find_by(email: email)
+    # BCrypt.secure_compare prevents timing attacks
+    return nil unless user&.authenticate(password)
+    user
+  end
+end
+
+# 6. Authorization
+# ใช้ Pundit หรือ CanCanCan
+class ArticlePolicy < ApplicationPolicy
+  def update?
+    user.admin? || record.user == user
+  end
+
+  def destroy?
+    user.admin?
+  end
+
+  class Scope < Scope
+    def resolve
+      if user.admin?
+        scope.all
+      else
+        scope.where(user: user).or(scope.published)
+      end
+    end
+  end
+end
+
+# 7. Secure Headers
+# config/initializers/secure_headers.rb
+# SecureHeaders::Configuration.default do |config|
+#   config.x_frame_options = "DENY"
+#   config.x_content_type_options = "nosniff"
+#   config.x_xss_protection = "1; mode=block"
+#   config.csp = {
+#     default_src: %w('self'),
+#     script_src: %w('self'),
+#   }
+# end
+
+# 8. Sensitive Data
+# ใช้ Rails credentials
+secret_key = Rails.application.credentials.stripe[:secret_key]
+
+# ห้ามเก็บ passwords/tokens ใน logs
+# config/application.rb
+config.filter_parameters += [:password, :token, :secret, :credit_card]
+
+# 9. File Upload Security
+def create_attachment
+  file = params[:file]
+  # ตรวจสอบ type
+  allowed_types = %w[image/jpeg image/png application/pdf]
+  raise "Invalid file type" unless allowed_types.include?(file.content_type)
+
+  # จำกัดขนาด
+  raise "File too large" if file.size > 5.megabytes
+
+  # ใช้ safe filename
+  safe_filename = File.basename(file.original_filename).gsub(/[^0-9A-Za-z.\-]/, '_')
+
+  Attachment.create!(file: file, filename: safe_filename)
+end
+
+# 10. Rate Limiting
+# ด้วย Rack::Attack
+class Rack::Attack
+  throttle("req/ip", limit: 300, period: 5.minutes) do |req|
+    req.ip
+  end
+
+  throttle("logins/ip", limit: 5, period: 20.seconds) do |req|
+    req.ip if req.path == "/login" && req.post?
+  end
+end
+```
+
+---
+
+### 22. อธิบาย Caching Strategies ใน Rails
+
+**เฉลย:**
+
+```ruby
+# Rails มี caching layers หลายชั้น
+
+# 1. Fragment Caching (HTML fragment)
+# app/views/articles/index.html.erb
+# <% cache @articles do %>
+#   <% @articles.each do |article| %>
+#     <% cache article do %>
+#       <%= render article %>
 #     <% end %>
 #   <% end %>
 # <% end %>
 
-# Low-level caching
+# 2. Russian Doll Caching - nested caches
+# Cache key โดยอัตโนมัติจาก updated_at
 class Article < ApplicationRecord
-  def expensive_stats
-    Rails.cache.fetch("article_#{id}_stats", expires_in: 1.hour) do
-      # expensive computation
-      { word_count: body.split.length, read_time: body.split.length / 200 }
+  belongs_to :user, touch: true  # update user's updated_at when article changes
+end
+
+# 3. Low-Level Caching
+class ProductsController < ApplicationController
+  def expensive_operation
+    @result = Rails.cache.fetch("expensive_result/#{params[:id]}", expires_in: 1.hour) do
+      # คำนวณที่ใช้เวลานาน
+      Product.complex_calculation(params[:id])
     end
   end
 end
 
-# Action caching
+# 4. Counter Cache
+class Post < ApplicationRecord
+  belongs_to :user, counter_cache: true
+end
+# users.posts_count จะ update อัตโนมัติ
+
+# 5. HTTP Caching
 class ArticlesController < ApplicationController
-  def index
-    @articles = Rails.cache.fetch("articles_index", expires_in: 15.minutes) do
-      Article.published.recent.limit(20)
+  def show
+    @article = Article.find(params[:id])
+
+    # Last-Modified header
+    fresh_when(last_modified: @article.updated_at, etag: @article)
+
+    # หรือ
+    if stale?(@article)
+      # จะ render เฉพาะเมื่อ content เปลี่ยน
+      respond_to do |format|
+        format.html
+        format.json { render json: @article }
+      end
     end
   end
 end
 
-# Cache store config
+# 6. Cache Stores
+# Memory Store (development)
+config.cache_store = :memory_store, { size: 64.megabytes }
+
+# Redis Store (production)
 config.cache_store = :redis_cache_store, {
-  url:        ENV['REDIS_URL'],
-  expires_in: 1.hour,
-  namespace:  'myapp'
+  url: ENV["REDIS_URL"],
+  expires_in: 1.day,
+  namespace: "myapp_cache"
 }
 
-# HTTP Caching
-def show
-  @article = Article.find(params[:id])
-  fresh_when(etag: @article, last_modified: @article.updated_at)
-end
-```
+# Memcached
+config.cache_store = :mem_cache_store, "cache-1.example.com", "cache-2.example.com"
 
----
+# 7. Cache Invalidation
+# Time-based
+Rails.cache.write("key", value, expires_in: 1.hour)
 
-## Mid-Level Rails (ข้อ 41-55)
+# Manual invalidation
+Rails.cache.delete("user/#{user.id}/profile")
+Rails.cache.delete_matched("user/#{user.id}/*")
 
-### ข้อ 41: Service Objects
-
-```ruby
-# Plain Ruby Service Object
-class UserRegistrationService
-  Result = Struct.new(:success?, :user, :errors, keyword_init: true)
-
-  def initialize(params)
-    @params = params
-  end
-
-  def call
-    user = User.new(@params)
-
-    if user.save
-      send_welcome_email(user)
-      create_default_settings(user)
-      track_signup(user)
-
-      Result.new(success?: true, user: user, errors: [])
-    else
-      Result.new(success?: false, user: nil, errors: user.errors.full_messages)
-    end
-  end
-
-  private
-
-  def send_welcome_email(user)
-    UserMailer.welcome(user).deliver_later
-  end
-
-  def create_default_settings(user)
-    UserSettings.create!(user: user, theme: 'light', notifications: true)
-  end
-
-  def track_signup(user)
-    Analytics.track(user_id: user.id, event: 'signup')
+# Using cache_key
+class User < ApplicationRecord
+  def full_cache_key
+    "user/#{id}/#{updated_at.to_i}"
   end
 end
 
-# Controller ใช้งาน
-class UsersController < ApplicationController
-  def create
-    result = UserRegistrationService.new(user_params).call
-
-    if result.success?
-      redirect_to root_path, notice: "Welcome!"
-    else
-      @errors = result.errors
-      render :new, status: :unprocessable_entity
-    end
-  end
-end
-```
-
----
-
-### ข้อ 42: Background Jobs
-
-```ruby
-# Active Job
-class SendEmailJob < ApplicationJob
-  queue_as :mailers
-
-  # Retry configuration
-  retry_on Net::OpenTimeout, wait: :polynomially_longer, attempts: 5
-  discard_on ActiveJob::DeserializationError
-
-  def perform(user_id, subject, body)
-    user = User.find(user_id)
-    UserMailer.custom(user, subject, body).deliver_now
-  end
-end
-
-# Enqueue
-SendEmailJob.perform_later(user.id, "Subject", "Body")
-SendEmailJob.set(wait: 5.minutes).perform_later(user.id, "Subject", "Body")
-SendEmailJob.set(wait_until: Date.tomorrow.noon).perform_later(...)
-
-# Sidekiq config
-# config/sidekiq.yml
-# :queues:
-#   - [critical, 3]
-#   - [default, 2]
-#   - [mailers, 1]
-
-# Sidekiq callbacks
-class ImportJob < ApplicationJob
-  around_perform do |job, block|
-    Rails.logger.info "Starting import #{job.job_id}"
-    block.call
-    Rails.logger.info "Finished import #{job.job_id}"
-  end
-end
-```
-
----
-
-### ข้อ 43: Action Mailer
-
-```ruby
-# app/mailers/user_mailer.rb
-class UserMailer < ApplicationMailer
-  default from: 'noreply@myapp.com'
-
-  def welcome(user)
-    @user    = user
-    @sign_in_url = sign_in_url
-
-    mail(
-      to:      @user.email,
-      subject: "Welcome to MyApp!"
-    )
-  end
-
-  def reset_password(user, token)
-    @user           = user
-    @reset_url      = edit_password_reset_url(token)
-    @expires_in     = "24 hours"
-
-    mail(
-      to:      @user.email,
-      subject: "Reset your password"
-    )
-  end
-
-  def weekly_report(user)
-    @user    = user
-    @report  = WeeklyReportService.new(user).generate
-
-    attachments['report.pdf'] = generate_pdf(@report)
-
-    mail(
-      to:      @user.email,
-      subject: "Your weekly report"
-    )
-  end
-
-  private
-
-  def generate_pdf(data)
-    # WickedPDF or Prawn
-  end
-end
-
-# Deliver
-UserMailer.welcome(@user).deliver_now
-UserMailer.welcome(@user).deliver_later
-UserMailer.welcome(@user).deliver_later(wait: 5.minutes)
-```
-
----
-
-### ข้อ 44: Authentication vs Authorization
-
-```ruby
-# Authentication = ใครคุณ
-# Devise gem
-devise :database_authenticatable, :registerable,
-       :recoverable, :rememberable, :validatable,
-       :confirmable, :lockable, :trackable
-
-# Custom JWT Auth
-class ApplicationController < ActionController::API
-  before_action :authenticate_user!
-
-  private
-
-  def authenticate_user!
-    token   = request.headers['Authorization']&.split(' ')&.last
-    payload = JWT.decode(token, Rails.application.credentials.secret_key_base)
-    @current_user = User.find(payload.first['user_id'])
-  rescue JWT::DecodeError
-    render json: { error: 'Unauthorized' }, status: :unauthorized
-  end
-end
-
-# Authorization = คุณทำอะไรได้
-# Pundit gem
-class ArticlePolicy < ApplicationPolicy
-  def show?    = true
-  def create?  = user.present?
-  def update?  = user == record.author || user.admin?
-  def destroy? = user.admin?
-end
-
-class ArticlesController < ApplicationController
-  def update
-    @article = Article.find(params[:id])
-    authorize @article  # ใช้ ArticlePolicy#update?
-
-    if @article.update(article_params)
-      redirect_to @article
-    else
-      render :edit
-    end
-  end
-end
-
-# CanCanCan gem
-class Ability
-  include CanCan::Ability
-
-  def initialize(user)
-    can :read, Article, published: true
-    return unless user.present?
-
-    can :create, Article
-    can :update, Article, user_id: user.id
-    can :manage, :all if user.admin?
-  end
-end
-```
-
----
-
-### ข้อ 45: Testing ใน Rails
-
-```ruby
-# RSpec + FactoryBot
-# spec/models/user_spec.rb
-RSpec.describe User, type: :model do
-  subject(:user) { build(:user) }
-
-  describe 'validations' do
-    it { should validate_presence_of(:email) }
-    it { should validate_uniqueness_of(:email).case_insensitive }
-    it { should validate_presence_of(:name) }
-  end
-
-  describe 'associations' do
-    it { should have_many(:posts).dependent(:destroy) }
-    it { should have_one(:profile) }
-  end
-
-  describe '#full_name' do
-    it 'combines first and last name' do
-      user = build(:user, first_name: 'John', last_name: 'Doe')
-      expect(user.full_name).to eq('John Doe')
-    end
-  end
-end
-
-# spec/requests/articles_spec.rb
-RSpec.describe 'Articles', type: :request do
-  let(:user) { create(:user) }
-  let(:headers) { auth_headers(user) }
-
-  describe 'GET /articles' do
-    before { create_list(:article, 5, published: true) }
-
-    it 'returns published articles' do
-      get '/articles', headers: headers
-      expect(response).to have_http_status(:ok)
-      expect(json['articles'].length).to eq(5)
-    end
-  end
-end
-
-# spec/factories/users.rb
-FactoryBot.define do
-  factory :user do
-    name  { Faker::Name.full_name }
-    email { Faker::Internet.unique.email }
-    password { 'password123' }
-
-    trait :admin do
-      role { 'admin' }
-    end
-
-    trait :with_posts do
-      after(:create) { |user| create_list(:post, 3, user: user) }
-    end
-  end
-end
-```
-
----
-
-## Senior Rails (ข้อ 46-60)
-
-### ข้อ 46: Performance Optimization
-
-```ruby
-# 1. Database Query Optimization
-
-# ใช้ select เฉพาะ columns ที่ต้องการ
-User.select(:id, :name, :email).limit(100)
-
-# ใช้ pluck สำหรับ single values
-User.pluck(:email)  # => ["a@test.com", ...]
-User.pluck(:id, :email)  # => [[1, "a@..."], ...]
-
-# Batch processing - ไม่โหลด ทั้งหมดใน memory
-User.find_each(batch_size: 1000) { |user| process(user) }
-
-User.in_batches(of: 1000) do |batch|
-  batch.update_all(updated_at: Time.current)
-end
-
-# 2. Caching
-def expensive_query
-  Rails.cache.fetch("expensive_#{cache_key}", expires_in: 5.minutes) do
-    # heavy computation
-  end
-end
-
-# 3. Bulk operations
-# Bad
-users.each { |u| u.update!(active: false) }
-
-# Good
-User.where(id: users.map(&:id)).update_all(active: false)
-
-# 4. Database indexes
-add_index :orders, [:user_id, :status, :created_at]
-add_index :products, :name, using: :gin  # Full-text search
-
-# 5. Connection Pooling
-# database.yml
-# pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
-```
-
----
-
-### ข้อ 47: Security Best Practices
-
-```ruby
-# 1. SQL Injection Prevention
-# NEVER
-User.where("email = '#{params[:email]}'")  # VULNERABLE!
-
-# ALWAYS
-User.where(email: params[:email])
-User.where("email = ?", params[:email])
-User.where("email = :email", email: params[:email])
-
-# 2. XSS Prevention
-# Rails auto-escapes ERB output
-# <%= user_input %>     # safe - escaped
-# <%= raw user_input %> # UNSAFE!
-# <%= user_input.html_safe %> # UNSAFE unless you sanitize!
-
-# Sanitize HTML
-ActionController::Base.helpers.sanitize(
-  user_content,
-  tags: %w[p br strong em],
-  attributes: %w[class]
-)
-
-# 3. CSRF Protection
-# ApplicationController includes protect_from_forgery by default
-protect_from_forgery with: :exception  # default for HTML
-protect_from_forgery with: :null_session  # for API
-
-# 4. Mass Assignment Protection
-# ใช้ strong parameters (ดูข้อ 38)
-
-# 5. Sensitive Data
-# ใช้ credentials
-Rails.application.credentials.stripe_api_key
-
-# 6. Secure Headers
-# gem 'secure_headers'
-SecureHeaders::Configuration.default do |config|
-  config.x_frame_options = "DENY"
-  config.x_content_type_options = "nosniff"
-  config.x_xss_protection = "1; mode=block"
-  config.content_security_policy = {
-    default_src: %w('none'),
-    script_src:  %w('self'),
-    style_src:   %w('self')
-  }
-end
-```
-
----
-
-### ข้อ 48: API Design
-
-```ruby
-# RESTful API with versioning
-# app/controllers/api/v1/base_controller.rb
-module Api
-  module V1
-    class BaseController < ActionController::API
-      include Pagy::Backend
-
-      before_action :authenticate_request!
-
-      rescue_from ActiveRecord::RecordNotFound,    with: :not_found
-      rescue_from ActiveRecord::RecordInvalid,     with: :unprocessable_entity
-      rescue_from ActionController::ParameterMissing, with: :bad_request
-
-      private
-
-      def authenticate_request!
-        token = request.headers['Authorization']&.sub(/^Bearer /, '')
-        @current_user = User.find_by_token(token)
-        render json: { error: 'Unauthorized' }, status: 401 unless @current_user
-      end
-
-      def not_found(exception)
-        render json: { error: exception.message }, status: :not_found
-      end
-
-      def paginated_response(collection, serializer:)
-        pagy, records = pagy(collection)
-
-        render json: {
-          data: records.map { |r| serializer.new(r).as_json },
-          meta: pagy_metadata(pagy)
-        }
+# 8. Sidekiq + Cache warming
+class CacheWarmingJob < ApplicationJob
+  def perform
+    User.find_each do |user|
+      Rails.cache.fetch("user/#{user.id}/stats", expires_in: 1.hour) do
+        user.calculate_stats
       end
     end
   end
 end
-
-# Serializers
-class UserSerializer
-  def initialize(user)
-    @user = user
-  end
-
-  def as_json
-    {
-      id:         @user.id,
-      name:       @user.name,
-      email:      @user.email,
-      created_at: @user.created_at.iso8601
-    }
-  end
-end
 ```
 
 ---
 
-### ข้อ 49: Database Transactions
+## System Design Questions {#system-design}
+
+### 23. ออกแบบระบบ URL Shortener
+
+**เฉลย:**
 
 ```ruby
-# Basic transaction
-ActiveRecord::Base.transaction do
-  order = Order.create!(user: user, total: 100)
-  PaymentRecord.create!(order: order, amount: 100)
-  inventory.update!(quantity: inventory.quantity - 1)
-end
-# ถ้า exception เกิดขึ้น ทั้งหมด rollback
+# Requirements:
+# - รับ URL ยาว -> คืน short URL
+# - Redirect short URL ไป original
+# - Track click stats
+# - High availability, low latency
 
-# Nested transactions (savepoints)
-User.transaction do
-  user.save!
+# Database Schema
+# urls: id, original_url, short_code, user_id, created_at
+# url_clicks: id, url_id, ip_address, user_agent, clicked_at
 
-  User.transaction(requires_new: true) do  # savepoint
-    user.profile.save!
-  end
-end
-
-# Transaction callbacks
-class Order < ApplicationRecord
-  after_commit :send_confirmation,  on: :create
-  after_commit :notify_change,      on: :update
-  after_rollback :handle_failure
-
-  def send_confirmation
-    OrderMailer.confirmation(self).deliver_later
-  end
-end
-
-# lock! - pessimistic locking
-def transfer_funds(from, to, amount)
-  Account.transaction do
-    from_account = Account.lock.find(from.id)
-    to_account   = Account.lock.find(to.id)
-
-    raise "Insufficient funds" if from_account.balance < amount
-
-    from_account.update!(balance: from_account.balance - amount)
-    to_account.update!(balance: to_account.balance + amount)
-  end
-end
-
-# Optimistic locking
-class Article < ApplicationRecord
-  # ต้องมี column lock_version: integer
-end
-
-article = Article.find(1)
-article.update!(title: "New")  # เพิ่ม WHERE lock_version = old_value
-# raise ActiveRecord::StaleObjectError ถ้า version เปลี่ยน
-```
-
----
-
-### ข้อ 50: Rails Engines
-
-```ruby
-# สร้าง Engine
-rails plugin new my_engine --mountable
-
-# my_engine/lib/my_engine/engine.rb
-module MyEngine
-  class Engine < ::Rails::Engine
-    isolate_namespace MyEngine
-
-    initializer "my_engine.assets" do |app|
-      app.config.assets.precompile += %w[my_engine/application.js]
-    end
-
-    config.generators do |g|
-      g.test_framework :rspec
-      g.fixture_replacement :factory_bot
-    end
-  end
-end
-
-# Mount ใน host app
-# config/routes.rb
-mount MyEngine::Engine, at: '/engine'
-
-# ใช้ path helpers
-my_engine.root_path
-main_app.root_path
-```
-
----
-
-### ข้อ 51-60: Advanced Rails Topics
-
-### ข้อ 51: ActiveRecord Query Interface
-
-```ruby
-# Complex queries
-User.joins(:posts)
-    .joins(:profile)
-    .where(posts: { published: true })
-    .where('profiles.completed = ?', true)
-    .select('users.*, COUNT(posts.id) as post_count')
-    .group('users.id')
-    .having('COUNT(posts.id) > 5')
-    .order('post_count DESC')
-    .limit(10)
-
-# Subquery
-popular_user_ids = Post.group(:user_id)
-                       .having('COUNT(*) > 10')
-                       .pluck(:user_id)
-
-User.where(id: popular_user_ids)
-
-# exists?
-User.where(id: Post.select(:user_id).where(published: true))
-
-# Raw SQL (use carefully)
-User.find_by_sql(<<~SQL)
-  SELECT users.*, COUNT(posts.id) as post_count
-  FROM users
-  LEFT JOIN posts ON posts.user_id = users.id
-  GROUP BY users.id
-  ORDER BY post_count DESC
-  LIMIT 10
-SQL
-
-# Arel for complex conditions
-User.where(
-  User.arel_table[:created_at].gteq(1.month.ago)
-  .and(User.arel_table[:active].eq(true))
-)
-```
-
----
-
-### ข้อ 52: Polymorphic Associations
-
-```ruby
 # Model
-class Comment < ApplicationRecord
-  belongs_to :commentable, polymorphic: true
-  belongs_to :user
-end
+class Url < ApplicationRecord
+  belongs_to :user, optional: true
+  has_many :url_clicks
 
-class Article < ApplicationRecord
-  has_many :comments, as: :commentable
-end
+  validates :original_url, presence: true, format: URI::regexp(%w[http https])
+  validates :short_code, presence: true, uniqueness: true
 
-class Photo < ApplicationRecord
-  has_many :comments, as: :commentable
-end
+  before_create :generate_short_code
 
-# Migration
-create_table :comments do |t|
-  t.text       :body
-  t.references :user
-  t.references :commentable, polymorphic: true
-  t.timestamps
-end
-# สร้าง columns: commentable_id, commentable_type
-
-# Usage
-article.comments.create!(body: "Great!", user: user)
-photo.comments.create!(body: "Nice photo!", user: user)
-
-# Query
-Comment.where(commentable_type: 'Article')
-comment.commentable  # => Article หรือ Photo instance
-```
-
----
-
-### ข้อ 53: Concerns
-
-```ruby
-# app/models/concerns/searchable.rb
-module Searchable
-  extend ActiveSupport::Concern
-
-  included do
-    scope :search, ->(query) {
-      where("name ILIKE :q OR description ILIKE :q", q: "%#{query}%")
-    }
-  end
-
-  class_methods do
-    def search_by_tags(*tags)
-      joins(:tags).where(tags: { name: tags })
+  def click_count
+    Rails.cache.fetch("url/#{id}/click_count", expires_in: 5.minutes) do
+      url_clicks.count
     end
-  end
-
-  def highlight_in(text, query)
-    text.gsub(/#{Regexp.escape(query)}/i, "<mark>\\0</mark>")
-  end
-end
-
-# ใช้ใน model
-class Article < ApplicationRecord
-  include Searchable
-end
-
-class Product < ApplicationRecord
-  include Searchable
-end
-
-# Controller concerns
-module Authenticatable
-  extend ActiveSupport::Concern
-
-  included do
-    before_action :authenticate_user!
-    helper_method :current_user
   end
 
   private
 
-  def authenticate_user!
-    redirect_to login_path unless user_signed_in?
+  def generate_short_code
+    loop do
+      self.short_code = Base62.encode(SecureRandom.random_number(62**6))
+      break unless Url.exists?(short_code: short_code)
+    end
+  end
+end
+
+# Base62 encoding
+module Base62
+  CHARS = ('0'..'9').to_a + ('a'..'z').to_a + ('A'..'Z').to_a
+
+  def self.encode(num)
+    result = ""
+    while num > 0
+      result = CHARS[num % 62] + result
+      num /= 62
+    end
+    result.rjust(6, '0')
+  end
+end
+
+# Controller
+class UrlsController < ApplicationController
+  def create
+    @url = Url.find_or_create_by(original_url: url_params[:original_url]) do |u|
+      u.user = current_user
+    end
+
+    if @url.persisted?
+      render json: { short_url: short_url(@url.short_code) }
+    else
+      render json: { errors: @url.errors }, status: :unprocessable_entity
+    end
+  end
+end
+
+class RedirectsController < ApplicationController
+  def show
+    url = Url.find_by!(short_code: params[:code])
+
+    # Track click asynchronously
+    TrackClickJob.perform_later(url.id, request.ip, request.user_agent)
+
+    redirect_to url.original_url, status: :moved_permanently
+  rescue ActiveRecord::RecordNotFound
+    render plain: "URL not found", status: :not_found
+  end
+end
+
+# Background job for tracking
+class TrackClickJob < ApplicationJob
+  queue_as :low_priority
+
+  def perform(url_id, ip_address, user_agent)
+    UrlClick.create!(
+      url_id: url_id,
+      ip_address: ip_address,
+      user_agent: user_agent
+    )
+
+    # Invalidate cache
+    Rails.cache.delete("url/#{url_id}/click_count")
+  end
+end
+
+# Caching ด้วย Redis
+# config/initializers/redis.rb
+REDIS = Redis.new(url: ENV["REDIS_URL"])
+
+class RedirectsController < ApplicationController
+  def show
+    # ตรวจ Redis ก่อน (เร็วกว่า DB)
+    original_url = REDIS.get("url:#{params[:code]}")
+
+    unless original_url
+      url = Url.find_by!(short_code: params[:code])
+      original_url = url.original_url
+      REDIS.setex("url:#{params[:code]}", 3600, original_url)
+    end
+
+    TrackClickJob.perform_later(params[:code], request.ip, request.user_agent)
+    redirect_to original_url, status: :moved_permanently
   end
 end
 ```
 
 ---
 
-### ข้อ 54: ActionCable
+### 24. ออกแบบระบบ Chat Application
+
+**เฉลย:**
 
 ```ruby
-# Channel
-class ChatChannel < ApplicationCable::Channel
-  def subscribed
-    @room = Room.find(params[:room_id])
-    stream_for @room
+# Stack: Rails + ActionCable + Redis + Sidekiq
+
+# Models
+class Conversation < ApplicationRecord
+  has_many :messages, dependent: :destroy
+  has_many :conversation_participants, dependent: :destroy
+  has_many :users, through: :conversation_participants
+
+  def self.find_or_create_direct(user1, user2)
+    conversation = joins(:conversation_participants)
+      .where(conversation_participants: { user: user1 })
+      .joins(:conversation_participants)
+      .where(conversation_participants: { user: user2 })
+      .where(direct: true)
+      .first
+
+    conversation || create_direct_conversation(user1, user2)
   end
 
-  def receive(data)
-    message = @room.messages.create!(
-      content: data['content'],
-      user:    current_user
-    )
+  private
 
-    ChatChannel.broadcast_to(@room, {
-      id:         message.id,
-      content:    message.content,
-      user:       current_user.username,
-      created_at: message.created_at.iso8601
-    })
+  def self.create_direct_conversation(user1, user2)
+    transaction do
+      conversation = create!(direct: true)
+      conversation.conversation_participants.create!(user: user1)
+      conversation.conversation_participants.create!(user: user2)
+      conversation
+    end
   end
 end
 
-# Connection
+class Message < ApplicationRecord
+  belongs_to :conversation
+  belongs_to :user
+  has_many :message_reads, dependent: :destroy
+
+  validates :body, presence: true, length: { maximum: 5000 }
+
+  after_create_commit :broadcast_message
+  after_create_commit :update_conversation_timestamp
+
+  def read_by?(user)
+    message_reads.exists?(user: user)
+  end
+
+  private
+
+  def broadcast_message
+    ActionCable.server.broadcast(
+      "conversation_#{conversation_id}",
+      {
+        type: "new_message",
+        message: MessageSerializer.new(self).as_json
+      }
+    )
+  end
+
+  def update_conversation_timestamp
+    conversation.touch
+  end
+end
+
+# ActionCable Channel
+class ConversationChannel < ApplicationCable::Channel
+  def subscribed
+    conversation = find_conversation(params[:conversation_id])
+    stream_from "conversation_#{conversation.id}"
+    mark_messages_read(conversation)
+  end
+
+  def unsubscribed
+    # Cleanup
+  end
+
+  def send_message(data)
+    conversation = find_conversation(data["conversation_id"])
+    message = conversation.messages.create!(
+      user: current_user,
+      body: data["body"]
+    )
+
+    # Broadcast typing stopped
+    ActionCable.server.broadcast(
+      "conversation_#{conversation.id}",
+      { type: "typing_stopped", user_id: current_user.id }
+    )
+  end
+
+  def typing(data)
+    ActionCable.server.broadcast(
+      "conversation_#{data['conversation_id']}",
+      { type: "typing", user_id: current_user.id }
+    )
+  end
+
+  private
+
+  def find_conversation(id)
+    current_user.conversations.find(id)
+  end
+
+  def mark_messages_read(conversation)
+    unread = conversation.messages
+      .where.not(user: current_user)
+      .where(id: MessageRead.where(user: current_user).select(:message_id))
+
+    MessageRead.insert_all(
+      unread.map { |m| { message_id: m.id, user_id: current_user.id } }
+    )
+  end
+end
+
+# Connection authentication
 module ApplicationCable
   class Connection < ActionCable::Connection::Base
     identified_by :current_user
@@ -2425,343 +2092,602 @@ module ApplicationCable
     private
 
     def find_verified_user
-      User.find_by(id: cookies.encrypted[:user_id]) ||
+      if (token = request.params[:token])
+        user = User.find_by(auth_token: token)
+        return user if user
+
         reject_unauthorized_connection
+      elsif (user = env["warden"]&.user)
+        user
+      else
+        reject_unauthorized_connection
+      end
     end
   end
 end
-
-# Broadcast from anywhere
-ActionCable.server.broadcast("room_#{room.id}", {
-  type: 'message',
-  content: message.content
-})
 ```
 
 ---
 
-### ข้อ 55: Deployment และ DevOps
+## Coding Challenges พร้อมเฉลย {#coding-challenges}
+
+### 25. Two Sum Problem
+
+**โจทย์:** หา indices สองตัวใน array ที่บวกกันได้ target
 
 ```ruby
-# Dockerfile
-# FROM ruby:3.3-alpine
-# WORKDIR /app
-# COPY Gemfile* ./
-# RUN bundle install
-# COPY . .
-# RUN bundle exec rails assets:precompile RAILS_ENV=production
-# CMD ["bundle", "exec", "puma", "-C", "config/puma.rb"]
-
-# Puma config
-# config/puma.rb
-workers ENV.fetch('WEB_CONCURRENCY', 2)
-threads_count = ENV.fetch('RAILS_MAX_THREADS', 5)
-threads threads_count, threads_count
-
-preload_app!
-
-on_worker_boot do
-  ActiveRecord::Base.establish_connection if defined?(ActiveRecord)
+# วิธีที่ 1: Brute Force O(n²)
+def two_sum_brute(nums, target)
+  nums.each_with_index do |num1, i|
+    nums.each_with_index do |num2, j|
+      next if i == j
+      return [i, j] if num1 + num2 == target
+    end
+  end
+  nil
 end
 
-# Health check
-class HealthController < ApplicationController
-  def show
-    checks = {
-      database: database_ok?,
-      redis:    redis_ok?,
-      sidekiq:  sidekiq_ok?
-    }
+# วิธีที่ 2: Hash Map O(n) - ดีที่สุด
+def two_sum(nums, target)
+  seen = {}  # value => index
 
-    status = checks.values.all? ? :ok : :service_unavailable
-    render json: { status: status, checks: checks }, status: status
+  nums.each_with_index do |num, i|
+    complement = target - num
+    if seen.key?(complement)
+      return [seen[complement], i]
+    end
+    seen[num] = i
+  end
+
+  nil
+end
+
+# Test cases
+puts two_sum([2, 7, 11, 15], 9).inspect   # => [0, 1]
+puts two_sum([3, 2, 4], 6).inspect         # => [1, 2]
+puts two_sum([3, 3], 6).inspect            # => [0, 1]
+```
+
+---
+
+### 26. FizzBuzz ขั้นสูง
+
+**โจทย์:** FizzBuzz แบบ extensible
+
+```ruby
+# วิธีที่ 1: Simple
+def fizz_buzz(n)
+  (1..n).map do |i|
+    if i % 15 == 0 then "FizzBuzz"
+    elsif i % 3 == 0 then "Fizz"
+    elsif i % 5 == 0 then "Buzz"
+    else i.to_s
+    end
+  end
+end
+
+# วิธีที่ 2: Extensible/Open for extension
+class FizzBuzz
+  def initialize
+    @rules = {}
+  end
+
+  def add_rule(divisor, word)
+    @rules[divisor] = word
+    self
+  end
+
+  def generate(n)
+    (1..n).map { |i| apply_rules(i) }
   end
 
   private
 
-  def database_ok?
-    ActiveRecord::Base.connection.execute("SELECT 1")
-    true
-  rescue => e
-    false
-  end
+  def apply_rules(n)
+    result = @rules
+      .sort_by { |divisor, _| divisor }
+      .select { |divisor, _| n % divisor == 0 }
+      .map { |_, word| word }
+      .join
 
-  def redis_ok?
-    Redis.new.ping == "PONG"
-  rescue
-    false
+    result.empty? ? n.to_s : result
   end
 end
+
+# การใช้งาน
+fb = FizzBuzz.new
+  .add_rule(3, "Fizz")
+  .add_rule(5, "Buzz")
+  .add_rule(7, "Bazz")
+
+fb.generate(21)
+# => ["1", "2", "Fizz", "4", "Buzz", "Fizz", "Bazz", "8", "Fizz", "Buzz",
+#     "11", "Fizz", "13", "Bazz", "FizzBuzz", "16", "17", "Fizz", "19", "Buzz", "FizzBazz"]
 ```
 
 ---
 
-### ข้อ 56: Rails Credentials และ Secrets
+### 27. Implement LRU Cache
+
+**โจทย์:** สร้าง LRU (Least Recently Used) Cache
 
 ```ruby
-# config/credentials.yml.enc (encrypted)
-# rails credentials:edit
-# production:
-#   database_password: secret123
-#   stripe:
-#     api_key: sk_live_xxx
-#     webhook_secret: whsec_xxx
+class LRUCache
+  def initialize(capacity)
+    @capacity = capacity
+    @cache = {}
+    @order = []  # tracks usage order (oldest first)
+  end
 
-# Access
-Rails.application.credentials.database_password
-Rails.application.credentials.stripe[:api_key]
-Rails.application.credentials.dig(:stripe, :api_key)
+  def get(key)
+    return -1 unless @cache.key?(key)
 
-# Multiple environments
-rails credentials:edit --environment production
-# config/credentials/production.yml.enc
+    # Update usage order
+    @order.delete(key)
+    @order.push(key)
 
-# Master key
-# RAILS_MASTER_KEY environment variable
-# config/master.key (ไม่ commit ใน git!)
+    @cache[key]
+  end
+
+  def put(key, value)
+    if @cache.key?(key)
+      @order.delete(key)
+    elsif @cache.size >= @capacity
+      # Evict least recently used
+      lru_key = @order.shift
+      @cache.delete(lru_key)
+    end
+
+    @cache[key] = value
+    @order.push(key)
+  end
+
+  def to_s
+    @order.map { |k| "#{k}:#{@cache[k]}" }.join(" -> ")
+  end
+end
+
+# วิธีที่ดีกว่า: ใช้ Hash (Ruby 1.9+ preserves insertion order)
+class LRUCacheOptimized
+  def initialize(capacity)
+    @capacity = capacity
+    @cache = {}
+  end
+
+  def get(key)
+    return -1 unless @cache.key?(key)
+
+    value = @cache.delete(key)
+    @cache[key] = value  # re-insert ที่ท้าย (newest)
+    value
+  end
+
+  def put(key, value)
+    @cache.delete(key) if @cache.key?(key)
+    @cache.shift if @cache.size >= @capacity  # ลบ oldest (อยู่หัว)
+    @cache[key] = value
+  end
+end
+
+# Test
+cache = LRUCacheOptimized.new(3)
+cache.put(1, 1)
+cache.put(2, 2)
+cache.put(3, 3)
+puts cache.get(1)  # => 1 (1 กลายเป็น newest)
+cache.put(4, 4)    # evict 2 (oldest)
+puts cache.get(2)  # => -1 (2 ถูก evict)
+puts cache.get(3)  # => 3
+puts cache.get(4)  # => 4
 ```
 
 ---
 
-### ข้อ 57: ActiveStorage
+### 28. Flatten Nested Array
+
+**โจทย์:** Flatten nested array โดยไม่ใช้ built-in flatten
 
 ```ruby
-class User < ApplicationRecord
-  has_one_attached  :avatar
-  has_many_attached :documents
-end
+def flatten_array(arr, depth = Float::INFINITY)
+  result = []
 
-# Attach
-user.avatar.attach(
-  io:           File.open('avatar.jpg'),
-  filename:     'avatar.jpg',
-  content_type: 'image/jpeg'
-)
-
-# From controller
-user.avatar.attach(params[:avatar])
-
-# Check
-user.avatar.attached?
-user.avatar.blank?
-
-# URL
-url_for(user.avatar)
-rails_blob_path(user.avatar, only_path: true)
-rails_blob_url(user.avatar)
-
-# Variants (image processing)
-user.avatar.variant(resize_to_limit: [100, 100])
-user.avatar.variant(resize_to_fill: [200, 200], format: :webp)
-
-# Download
-user.avatar.download
-user.avatar.open { |file| process(file) }
-
-# Direct upload (S3)
-user.avatar.service_url  # Pre-signed URL
-
-# Delete
-user.avatar.purge
-user.avatar.purge_later  # Background job
-```
-
----
-
-### ข้อ 58: Event-Driven Architecture ใน Rails
-
-```ruby
-# ActiveSupport::Notifications
-# instrument event
-ActiveSupport::Notifications.instrument('order.created', { order_id: order.id }) do
-  order.process!
-end
-
-# subscribe
-ActiveSupport::Notifications.subscribe('order.created') do |*args|
-  event = ActiveSupport::Notifications::Event.new(*args)
-  Analytics.track(event: 'order_created', order_id: event.payload[:order_id])
-end
-
-# Custom event system
-class EventBus
-  def self.publish(event_name, payload = {})
-    Rails.logger.info "Event: #{event_name}"
-    subscribers(event_name).each { |s| s.call(payload) }
-  end
-
-  def self.subscribe(event_name, &handler)
-    subscribers(event_name) << handler
-  end
-
-  def self.subscribers(event_name)
-    @subscribers         ||= Hash.new { |h, k| h[k] = [] }
-    @subscribers[event_name]
-  end
-end
-
-EventBus.subscribe('user.signed_up') { |p| WelcomeEmailJob.perform_later(p[:user_id]) }
-EventBus.subscribe('user.signed_up') { |p| Analytics.track('signup', p) }
-EventBus.publish('user.signed_up', user_id: user.id)
-```
-
----
-
-### ข้อ 59: Advanced Caching Strategies
-
-```ruby
-# Cache key versioning
-class Product < ApplicationRecord
-  def cache_key_with_version
-    "#{cache_key}-#{updated_at.to_i}-#{ENV['APP_VERSION']}"
-  end
-end
-
-# Counter cache
-class Post < ApplicationRecord
-  belongs_to :user, counter_cache: true
-  # users table: posts_count integer default 0
-end
-
-# Cached associations
-class User < ApplicationRecord
-  def cached_posts
-    Rails.cache.fetch("user_#{id}_posts", expires_in: 5.minutes) do
-      posts.published.recent.limit(10).to_a  # .to_a สำคัญ!
+  arr.each do |element|
+    if element.is_a?(Array) && depth > 0
+      result.concat(flatten_array(element, depth - 1))
+    else
+      result << element
     end
   end
+
+  result
 end
 
-# HTTP Cache with Rack::Cache
-# Gemfile: gem 'rack-cache'
-# config/application.rb: config.action_dispatch.rack_cache = true
+# Tests
+puts flatten_array([1, [2, [3, [4, 5]]]]).inspect
+# => [1, 2, 3, 4, 5]
 
-# Conditional GET
-def show
-  @article = Article.find(params[:id])
+puts flatten_array([1, [2, [3, [4, 5]]]], 1).inspect
+# => [1, 2, [3, [4, 5]]]
 
-  if stale?(etag: @article, last_modified: @article.updated_at)
-    render json: @article  # 200
+puts flatten_array([1, [2, [3, [4, 5]]]], 2).inspect
+# => [1, 2, 3, [4, 5]]
+
+# Iterative version
+def flatten_iterative(arr)
+  result = []
+  stack = arr.dup
+
+  until stack.empty?
+    item = stack.shift
+    if item.is_a?(Array)
+      stack.unshift(*item)
+    else
+      result << item
+    end
   end
-  # 304 Not Modified ถ้า cache ยังใช้ได้
+
+  result
 end
 ```
 
 ---
 
-### ข้อ 60: Multi-Database Setup
+### 29. Binary Search Tree
+
+**โจทย์:** Implement BST พร้อม insert, search, traverse
 
 ```ruby
-# database.yml
-primary:
-  adapter:  postgresql
-  database: myapp_primary
+class Node
+  attr_accessor :value, :left, :right
 
-analytics:
-  adapter:  postgresql
-  database: myapp_analytics
-
-# Model
-class ApplicationRecord < ActiveRecord::Base
-  self.abstract_class = true
+  def initialize(value)
+    @value = value
+    @left = nil
+    @right = nil
+  end
 end
 
-class AnalyticsRecord < ActiveRecord::Base
-  self.abstract_class = true
-  connects_to database: { writing: :analytics, reading: :analytics }
+class BinarySearchTree
+  def initialize
+    @root = nil
+  end
+
+  def insert(value)
+    @root = insert_node(@root, value)
+    self
+  end
+
+  def search(value)
+    search_node(@root, value)
+  end
+
+  def include?(value)
+    !search(value).nil?
+  end
+
+  # In-order traversal (sorted order)
+  def in_order
+    result = []
+    in_order_traverse(@root, result)
+    result
+  end
+
+  # Pre-order traversal
+  def pre_order
+    result = []
+    pre_order_traverse(@root, result)
+    result
+  end
+
+  # Post-order traversal
+  def post_order
+    result = []
+    post_order_traverse(@root, result)
+    result
+  end
+
+  def height
+    calculate_height(@root)
+  end
+
+  def min_value
+    return nil if @root.nil?
+    node = @root
+    node = node.left while node.left
+    node.value
+  end
+
+  def max_value
+    return nil if @root.nil?
+    node = @root
+    node = node.right while node.right
+    node.value
+  end
+
+  private
+
+  def insert_node(node, value)
+    return Node.new(value) if node.nil?
+
+    if value < node.value
+      node.left = insert_node(node.left, value)
+    elsif value > node.value
+      node.right = insert_node(node.right, value)
+    end
+    # value == node.value: ไม่ insert ซ้ำ
+
+    node
+  end
+
+  def search_node(node, value)
+    return nil if node.nil?
+    return node if node.value == value
+
+    if value < node.value
+      search_node(node.left, value)
+    else
+      search_node(node.right, value)
+    end
+  end
+
+  def in_order_traverse(node, result)
+    return if node.nil?
+    in_order_traverse(node.left, result)
+    result << node.value
+    in_order_traverse(node.right, result)
+  end
+
+  def pre_order_traverse(node, result)
+    return if node.nil?
+    result << node.value
+    pre_order_traverse(node.left, result)
+    pre_order_traverse(node.right, result)
+  end
+
+  def post_order_traverse(node, result)
+    return if node.nil?
+    post_order_traverse(node.left, result)
+    post_order_traverse(node.right, result)
+    result << node.value
+  end
+
+  def calculate_height(node)
+    return -1 if node.nil?
+    [calculate_height(node.left), calculate_height(node.right)].max + 1
+  end
 end
 
-class Event < AnalyticsRecord
-  # uses analytics database
-end
+# Test
+bst = BinarySearchTree.new
+[5, 3, 7, 1, 4, 6, 8, 2].each { |n| bst.insert(n) }
 
-# Read replicas
-class ApplicationRecord < ActiveRecord::Base
-  self.abstract_class = true
-  connects_to database: {
-    writing: :primary,
-    reading: :primary_replica
-  }
-end
-
-# Switching databases
-ActiveRecord::Base.connected_to(role: :reading) do
-  User.all  # ใช้ read replica
-end
-
-# Horizontal sharding
-class OrderRecord < ApplicationRecord
-  connects_to shards: {
-    shard_one: { writing: :shard_one },
-    shard_two: { writing: :shard_two }
-  }
-end
-
-ActiveRecord::Base.connected_to(shard: :shard_one) do
-  Order.where(user_id: 1..5000)
-end
+puts bst.in_order.inspect   # => [1, 2, 3, 4, 5, 6, 7, 8]
+puts bst.pre_order.inspect  # => [5, 3, 1, 2, 4, 7, 6, 8]
+puts bst.include?(4)        # => true
+puts bst.include?(9)        # => false
+puts bst.min_value          # => 1
+puts bst.max_value          # => 8
+puts bst.height             # => 3
 ```
 
 ---
 
-## Coding Challenges
+### 30. Anagram Detection
 
-### Challenge 1: FizzBuzz
+**โจทย์:** ตรวจสอบว่า strings สองตัวเป็น anagram กันหรือไม่
+
 ```ruby
-(1..100).each do |n|
-  if n % 15 == 0
-    puts "FizzBuzz"
-  elsif n % 3 == 0
-    puts "Fizz"
-  elsif n % 5 == 0
-    puts "Buzz"
-  else
-    puts n
-  end
+# วิธีที่ 1: Sort and compare O(n log n)
+def anagram_sort?(str1, str2)
+  normalize(str1).chars.sort == normalize(str2).chars.sort
 end
 
-# One-liner
-(1..100).map { |n| (fb = [["Fizz", 3], ["Buzz", 5]].map { |s, m| s if n % m == 0 }.compact.join).empty? ? n : fb }
+def normalize(str)
+  str.downcase.gsub(/[^a-z]/, '')
+end
+
+# วิธีที่ 2: Character frequency O(n)
+def anagram?(str1, str2)
+  s1 = normalize(str1)
+  s2 = normalize(str2)
+
+  return false if s1.length != s2.length
+
+  freq = Hash.new(0)
+  s1.each_char { |c| freq[c] += 1 }
+  s2.each_char { |c| freq[c] -= 1 }
+
+  freq.values.all?(&:zero?)
+end
+
+# วิธีที่ 3: Group anagrams
+def group_anagrams(words)
+  words.group_by { |w| w.downcase.chars.sort.join }
+       .values
+end
+
+# Tests
+puts anagram?("listen", "silent")    # => true
+puts anagram?("hello", "world")      # => false
+puts anagram?("Astronomer", "Moon starer")  # => true (ignore spaces)
+
+groups = group_anagrams(["eat", "tea", "tan", "ate", "nat", "bat"])
+groups.each { |g| puts g.inspect }
+# => ["eat", "tea", "ate"]
+# => ["tan", "nat"]
+# => ["bat"]
 ```
 
-### Challenge 2: Palindrome
+---
+
+## Behavioral Questions {#behavioral}
+
+### 31. คำถาม Behavioral สำหรับ Senior Rails Developer
+
+**คำถาม:** "บอกถึงครั้งที่คุณต้องตัดสินใจเรื่อง trade-off ระหว่าง technical debt และ delivery speed"
+
+**Framework การตอบ (STAR Method):**
+
+**Situation:** โปรเจกต์ e-commerce ต้องการ launch ใน 2 สัปดาห์
+**Task:** ต้องสร้าง checkout flow ที่ซับซ้อน
+**Action:** ตัดสินใจ implement แบบ quick-and-dirty ก่อน แต่ document technical debt ทุกจุด
+**Result:** Launch ได้ตามกำหนด และมี refactoring plan ที่ชัดเจน
+
+**ตัวอย่างการตอบ:**
+
+```
+"ในโปรเจกต์ที่ผ่านมา เราต้องการ launch feature ใหม่ภายใน 2 สัปดาห์
+เพื่อตอบสนองความต้องการของลูกค้าสำคัญ
+
+ผมตัดสินใจทำ code review ร่วมกับทีม แล้วระบุส่วนที่:
+1. ต้องทำให้ถูกต้องตั้งแต่แรก (security, data integrity)
+2. สามารถ simplify ได้ชั่วคราว แล้วค่อย refactor ทีหลัง
+
+เราใช้ TODO comments ที่มีชื่อและ issue tracker
+เพื่อติดตาม technical debt ทุกชิ้น
+
+ผลคือ launch ได้ตามกำหนด และใน sprint ถัดมา
+เรา refactor ส่วนที่ค้างอยู่ได้ 80% ภายใน 3 sprints"
+```
+
+---
+
+### 32. Code Review คำถาม
+
+**คำถาม:** "คุณพบ code นี้ใน PR และมีความคิดเห็นอย่างไร?"
+
 ```ruby
-def palindrome?(str)
-  cleaned = str.downcase.gsub(/[^a-z0-9]/, '')
-  cleaned == cleaned.reverse
+# Code ที่พบใน PR
+def get_user_data(user_id)
+  user = User.find(user_id)
+  articles = Article.where("user_id = #{user_id}")  # SQL injection!
+  comments = Comment.where(user_id: user_id)
+
+  {
+    user: user,
+    articles: articles,
+    comments: comments
+  }
 end
 ```
 
-### Challenge 3: Two Sum
+**เฉลย - ปัญหาที่พบ:**
+
 ```ruby
-def two_sum(nums, target)
-  seen = {}
-  nums.each_with_index do |num, i|
-    complement = target - num
-    return [seen[complement], i] if seen.key?(complement)
-    seen[num] = i
-  end
+# ปัญหา 1: SQL Injection vulnerability
+articles = Article.where("user_id = #{user_id}")
+# แก้เป็น:
+articles = Article.where(user_id: user_id)
+
+# ปัญหา 2: N+1 potential - ถ้าเรียกใช้หลายครั้ง
+# แก้ด้วย eager loading
+
+# ปัญหา 3: ไม่จัดการ exception เมื่อ user ไม่พบ
+user = User.find(user_id)  # raise ActiveRecord::RecordNotFound
+
+# Version ที่ดีกว่า:
+def get_user_data(user_id)
+  user = User.includes(:articles, :comments).find(user_id)
+
+  {
+    user: user.as_json(only: [:id, :name, :email]),
+    articles: user.articles.as_json(only: [:id, :title, :created_at]),
+    comments: user.comments.as_json(only: [:id, :body, :created_at])
+  }
+rescue ActiveRecord::RecordNotFound
   nil
 end
 ```
 
 ---
 
-## สรุป
+### 33. Architecture Discussion Questions
 
-ตารางระดับคำถาม:
+**คำถาม:** "คุณจะออกแบบระบบ Background Job Processing อย่างไร?"
 
-| ระดับ | หัวข้อ | จำนวน |
-|-------|--------|-------|
-| Junior Ruby | Basics, OOP, Collections | 1-10 |
-| Mid Ruby | Closures, Metaprogramming, Concurrency | 11-25 |
-| Senior Ruby | GC, Fibers, Performance | 26-30 |
-| Junior Rails | MVC, AR Basics, Routing | 31-40 |
-| Mid Rails | Services, Jobs, Auth | 41-50 |
-| Senior Rails | Performance, Security, Architecture | 51-60 |
+**เฉลย:**
 
-เตรียมตัวเพิ่มเติม:
-1. ฝึก System Design สำหรับ Senior level
-2. ทำ LeetCode ใน Ruby
-3. อ่าน Rails Guides ทั้งหมด
-4. ทำ side project จริง
+```ruby
+# ระบบที่ดีต้องประกอบด้วย:
+
+# 1. Job definitions ที่ชัดเจน
+class SendEmailJob < ApplicationJob
+  queue_as :emails
+  retry_on StandardError, attempts: 3, wait: :exponentially_longer
+  discard_on ActiveRecord::RecordNotFound
+
+  def perform(user_id, email_type)
+    user = User.find(user_id)
+    UserMailer.send(email_type, user).deliver_now
+  end
+end
+
+# 2. Priority queues
+# config/sidekiq.yml
+# :queues:
+#   - [critical, 10]
+#   - [default, 5]
+#   - [low, 1]
+
+# 3. Idempotency - ทำซ้ำได้โดยไม่เกิดผลข้างเคียง
+class ProcessPaymentJob < ApplicationJob
+  def perform(payment_id)
+    payment = Payment.find(payment_id)
+
+    # ตรวจสอบว่าเคยทำแล้วหรือยัง
+    return if payment.processed?
+
+    ActiveRecord::Base.transaction do
+      payment.process!
+      payment.update!(processed_at: Time.current)
+    end
+  end
+end
+
+# 4. Dead Letter Queue - จัดการ jobs ที่ fail
+class DeadLetterReporter
+  def self.check_and_alert
+    dead_jobs = Sidekiq::DeadSet.new
+    if dead_jobs.size > 100
+      AdminMailer.dead_jobs_alert(dead_jobs.size).deliver_later
+    end
+  end
+end
+
+# 5. Monitoring
+# Sidekiq Web UI mounted ใน routes
+require 'sidekiq/web'
+mount Sidekiq::Web => '/admin/sidekiq'
+```
+
+---
+
+## สรุป Tips สำหรับการสัมภาษณ์
+
+### เทคนิคการตอบคำถาม Technical
+
+1. **อธิบาย concept ก่อน** - อย่าเริ่ม code ทันที
+2. **พูดถึง trade-offs** - แสดงว่าเข้าใจว่าไม่มีทางเลือกที่ดีที่สุดเสมอ
+3. **ถามคำถาม** - เพื่อทำความเข้าใจ requirements
+4. **เริ่มจาก brute force** - แล้วค่อย optimize
+5. **Test cases ก่อน code** - แสดง TDD thinking
+
+### คำถามที่ควรถามผู้สัมภาษณ์
+
+1. "Team size เท่าไหร่ และ code review process เป็นอย่างไร?"
+2. "Tech stack ปัจจุบันมีอะไรบ้าง และมีแผนจะเปลี่ยนอะไรไหม?"
+3. "On-call responsibility เป็นอย่างไร?"
+4. "Engineering culture ให้ความสำคัญกับอะไร?"
+5. "Definition of Done สำหรับ feature คืออะไร?"
+
+### Red Flags ที่ควรระวัง
+
+- ไม่มี code review process
+- ไม่มี tests
+- Deployment manual ทั้งหมด
+- Technical debt สูงมากและไม่มีแผนจัดการ
+- Team turnover สูง
+
+---
+
+*อัพเดทล่าสุด: 2024 | Ruby 3.3 | Rails 7.1*
