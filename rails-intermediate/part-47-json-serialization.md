@@ -1,347 +1,255 @@
-# ตอนที่ 47: JSON และ Serialization (Steps 1036-1055)
+# Part 47: JSON และ Serialization ใน Rails
 
-## บทนำ
-
-Serialization คือกระบวนการแปลง Ruby objects ให้เป็น JSON format ที่ส่งผ่าน API ได้ Rails มีหลายวิธีในการทำ serialization ตั้งแต่วิธีพื้นฐานอย่าง `as_json` จนถึง library ที่ซับซ้อนอย่าง `jsonapi-serializer`
-
-ในบทนี้เราจะเรียนรู้แต่ละวิธีพร้อมข้อดีข้อเสีย เพื่อให้เลือกใช้ได้เหมาะสมกับแต่ละโปรเจกต์
+## ขั้นตอนที่ 1036-1055: การจัดการ JSON Data
 
 ---
 
-## Step 1036: to_json และ as_json
-
-### ความแตกต่างระหว่าง to_json และ as_json
+## ขั้นตอนที่ 1036: JSON Basics ใน Rails
 
 ```ruby
-# to_json - แปลง object เป็น JSON string โดยตรง
-article = Article.first
-article.to_json
-# => '{"id":1,"title":"Hello","body":"World","created_at":"2024-01-01T00:00:00Z"}'
+# to_json - แปลง object เป็น JSON string
+user = User.find(1)
+user.to_json  
+# => '{"id":1,"name":"สมชาย","email":"somchai@example.com",...}'
 
-# as_json - แปลง object เป็น Hash ก่อน (ก่อนจะ serialize เป็น JSON)
-article.as_json
-# => {"id"=>1, "title"=>"Hello", "body"=>"World", "created_at"=>"2024-01-01T00:00:00Z"}
+# ควบคุม fields ที่แสดง
+user.to_json(only: [:id, :name])
+# => '{"id":1,"name":"สมชาย"}'
+
+user.to_json(except: [:password_digest, :remember_digest])
+
+# เพิ่ม methods
+user.to_json(methods: [:full_name, :avatar_url])
+
+# Include associations
+user.to_json(include: :posts)
+user.to_json(include: { posts: { only: [:id, :title] } })
 ```
 
-### as_json Options
-
 ```ruby
-# only: แสดงเฉพาะ fields ที่ระบุ
-article.as_json(only: [:id, :title, :created_at])
-# => {"id"=>1, "title"=>"Hello", "created_at"=>"2024-01-01T00:00:00Z"}
+# as_json - แปลงเป็น Ruby Hash (ก่อน serialize)
+user.as_json  
+# => {"id"=>1, "name"=>"สมชาย", ...}
 
-# except: แสดงทุก field ยกเว้นที่ระบุ
-article.as_json(except: [:body, :updated_at])
+user.as_json(only: [:id, :name, :email])
 
-# include: รวม associations
-article.as_json(include: :user)
-article.as_json(include: { user: { only: [:id, :name] } })
+# Collection
+users = User.all
+users.as_json  # Array of hashes
+users.to_json  # JSON string ของ array
 
-# methods: เรียก instance methods
-article.as_json(methods: [:excerpt, :reading_time])
-
-# ผสมกัน
-article.as_json(
-  only: [:id, :title],
-  include: { 
-    user: { only: [:id, :name, :email] },
-    comments: { 
-      only: [:id, :body, :created_at],
-      include: { user: { only: [:id, :name] } }
-    }
-  },
-  methods: [:comments_count, :excerpt]
-)
+# render json ใน controller
+class UsersController < ApplicationController
+  def show
+    @user = User.find(params[:id])
+    render json: @user.as_json(
+      only: [:id, :name, :email],
+      methods: [:avatar_url],
+      include: { posts: { only: [:id, :title, :published] } }
+    )
+  end
+end
 ```
 
-### Override as_json ใน Model
+## ขั้นตอนที่ 1037: Override as_json
 
 ```ruby
-# app/models/article.rb
-class Article < ApplicationRecord
-  belongs_to :user
-  has_many :comments
-  
+# app/models/user.rb
+class User < ApplicationRecord
   def as_json(options = {})
-    default_options = {
-      only: [:id, :title, :body, :published, :views_count, :created_at, :updated_at],
-      include: {
-        user: { only: [:id, :name, :email] }
-      },
-      methods: [:excerpt, :reading_time, :comments_count]
-    }
+    super(options.merge(
+      only: [:id, :name, :email, :created_at],
+      methods: [:avatar_url, :posts_count],
+      except: [:password_digest, :remember_digest, :reset_digest]
+    ))
+  end
+  
+  def avatar_url
+    if avatar.attached?
+      Rails.application.routes.url_helpers.url_for(avatar)
+    else
+      "https://ui-avatars.com/api/?name=#{URI.encode_www_form_component(name)}&background=random"
+    end
+  end
+  
+  def posts_count
+    posts.published.count
+  end
+end
+```
+
+```ruby
+# app/models/post.rb
+class Post < ApplicationRecord
+  def as_json(options = {})
+    base = super(options.merge(
+      only: [:id, :title, :content, :published, :created_at, :updated_at],
+      methods: [:excerpt, :reading_time]
+    ))
     
-    super(default_options.deep_merge(options))
+    # เพิ่ม computed fields
+    base.merge(
+      'author' => user&.as_json(only: [:id, :name]),
+      'tags' => tags.map { |t| t.as_json(only: [:id, :name]) }
+    )
   end
   
   def excerpt
-    body&.truncate(200, separator: ' ')
+    content&.truncate(200)
   end
   
   def reading_time
-    words_per_minute = 200
-    words = body&.split&.length || 0
-    minutes = [(words / words_per_minute.to_f).ceil, 1].max
-    "#{minutes} นาที"
-  end
-  
-  def comments_count
-    comments.count
+    words = content.to_s.split.length
+    (words / 200.0).ceil
   end
 end
 ```
 
----
-
-## Step 1037: Jbuilder
-
-### การใช้ Jbuilder
-
-Jbuilder ทำให้สร้าง JSON ใน view files ได้ คล้าย ERB views
+## ขั้นตอนที่ 1038: to_xml
 
 ```ruby
-# Gemfile (รวมอยู่ใน Rails แล้ว สำหรับ non-API mode)
+# แปลงเป็น XML
+user.to_xml
+# => <?xml version="1.0" encoding="UTF-8"?>
+#    <user>
+#      <id type="integer">1</id>
+#      <name>สมชาย</name>
+#      ...
+#    </user>
+
+# ควบคุม output
+user.to_xml(
+  only: [:id, :name],
+  root: 'member',
+  skip_types: true,
+  indent: 2
+)
+
+# Include associations
+user.to_xml(include: :posts)
+
+# Custom builder
+user.to_xml do |xml|
+  xml.profile do
+    xml.name user.name
+    xml.email user.email
+    xml.joined user.created_at.strftime("%Y-%m-%d")
+  end
+end
+```
+
+## ขั้นตอนที่ 1039: Jbuilder Views
+
+Jbuilder เป็น gem ที่มาพร้อมกับ Rails ใช้สร้าง JSON ใน view templates
+
+```ruby
+# Gemfile (มาพร้อม Rails แล้ว)
 gem 'jbuilder'
 ```
 
-### Jbuilder View Files
-
 ```ruby
-# app/views/api/v1/articles/index.json.jbuilder
-json.success true
-json.data do
-  json.array! @articles do |article|
-    json.extract! article, :id, :title, :body, :published, :views_count, :created_at
-    json.user do
-      json.extract! article.user, :id, :name, :email
-    end
-    json.excerpt article.body&.truncate(150)
-    json.comments_count article.comments.count
+# app/views/api/v1/posts/index.json.jbuilder
+json.posts @posts do |post|
+  json.id post.id
+  json.title post.title
+  json.excerpt post.content.truncate(200)
+  json.published post.published
+  json.created_at post.created_at.iso8601
+  
+  json.author do
+    json.id post.user.id
+    json.name post.user.name
+    json.avatar_url post.user.avatar_url
   end
+  
+  json.tags post.tags, :id, :name
+  
+  json.url api_v1_post_url(post)
 end
+
 json.meta do
-  json.total_items @pagy.count
-  json.total_pages @pagy.pages
-  json.current_page @pagy.page
-  json.per_page @pagy.items
+  json.total @posts.total_count
+  json.pages @posts.total_pages
+  json.current_page @posts.current_page
 end
 ```
 
 ```ruby
-# app/views/api/v1/articles/show.json.jbuilder
-json.success true
-json.data do
-  json.extract! @article, :id, :title, :body, :published, :views_count, :created_at, :updated_at
+# app/views/api/v1/posts/show.json.jbuilder
+json.id @post.id
+json.title @post.title
+json.content @post.content
+json.published @post.published
+json.published_at @post.published_at&.iso8601
+json.created_at @post.created_at.iso8601
+json.updated_at @post.updated_at.iso8601
+json.reading_time @post.reading_time
+json.views_count @post.views_count
+json.likes_count @post.likes_count
+
+json.author do
+  json.id @post.user.id
+  json.name @post.user.name
+  json.bio @post.user.bio
+  json.avatar_url @post.user.avatar_url
+  json.posts_count @post.user.posts.published.count
+end
+
+json.tags @post.tags do |tag|
+  json.id tag.id
+  json.name tag.name
+  json.slug tag.slug
+  json.posts_count tag.posts.published.count
+end
+
+json.comments @post.comments.approved.recent.limit(10) do |comment|
+  json.id comment.id
+  json.body comment.body
+  json.created_at comment.created_at.iso8601
   
   json.user do
-    json.extract! @article.user, :id, :name, :email
-    json.articles_count @article.user.articles.count
+    json.id comment.user.id
+    json.name comment.user.name
+    json.avatar_url comment.user.avatar_url
   end
-  
-  json.comments do
-    json.array! @article.comments.includes(:user) do |comment|
-      json.extract! comment, :id, :body, :created_at
-      json.user do
-        json.extract! comment.user, :id, :name
-      end
-    end
-  end
-  
-  json.meta do
-    json.reading_time @article.reading_time
-    json.comments_count @article.comments.count
-    json.is_published @article.published?
-  end
+end
+
+json.related_posts @post.related_posts.limit(5) do |related|
+  json.id related.id
+  json.title related.title
+  json.excerpt related.content.truncate(150)
+  json.url api_v1_post_url(related)
 end
 ```
 
 ```ruby
-# app/views/api/v1/articles/_article.json.jbuilder (partial)
-json.extract! article, :id, :title, :published, :views_count, :created_at
-json.excerpt article.body&.truncate(150)
-json.author article.user.name
-
-# ใช้ partial ใน index
-# app/views/api/v1/articles/index.json.jbuilder
-json.array! @articles, partial: 'api/v1/articles/article', as: :article
-```
-
-### Controller ที่ใช้ Jbuilder
-
-```ruby
-# app/controllers/api/v1/articles_controller.rb
-def index
-  @articles = Article.published.includes(:user, :comments)
-  @pagy, @articles = pagy(@articles)
-  # Jbuilder จะ render index.json.jbuilder อัตโนมัติ
-end
-
-def show
-  @article = Article.includes(:user, comments: :user).find(params[:id])
-  @article.increment_views!
-  # Jbuilder จะ render show.json.jbuilder
-end
-```
-
----
-
-## Step 1038: Active Model Serializers (AMS)
-
-### Setup
-
-```ruby
-# Gemfile
-gem 'active_model_serializers', '~> 0.10.0'
-```
-
-```bash
-bundle install
-
-# Generate serializer
-rails generate serializer Article
-rails generate serializer User
-rails generate serializer Comment
-```
-
-```ruby
-# config/initializers/ams.rb
-ActiveModelSerializers.config.adapter = :json  # หรือ :json_api
-ActiveModelSerializers.config.key_transform = :camel_lower  # หรือ :dash, :underscore
-```
-
-### Serializer Classes
-
-```ruby
-# app/serializers/user_serializer.rb
-class UserSerializer < ActiveModel::Serializer
-  attributes :id, :name, :email, :role, :created_at
-  
-  has_many :articles
-  
-  attribute :full_name do
-    "#{object.first_name} #{object.last_name}"
-  end
-  
-  attribute :articles_count do
-    object.articles.count
-  end
-  
-  # Conditional attribute
-  attribute :admin_data, if: :admin? do
-    {
-      permissions: object.permissions,
-      last_login: object.last_sign_in_at
-    }
-  end
-  
-  private
-  
-  def admin?
-    scope&.admin?
-  end
+# Jbuilder partials
+# app/views/api/v1/posts/_post.json.jbuilder
+json.cache! ['v1', post], expires_in: 10.minutes do
+  json.id post.id
+  json.title post.title
+  json.excerpt post.content.truncate(200)
+  json.author post.user.name
+  json.url api_v1_post_url(post)
 end
 ```
 
 ```ruby
-# app/serializers/article_serializer.rb
-class ArticleSerializer < ActiveModel::Serializer
-  attributes :id, :title, :body, :published, :views_count, :created_at, :updated_at
-  
-  belongs_to :user
-  has_many :comments
-  
-  attribute :excerpt do
-    object.body&.truncate(200, separator: ' ')
-  end
-  
-  attribute :reading_time do
-    words = object.body&.split&.length || 0
-    minutes = [(words / 200.0).ceil, 1].max
-    "#{minutes} นาที"
-  end
-  
-  attribute :comments_count do
-    object.comments.size
-  end
-  
-  attribute :url do
-    Rails.application.routes.url_helpers.api_v1_article_url(object)
-  end
-  
-  # แสดง body เฉพาะ detail view
-  attribute :body, if: -> { instance_options[:include_body] }
+# ใช้ partial
+# app/views/api/v1/posts/index.json.jbuilder
+json.posts @posts do |post|
+  json.partial! post
 end
 ```
 
-### ใช้ใน Controller
+## ขั้นตอนที่ 1040: Blueprinter Gem
 
-```ruby
-# app/controllers/api/v1/articles_controller.rb
-def index
-  articles = Article.published.includes(:user, :comments)
-  render json: articles, each_serializer: ArticleSerializer
-end
-
-def show
-  article = Article.find(params[:id])
-  # ส่ง options ไปยัง serializer
-  render json: article, 
-         serializer: ArticleSerializer,
-         include_body: true,
-         scope: current_user,
-         scope_name: :current_user
-end
-
-def create
-  article = current_user.articles.build(article_params)
-  if article.save
-    render json: article, 
-           serializer: ArticleSerializer,
-           status: :created
-  else
-    render json: { errors: article.errors }, status: :unprocessable_entity
-  end
-end
-```
-
-### Nested Associations
-
-```ruby
-# app/serializers/article_with_comments_serializer.rb
-class ArticleWithCommentsSerializer < ArticleSerializer
-  has_many :comments, serializer: CommentWithUserSerializer
-  
-  attributes :full_text  # override ของ parent
-  
-  def full_text
-    object.body  # แสดง body เต็ม (ไม่ truncate)
-  end
-end
-
-# app/serializers/comment_with_user_serializer.rb
-class CommentWithUserSerializer < ActiveModel::Serializer
-  attributes :id, :body, :created_at
-  belongs_to :user, serializer: UserBriefSerializer
-end
-
-# app/serializers/user_brief_serializer.rb
-class UserBriefSerializer < ActiveModel::Serializer
-  attributes :id, :name, :email
-end
-```
-
----
-
-## Step 1039: Blueprinter
-
-### Setup
+Blueprinter เป็น serialization library ที่เร็วและง่ายต่อการใช้
 
 ```ruby
 # Gemfile
 gem 'blueprinter'
 ```
-
-### Blueprint Classes
 
 ```ruby
 # app/blueprints/user_blueprint.rb
@@ -351,139 +259,151 @@ class UserBlueprint < Blueprinter::Base
   # Default view
   fields :name, :email, :created_at
   
-  field :role do |user, _options|
-    user.role.to_s.capitalize
+  field :avatar_url do |user, _options|
+    user.avatar_url
   end
   
-  # Named views
+  # Normal view
+  view :normal do
+    fields :name, :email, :bio, :created_at
+  end
+  
+  # Extended view (includes more data)
   view :extended do
-    fields :name, :email, :role, :created_at, :updated_at
+    include_view :normal
     
-    field :articles_count do |user|
-      user.articles.count
+    fields :phone, :timezone, :locale
+    
+    field :posts_count do |user|
+      user.posts.published.count
     end
     
-    association :articles, blueprint: ArticleBlueprint, view: :brief
+    association :posts, blueprint: PostBlueprint, view: :summary
   end
   
+  # Admin view (everything)
   view :admin do
     include_view :extended
-    fields :id  # Admin ได้เห็น id
-    
-    field :total_comments do |user|
-      user.comments.count
-    end
+    fields :role, :last_sign_in_at, :sign_in_count, :active
   end
 end
 ```
 
 ```ruby
-# app/blueprints/article_blueprint.rb
-class ArticleBlueprint < Blueprinter::Base
+# app/blueprints/post_blueprint.rb
+class PostBlueprint < Blueprinter::Base
   identifier :id
   
-  view :brief do
-    fields :id, :title, :published, :created_at
+  view :summary do
+    fields :title, :excerpt, :published_at, :reading_time
     
-    field :excerpt do |article|
-      article.body&.truncate(150)
+    field :excerpt do |post|
+      post.content.truncate(200)
     end
     
-    association :user, blueprint: UserBlueprint
+    field :url do |post, options|
+      options[:url_helpers].api_v1_post_url(post)
+    end
   end
   
   view :normal do
-    include_view :brief
-    fields :body, :views_count, :updated_at
+    include_view :summary
+    fields :content, :views_count, :likes_count
     
-    field :reading_time do |article|
-      words = article.body&.split&.length || 0
-      "#{[(words / 200.0).ceil, 1].max} นาที"
-    end
+    association :user, blueprint: UserBlueprint, view: :normal
+    association :tags, blueprint: TagBlueprint
   end
   
   view :full do
     include_view :normal
-    association :comments, blueprint: CommentBlueprint, view: :with_user
     
-    field :comments_count do |article|
-      article.comments.size
+    association :comments, blueprint: CommentBlueprint do |post|
+      post.comments.approved.order(created_at: :desc).limit(20)
     end
   end
 end
 ```
 
-### ใช้ Blueprinter ใน Controller
-
 ```ruby
-# app/controllers/api/v1/articles_controller.rb
-def index
-  articles = Article.published.includes(:user)
-  pagy, articles = pagy(articles)
+# การใช้งาน Blueprinter ใน controller
+class Api::V1::PostsController < ApplicationController
+  def index
+    @posts = Post.published.page(params[:page])
+    
+    render json: PostBlueprint.render_as_hash(
+      @posts,
+      view: :normal,
+      root: :posts,
+      url_helpers: Rails.application.routes.url_helpers
+    )
+  end
   
-  render json: {
-    success: true,
-    data: ArticleBlueprint.render_as_hash(articles, view: :brief),
-    meta: {
-      total: pagy.count,
-      page: pagy.page
-    }
-  }
-end
-
-def show
-  article = Article.includes(:user, comments: :user).find(params[:id])
-  
-  render json: {
-    success: true,
-    data: ArticleBlueprint.render_as_hash(article, view: :full)
-  }
-end
-
-# render เป็น JSON string โดยตรง
-def export
-  articles = Article.all
-  render json: ArticleBlueprint.render(articles, view: :normal)
+  def show
+    @post = Post.find(params[:id])
+    
+    render json: PostBlueprint.render_as_hash(
+      @post,
+      view: :full,
+      url_helpers: Rails.application.routes.url_helpers
+    )
+  end
 end
 ```
 
----
-
-## Step 1040: jsonapi-serializer (fast_jsonapi)
-
-### Setup
+## ขั้นตอนที่ 1041: Fast JSONAPI (jsonapi-serializer)
 
 ```ruby
 # Gemfile
 gem 'jsonapi-serializer'
 ```
 
-### Serializer Classes
-
 ```ruby
-# app/serializers/article_serializer.rb
-class ArticleSerializer
+# app/serializers/post_serializer.rb
+class PostSerializer
   include JSONAPI::Serializer
   
-  set_type :article
+  set_type :post
   set_id :id
   
-  attributes :title, :body, :published, :views_count, :created_at, :updated_at
+  attributes :title, :content, :published
   
-  attribute :excerpt do |article|
-    article.body&.truncate(200)
+  # Computed attributes
+  attribute :excerpt do |object|
+    object.content&.truncate(200)
   end
   
-  attribute :reading_time do |article|
-    words = article.body&.split&.length || 0
-    "#{[(words / 200.0).ceil, 1].max} นาที"
+  attribute :reading_time do |object|
+    (object.content.to_s.split.length / 200.0).ceil
   end
   
+  attribute :url do |object, params|
+    params[:url_helpers].api_v1_post_url(object) if params[:url_helpers]
+  end
+  
+  # Conditional attributes
+  attribute :admin_notes do |object, params|
+    object.admin_notes if params[:current_user]&.admin?
+  end
+  
+  # Relationships
   belongs_to :user
-  has_many :comments
+  has_many :tags
+  has_many :comments do |object|
+    object.comments.approved.limit(10)
+  end
   
-  # Cache control
-  cache_options store: Rails.cache, namespace: 'jsonapi-serializer', expires_in: 1.hour
+  # Links
+  link :self do |object|
+    Rails.application.routes.url_helpers.api_v1_post_url(object)
+  end
+  
+  # Meta
+  meta do |object, params|
+    {
+      likes_count: object.likes.count,
+      comments_count: object.comments.approved.count
+    }
+  end
 end
 ```
 
@@ -494,630 +414,809 @@ class UserSerializer
   
   set_type :user
   
-  attributes :name, :email, :role, :created_at
+  attributes :name, :created_at
   
-  has_many :articles
+  # ซ่อน email ตาม permission
+  attribute :email do |object, params|
+    object.email if params[:current_user] == object || params[:current_user]&.admin?
+  end
   
-  # Conditional attribute
-  attribute :admin_notes, if: proc { |record, params|
-    params[:current_user]&.admin?
-  }
+  attribute :avatar_url do |object|
+    object.avatar_url
+  end
+  
+  has_many :posts do |object, params|
+    scope = params[:include_drafts] ? object.posts : object.posts.published
+    scope.order(created_at: :desc).limit(10)
+  end
 end
 ```
-
-### ใช้ใน Controller
 
 ```ruby
-# app/controllers/api/v1/articles_controller.rb
-def index
-  articles = Article.published.includes(:user, :comments)
-  pagy, articles = pagy(articles)
+# การใช้งานใน controller
+class Api::V1::PostsController < ApplicationController
+  def index
+    @posts = Post.published
+                 .includes(:user, :tags)
+                 .order(created_at: :desc)
+    
+    # กำหนด params สำหรับ serializer
+    serializer_params = {
+      current_user: current_user,
+      url_helpers: Rails.application.routes.url_helpers
+    }
+    
+    render json: PostSerializer.new(
+      @posts,
+      include: [:user, :tags],
+      params: serializer_params,
+      meta: { total: @posts.count }
+    ).serializable_hash
+  end
   
-  options = {
-    meta: {
-      total_pages: pagy.pages,
-      current_page: pagy.page,
-      total_items: pagy.count
-    },
-    params: { current_user: current_user }
-  }
-  
-  render json: ArticleSerializer.new(articles, options).serializable_hash
-end
-
-def show
-  article = Article.includes(:user, comments: :user).find(params[:id])
-  
-  options = {
-    include: [:user, :'comments.user'],
-    params: { current_user: current_user }
-  }
-  
-  render json: ArticleSerializer.new(article, options).serializable_hash
+  def show
+    @post = Post.includes(:user, :tags, :comments).find(params[:id])
+    
+    render json: PostSerializer.new(
+      @post,
+      include: ['user', 'tags', 'comments.user'],
+      params: { current_user: current_user }
+    ).serializable_hash
+  end
 end
 ```
 
-### JSON:API Format Output
-
-```json
-{
-  "data": {
-    "id": "1",
-    "type": "article",
-    "attributes": {
-      "title": "Hello World",
-      "body": "Content here",
-      "excerpt": "Content...",
-      "reading_time": "2 นาที"
-    },
-    "relationships": {
-      "user": {
-        "data": { "id": "1", "type": "user" }
-      },
-      "comments": {
-        "data": [
-          { "id": "1", "type": "comment" }
-        ]
-      }
-    }
-  },
-  "included": [
-    {
-      "id": "1",
-      "type": "user",
-      "attributes": {
-        "name": "John Doe",
-        "email": "john@example.com"
-      }
-    }
-  ],
-  "meta": {
-    "total_pages": 5,
-    "current_page": 1
-  }
-}
-```
-
----
-
-## Step 1041: Custom Serializers
-
-### Pure Ruby Serializer
+## ขั้นตอนที่ 1042: Custom Serializers (ไม่ใช้ gem)
 
 ```ruby
 # app/serializers/base_serializer.rb
 class BaseSerializer
-  def initialize(object, options = {})
-    @object = object
+  def initialize(resource, options = {})
+    @resource = resource
     @options = options
-    @current_user = options[:current_user]
   end
   
   def as_json
-    raise NotImplementedError, "Subclasses must implement as_json"
+    raise NotImplementedError
   end
   
-  def self.serialize(object, options = {})
-    new(object, options).as_json
-  end
-  
-  def self.serialize_collection(objects, options = {})
-    objects.map { |obj| new(obj, options).as_json }
+  def to_json
+    as_json.to_json
   end
   
   private
   
-  attr_reader :object, :options, :current_user
+  attr_reader :resource, :options
+  
+  def current_user
+    options[:current_user]
+  end
+  
+  def admin?
+    current_user&.admin?
+  end
 end
 ```
 
 ```ruby
-# app/serializers/article_serializer.rb
-class ArticleSerializer < BaseSerializer
+# app/serializers/post_detail_serializer.rb
+class PostDetailSerializer < BaseSerializer
   def as_json
-    base_data.tap do |data|
-      data[:user] = UserSerializer.serialize(object.user) if object.association(:user).loaded?
-      data[:comments] = CommentSerializer.serialize_collection(object.comments) if options[:include_comments]
-    end
-  end
-  
-  private
-  
-  def base_data
     {
-      id: object.id,
-      title: object.title,
-      body: include_full_body? ? object.body : nil,
-      excerpt: object.body&.truncate(200),
-      published: object.published,
-      views_count: object.views_count,
-      reading_time: calculate_reading_time,
-      created_at: object.created_at.iso8601,
-      updated_at: object.updated_at.iso8601
-    }.compact
+      id: resource.id,
+      type: "post",
+      attributes: attributes,
+      relationships: relationships,
+      links: links,
+      meta: meta
+    }
   end
   
-  def include_full_body?
-    options[:include_body] == true
-  end
+  private
   
-  def calculate_reading_time
-    words = object.body&.split&.length || 0
-    minutes = [(words / 200.0).ceil, 1].max
-    "#{minutes} นาที"
-  end
-end
-```
-
----
-
-## Step 1042: Serializing Associations
-
-### Handling N+1 ด้วย includes
-
-```ruby
-# app/controllers/api/v1/articles_controller.rb
-def index
-  # ป้องกัน N+1 queries
-  articles = Article.published
-                    .includes(:user, :comments, :tags)  # Eager load
-                    .order(created_at: :desc)
-  
-  pagy, articles = pagy(articles)
-  
-  render json: {
-    data: articles.map { |article| ArticleSerializer.new(article).as_json }
-  }
-end
-```
-
-### Conditional Associations
-
-```ruby
-# app/serializers/article_serializer.rb
-class ArticleSerializer < ActiveModel::Serializer
-  attributes :id, :title, :published, :created_at
-  
-  # Association ที่แสดงเฉพาะเมื่อ include ขอ
-  has_many :comments, if: -> { instance_options[:include_comments] }
-  belongs_to :user
-  
-  # Conditional nested fields
-  attribute :user_email, if: -> { 
-    scope&.admin? || object.user == scope 
-  } do
-    object.user.email
-  end
-end
-```
-
-### Polymorphic Associations
-
-```ruby
-# app/serializers/activity_serializer.rb
-class ActivitySerializer < ActiveModel::Serializer
-  attributes :id, :action, :created_at
-  
-  attribute :subject do
-    case object.subject_type
-    when 'Article'
-      ArticleSerializer.new(object.subject).as_json
-    when 'Comment'
-      CommentSerializer.new(object.subject).as_json
-    when 'User'
-      UserSerializer.new(object.subject).as_json
-    end
-  end
-end
-```
-
----
-
-## Step 1043: Conditional Attributes
-
-```ruby
-# app/serializers/article_serializer.rb
-class ArticleSerializer < ActiveModel::Serializer
-  attributes :id, :title, :published, :created_at
-  
-  # แสดงเฉพาะเมื่อ published
-  attribute :published_at, if: -> { object.published? }
-  
-  # แสดงเฉพาะ admin
-  attribute :internal_notes, if: -> { scope&.admin? } do
-    object.internal_notes
-  end
-  
-  # แสดงเฉพาะ owner หรือ admin
-  attribute :draft_content, if: -> {
-    scope&.admin? || object.user_id == scope&.id
-  } do
-    object.draft_body
-  end
-  
-  # แสดงตาม options ที่ส่งมา
-  attribute :full_body, if: -> { instance_options[:detailed_view] } do
-    object.body
-  end
-end
-```
-
----
-
-## Step 1044: Camelize vs Snake_case
-
-### Key Transform
-
-```ruby
-# config/initializers/ams.rb
-# ใช้ camelCase (สำหรับ JavaScript frontend)
-ActiveModelSerializers.config.key_transform = :camel_lower
-# { "createdAt": "...", "viewsCount": 0 }
-
-# ใช้ dash (สำหรับ JSON:API)
-ActiveModelSerializers.config.key_transform = :dash
-# { "created-at": "...", "views-count": 0 }
-
-# ใช้ underscore (default Rails)
-ActiveModelSerializers.config.key_transform = :underscore
-# { "created_at": "...", "views_count": 0 }
-```
-
-### Manual Camelize
-
-```ruby
-# app/serializers/article_serializer.rb
-class ArticleSerializer
-  include JSONAPI::Serializer
-  
-  set_key_transform :camel_lower
-  
-  attributes :title, :body, :created_at
-  # Output: { "title": "...", "createdAt": "..." }
-end
-```
-
-```ruby
-# Custom camelize helper
-module CamelizeHelper
-  def camelize_keys(hash)
-    hash.transform_keys { |key| key.to_s.camelize(:lower).to_sym }
-  end
-  
-  def deep_camelize_keys(obj)
-    case obj
-    when Hash
-      obj.transform_keys { |key| key.to_s.camelize(:lower) }
-         .transform_values { |val| deep_camelize_keys(val) }
-    when Array
-      obj.map { |item| deep_camelize_keys(item) }
-    else
-      obj
-    end
-  end
-end
-```
-
----
-
-## Step 1045: Performance Comparison
-
-### Benchmark ต่างๆ
-
-```ruby
-# lib/tasks/benchmark.rake
-namespace :benchmark do
-  desc "Compare serializer performance"
-  task serializers: :environment do
-    require 'benchmark'
+  def attributes
+    data = {
+      title: resource.title,
+      content: resource.content,
+      excerpt: resource.content&.truncate(200),
+      published: resource.published,
+      reading_time: reading_time,
+      created_at: resource.created_at.iso8601,
+      updated_at: resource.updated_at.iso8601
+    }
     
-    articles = Article.includes(:user, :comments).first(100)
+    # Admin-only fields
+    data[:admin_notes] = resource.admin_notes if admin?
+    data[:internal_id] = resource.internal_id if admin?
     
-    Benchmark.bm(30) do |x|
-      x.report("as_json:") do
-        100.times { articles.as_json(include: { user: {}, comments: {} }) }
-      end
-      
-      x.report("AMS:") do
-        100.times { 
-          ActiveModelSerializers::SerializableResource.new(articles).as_json 
+    data
+  end
+  
+  def relationships
+    {
+      author: {
+        data: { type: "user", id: resource.user_id },
+        attributes: {
+          name: resource.user.name,
+          avatar_url: resource.user.avatar_url
         }
-      end
-      
-      x.report("Blueprinter:") do
-        100.times { ArticleBlueprint.render_as_hash(articles, view: :normal) }
-      end
-      
-      x.report("jsonapi-serializer:") do
-        100.times { ArticleSerializer.new(articles).serializable_hash }
-      end
-    end
+      },
+      tags: resource.tags.map { |tag| 
+        { id: tag.id, name: tag.name, slug: tag.slug }
+      },
+      comments: {
+        data: resource.comments.approved.count,
+        recent: resource.comments.approved.order(created_at: :desc).limit(3).map { |c|
+          { id: c.id, body: c.body.truncate(100), user: c.user.name }
+        }
+      }
+    }
+  end
+  
+  def links
+    {
+      self: Rails.application.routes.url_helpers.api_v1_post_url(resource)
+    }
+  end
+  
+  def meta
+    {
+      views: resource.views_count,
+      likes: resource.likes_count
+    }
+  end
+  
+  def reading_time
+    words = resource.content.to_s.split.length
+    "#{(words / 200.0).ceil} นาที"
   end
 end
 ```
 
-### ผลการ Benchmark (approximate)
-
-| Gem | Speed | Memory | Use Case |
-|-----|-------|--------|---------|
-| as_json | Medium | Low | Simple, quick |
-| Jbuilder | Slow | Medium | Complex views |
-| AMS | Slow | High | Full-featured |
-| Blueprinter | Fast | Low | Production |
-| jsonapi-serializer | Very Fast | Low | JSON:API |
-
----
-
-## Step 1046: Best Practices
-
-### การเลือก Serializer
+## ขั้นตอนที่ 1043: Serializing Associations
 
 ```ruby
-# สำหรับ Simple API
-# ใช้ as_json หรือ custom Hash serializer
-
-# สำหรับ Complex API ที่ต้องการ flexibility
-# ใช้ Active Model Serializers
-
-# สำหรับ High Performance API
-# ใช้ Blueprinter หรือ jsonapi-serializer
-
-# สำหรับ JSON:API spec compliance
-# ใช้ jsonapi-serializer
-```
-
-### Caching Serialization Results
-
-```ruby
-# app/serializers/article_serializer.rb
-class ArticleSerializer < ActiveModel::Serializer
-  cache key: 'article', expires_in: 1.hour
-  
-  attributes :id, :title, :body, :created_at
-  belongs_to :user
-end
-```
-
-### Avoiding N+1 ใน Serializers
-
-```ruby
-# ไม่ดี - N+1 query
-articles.each do |article|
-  article.user.name  # query สำหรับทุก article
-  article.comments.count  # อีก query
-end
-
-# ดี - Eager load
-articles = Article.includes(:user, :comments).all
-articles.each do |article|
-  article.user.name  # ไม่มี N+1
-  article.comments.count  # ใช้ counter_cache
-end
-
-# ดีกว่า - ใช้ counter_cache
-add_column :articles, :comments_count, :integer, default: 0
-
-class Comment < ApplicationRecord
-  belongs_to :article, counter_cache: true
-end
-
-# ใน serializer
-def comments_count
-  object.comments_count  # ไม่ต้อง query
-end
-```
-
----
-
-## แบบฝึกหัด (20 ข้อ)
-
-### ระดับพื้นฐาน
-
-**ข้อ 1:** เขียน as_json ที่แสดงเฉพาะ id, name, email ของ User
-```ruby
-# เฉลย
-user.as_json(only: [:id, :name, :email])
-```
-
-**ข้อ 2:** เขียน as_json ที่รวม User's articles พร้อม title และ created_at
-```ruby
-# เฉลย
-user.as_json(
-  only: [:id, :name],
-  include: { articles: { only: [:id, :title, :created_at] } }
-)
-```
-
-**ข้อ 3:** สร้าง Jbuilder view สำหรับ product list ที่แสดง id, name, price, category name
-```ruby
-# เฉลย
-# app/views/api/v1/products/index.json.jbuilder
-json.array! @products do |product|
-  json.extract! product, :id, :name, :price
-  json.category_name product.category&.name
-end
-```
-
-**ข้อ 4:** สร้าง ProductSerializer ด้วย AMS ที่มี :brief view แสดง id, name, price
-```ruby
-# เฉลย
-class ProductSerializer < ActiveModel::Serializer
-  attributes :id, :name, :price
-  
-  attribute :in_stock do
-    object.stock_quantity > 0
-  end
-end
-```
-
-**ข้อ 5:** สร้าง Blueprint สำหรับ User ที่มี :with_stats view แสดงจำนวน articles และ comments
-```ruby
-# เฉลย
-class UserBlueprint < Blueprinter::Base
-  identifier :id
-  fields :name, :email
-  
-  view :with_stats do
-    fields :name, :email, :created_at
-    
-    field :articles_count do |user|
-      user.articles.count
-    end
-    
-    field :comments_count do |user|
-      user.comments.count
-    end
-  end
-end
-```
-
-### ระดับกลาง
-
-**ข้อ 6:** สร้าง jsonapi-serializer สำหรับ Article ที่มี relationships กับ User และ Tags
-```ruby
-# เฉลย
-class ArticleSerializer
+# app/serializers/post_with_nested_serializer.rb
+class PostWithNestedSerializer
   include JSONAPI::Serializer
   
-  set_type :article
-  attributes :title, :body, :published, :created_at
+  attributes :title, :content
   
-  attribute :excerpt do |article|
-    article.body&.truncate(200)
+  # Nested serializer สำหรับ belongs_to
+  belongs_to :user, serializer: UserBasicSerializer
+  
+  # Nested serializer สำหรับ has_many
+  has_many :tags, serializer: TagSerializer
+  
+  # Nested serializer แบบ conditional
+  has_many :comments, serializer: CommentSerializer do |post, params|
+    if params[:include_all_comments]
+      post.comments.approved
+    else
+      post.comments.approved.order(created_at: :desc).limit(5)
+    end
   end
   
+  # Polymorphic association
+  belongs_to :commentable, polymorphic: true
+end
+```
+
+```ruby
+# Serialize deeply nested data
+class UserWithPostsSerializer
+  include JSONAPI::Serializer
+  
+  attributes :name, :email
+  
+  has_many :posts do |user, params|
+    user.posts.published.includes(:tags, :comments)
+  end
+end
+
+# ใน controller
+render json: UserWithPostsSerializer.new(
+  user,
+  include: ['posts', 'posts.tags', 'posts.comments']
+).serializable_hash
+```
+
+## ขั้นตอนที่ 1044: Performance Tips สำหรับ Serialization
+
+```ruby
+# 1. Eager loading associations
+class Api::V1::PostsController < ApplicationController
+  def index
+    @posts = Post.published
+                 .includes(:user, :tags, :comments)  # ป้องกัน N+1
+                 .page(params[:page])
+    
+    render json: PostSerializer.new(@posts).serializable_hash
+  end
+end
+
+# 2. Caching serialized data
+class PostSerializer
+  include JSONAPI::Serializer
+  
+  cache_options store: Rails.cache, namespace: 'jsonapi', expires_in: 1.hour
+  
+  attributes :title, :content, :published_at
   belongs_to :user
   has_many :tags
 end
-```
 
-**ข้อ 7:** เพิ่ม conditional attribute ใน AMS serializer ที่แสดง admin_notes เฉพาะ admin users
-```ruby
-# เฉลย
-class ArticleSerializer < ActiveModel::Serializer
-  attributes :id, :title, :body
+# 3. Select เฉพาะ columns ที่ต้องการ
+@posts = Post.select(:id, :title, :content, :user_id, :published_at)
+             .published
+             .page(params[:page])
+
+# 4. ใช้ batch loading
+# gem 'batch-loader'
+class PostSerializer
+  include JSONAPI::Serializer
   
-  attribute :admin_notes, if: -> { scope&.admin? } do
-    object.admin_notes
+  attribute :comments_count do |post|
+    BatchLoader::GraphQL.for(post.id).batch do |post_ids, loader|
+      Comment.where(post_id: post_ids)
+             .group(:post_id)
+             .count
+             .each { |id, count| loader.call(id, count) }
+    end
+  end
+end
+
+# 5. Streaming large datasets
+class Api::V1::ExportsController < ApplicationController
+  def posts
+    response.headers['Content-Type'] = 'application/json'
+    response.headers['Transfer-Encoding'] = 'chunked'
+    
+    self.response_body = Enumerator.new do |y|
+      y << '{"posts":['
+      
+      Post.published.find_each.with_index do |post, index|
+        y << ',' if index > 0
+        y << PostSerializer.new(post).to_json
+      end
+      
+      y << ']}'
+    end
   end
 end
 ```
 
-**ข้อ 8:** สร้าง custom serializer แบบ Pure Ruby ที่ transform keys เป็น camelCase
+## ขั้นตอนที่ 1045: JSON Schema Validation
+
 ```ruby
-# เฉลย
-class ArticleSerializer
-  def initialize(article)
-    @article = article
+# app/validators/json_schema_validator.rb
+class JsonSchemaValidator < ActiveModel::EachValidator
+  def validate_each(record, attribute, value)
+    return if value.blank?
+    
+    schema = options[:with]
+    errors = JSON::Validator.fully_validate(schema, value)
+    
+    if errors.any?
+      errors.each { |error| record.errors.add(attribute, error) }
+    end
+  end
+end
+
+# app/models/product.rb
+class Product < ApplicationRecord
+  METADATA_SCHEMA = {
+    "type" => "object",
+    "properties" => {
+      "color" => { "type" => "string" },
+      "size" => { "type" => "string", "enum" => ["S", "M", "L", "XL"] },
+      "weight" => { "type" => "number", "minimum" => 0 }
+    },
+    "required" => ["color", "size"]
+  }
+  
+  validates :metadata, json_schema: { with: METADATA_SCHEMA }
+  
+  store_accessor :metadata, :color, :size, :weight
+end
+```
+
+## ขั้นตอนที่ 1046: JSON Columns ใน Database
+
+```ruby
+# Migration
+class AddMetadataToProducts < ActiveRecord::Migration[7.0]
+  def change
+    add_column :products, :metadata, :jsonb, default: {}
+    add_column :products, :attributes_data, :json
+    
+    # JSON index (PostgreSQL)
+    add_index :products, :metadata, using: :gin
+    add_index :products, "(metadata->>'color')"
+    add_index :products, "((metadata->>'price')::numeric)"
+  end
+end
+```
+
+```ruby
+# app/models/product.rb
+class Product < ApplicationRecord
+  # JSON column accessors
+  store_accessor :metadata, :color, :size, :weight, :dimensions
+  
+  # Serializers
+  serialize :specifications, coder: JSON
+  
+  # Validations
+  validates :color, presence: true
+  validates :size, inclusion: { in: %w[XS S M L XL XXL] }
+  
+  # Scopes ที่ใช้ JSON column
+  scope :red_products, -> { where("metadata->>'color' = ?", "red") }
+  scope :large_sizes, -> { where("metadata->>'size' IN (?)", %w[L XL XXL]) }
+  scope :heavy_items, -> { where("(metadata->>'weight')::float > ?", 5.0) }
+end
+```
+
+```ruby
+# Querying JSON columns
+Post.where("settings->>'language' = ?", "th")
+Post.where("(settings->'notifications')::boolean = true")
+Post.where("tags @> ?", ["ruby", "rails"].to_json)  # JSONB contains
+Post.where("extra_data ? :key", key: "special_field")  # key exists
+```
+
+## ขั้นตอนที่ 1047: JSON API Error Responses
+
+```ruby
+# Standard JSON:API error format
+{
+  "errors": [
+    {
+      "status": "422",
+      "source": { "pointer": "/data/attributes/title" },
+      "title": "Invalid Attribute",
+      "detail": "Title ไม่สามารถเว้นว่างได้"
+    },
+    {
+      "status": "422",
+      "source": { "pointer": "/data/attributes/email" },
+      "title": "Invalid Attribute",
+      "detail": "Email รูปแบบไม่ถูกต้อง"
+    }
+  ]
+}
+```
+
+```ruby
+# app/services/error_serializer.rb
+class ErrorSerializer
+  def initialize(model)
+    @model = model
   end
   
-  def as_json
+  def serialize
     {
-      id: @article.id,
-      articleTitle: @article.title,
-      articleBody: @article.body,
-      createdAt: @article.created_at.iso8601,
-      viewsCount: @article.views_count
+      errors: @model.errors.map { |error| serialize_error(error) }
+    }
+  end
+  
+  private
+  
+  def serialize_error(error)
+    {
+      status: "422",
+      source: { pointer: "/data/attributes/#{error.attribute}" },
+      title: "Validation Error",
+      detail: error.full_message
     }
   end
 end
 ```
 
-**ข้อ 9:** เพิ่ม caching ใน AMS serializer
+## ขั้นตอนที่ 1048: Blueprinter ขั้นสูง
+
 ```ruby
-# เฉลย
-class ProductSerializer < ActiveModel::Serializer
-  cache key: 'product', expires_in: 30.minutes
+# Transformations
+class PostBlueprint < Blueprinter::Base
+  # เปลี่ยน field names
+  transform do |hash|
+    hash.transform_keys { |k| k.to_s.camelize(:lower) }
+  end
   
-  attributes :id, :name, :price, :description
-  belongs_to :category
+  # นิยาม field แบบ dynamic
+  view :with_metrics do
+    include_view :normal
+    
+    dynamic_field :engagement_score do |post|
+      (post.likes_count * 2 + post.comments.count * 3 + post.views_count).to_f / 
+        [post.age_in_days, 1].max
+    end
+  end
 end
 ```
 
-**ข้อ 10:** เขียน Jbuilder view ที่แสดง nested comments (comment มี sub-comments)
 ```ruby
-# เฉลย
-json.comments do
-  json.array! @article.root_comments do |comment|
-    json.extract! comment, :id, :body, :created_at
-    json.replies do
-      json.array! comment.replies do |reply|
-        json.extract! reply, :id, :body, :created_at
-        json.user_name reply.user.name
+# Nested Blueprints
+class OrderBlueprint < Blueprinter::Base
+  identifier :id
+  
+  fields :status, :total_amount, :created_at
+  
+  association :user, blueprint: UserBlueprint
+  association :items, blueprint: OrderItemBlueprint
+  
+  view :with_shipping do
+    include_view :normal
+    
+    field :shipping_details do |order|
+      {
+        address: order.shipping_address,
+        carrier: order.carrier,
+        tracking_number: order.tracking_number,
+        estimated_delivery: order.estimated_delivery&.strftime("%d/%m/%Y")
+      }
+    end
+  end
+end
+```
+
+## ขั้นตอนที่ 1049: Testing Serializers
+
+```ruby
+# spec/serializers/post_serializer_spec.rb
+require 'rails_helper'
+
+RSpec.describe PostSerializer do
+  let(:user) { create(:user) }
+  let(:post) { create(:post, :published, user: user) }
+  let(:tags) { create_list(:tag, 3) }
+  
+  before { post.tags << tags }
+  
+  subject(:serialized) do
+    described_class.new(post, params: { current_user: user }).serializable_hash
+  end
+  
+  describe "attributes" do
+    it "includes required attributes" do
+      attrs = serialized[:data][:attributes]
+      expect(attrs).to include(:title, :content, :published)
+    end
+    
+    it "includes excerpt" do
+      expect(serialized[:data][:attributes][:excerpt]).to eq(post.content.truncate(200))
+    end
+    
+    it "includes reading_time" do
+      expect(serialized[:data][:attributes][:reading_time]).to be_a(Integer)
+    end
+  end
+  
+  describe "relationships" do
+    it "includes user relationship" do
+      expect(serialized[:data][:relationships][:user]).to be_present
+    end
+    
+    it "includes tags" do
+      expect(serialized[:data][:relationships][:tags][:data].length).to eq(3)
+    end
+  end
+  
+  describe "conditional attributes" do
+    context "ผู้ใช้ทั่วไป" do
+      it "ไม่รวม admin_notes" do
+        expect(serialized[:data][:attributes]).not_to have_key(:admin_notes)
+      end
+    end
+    
+    context "admin" do
+      let(:admin) { create(:user, :admin) }
+      
+      subject(:serialized) do
+        described_class.new(post, params: { current_user: admin }).serializable_hash
+      end
+      
+      it "รวม admin_notes" do
+        expect(serialized[:data][:attributes]).to have_key(:admin_notes)
       end
     end
   end
 end
 ```
 
-### ระดับสูง
+## ขั้นตอนที่ 1050: Jbuilder Best Practices
 
-**ข้อ 11:** เขียน benchmark เปรียบเทียบ as_json กับ Blueprinter สำหรับ 1000 records
 ```ruby
-# เฉลย
-require 'benchmark'
-articles = Article.includes(:user).first(1000)
+# ใช้ partial สำหรับ reusability
+# app/views/api/v1/shared/_user.json.jbuilder
+json.id user.id
+json.name user.name
+json.avatar_url user.avatar_url
 
-Benchmark.bm do |x|
-  x.report("as_json:") { articles.as_json(include: :user) }
-  x.report("Blueprint:") { ArticleBlueprint.render_as_hash(articles) }
+# app/views/api/v1/posts/show.json.jbuilder
+json.id @post.id
+json.title @post.title
+
+json.author do
+  json.partial! 'api/v1/shared/user', user: @post.user
 end
+
+# ใช้ cache
+json.cache! [@post, 'v2'], expires_in: 5.minutes do
+  json.id @post.id
+  json.title @post.title
+  json.content @post.content
+end
+
+# Conditional rendering
+json.secret_key @post.secret_key if current_user&.admin?
+
+# Null handling
+json.published_at @post.published_at&.iso8601
 ```
 
-**ข้อ 12:** สร้าง serializer ที่ handle N+1 โดย detect ว่า association loaded หรือยัง
+## ขั้นตอนที่ 1051: JSONB PostgreSQL
+
 ```ruby
-# เฉลย
-class ArticleSerializer
-  def as_json
-    data = { id: @article.id, title: @article.title }
+# การค้นหาใน JSONB
+# ค้นหา records ที่มี key
+Post.where("settings ? 'dark_mode'")
+
+# ค้นหาค่าใน JSONB
+Post.where("settings ->> 'theme' = ?", 'dark')
+
+# JSONB contains
+Post.where("tags @> ?", '["ruby"]')
+
+# Path operator
+Post.where("settings #>> '{notifications, email}' = ?", 'true')
+
+# Update JSONB
+Post.where(id: 1).update_all("settings = settings || '#{{"featured": true}}'.to_json")
+
+# Aggregate JSON
+Post.group("settings->>'category'").count
+```
+
+```ruby
+# Migration สำหรับ JSONB
+class AddSettingsToUsers < ActiveRecord::Migration[7.0]
+  def change
+    add_column :users, :settings, :jsonb, default: {
+      theme: 'light',
+      language: 'th',
+      notifications: {
+        email: true,
+        push: false,
+        sms: false
+      }
+    }
     
-    if @article.association(:user).loaded?
-      data[:user] = { id: @article.user.id, name: @article.user.name }
-    else
-      data[:user_id] = @article.user_id
-    end
+    # Index สำหรับ JSONB
+    add_index :users, :settings, using: :gin
     
-    data
+    # Index สำหรับ specific path
+    add_index :users, "(settings->>'theme')", name: 'index_users_on_settings_theme'
   end
 end
 ```
 
-**ข้อ 13-20:** (แบบฝึกหัดเพิ่มเติม)
-- สร้าง serializer ที่รองรับ polymorphic associations
-- implement streaming serialization สำหรับ large datasets
-- สร้าง serializer ที่ exclude null/empty values
-- implement pagination metadata ใน serializer
-- สร้าง serializer versioning system
-- implement field selection (sparse fieldsets)
-- สร้าง serializer ที่รองรับ circular references
-- performance optimization ด้วย fragment caching
+## ขั้นตอนที่ 1052: Serialization สำหรับ CSV/Excel
 
 ```ruby
-# เฉลย ข้อ 14 - Sparse Fieldsets
-class ArticleSerializer
-  include JSONAPI::Serializer
+# app/serializers/post_csv_serializer.rb
+class PostCsvSerializer
+  def self.serialize(posts)
+    CSV.generate(headers: true) do |csv|
+      csv << headers
+      posts.each { |post| csv << row(post) }
+    end
+  end
   
-  attributes :id, :title, :body, :published, :created_at
+  private
   
-  # ใน controller
-  # fields = params[:fields]&.split(',') || []
-  # ArticleSerializer.new(article, { fields: { article: fields } })
+  def self.headers
+    ["ID", "หัวข้อ", "ผู้เขียน", "สถานะ", "วันที่สร้าง", "ยอดวิว", "ยอดถูกใจ"]
+  end
+  
+  def self.row(post)
+    [
+      post.id,
+      post.title,
+      post.user.name,
+      post.published? ? "เผยแพร่" : "ร่าง",
+      post.created_at.strftime("%d/%m/%Y %H:%M"),
+      post.views_count,
+      post.likes_count
+    ]
+  end
 end
 
-# Request: GET /articles?fields[article]=id,title,created_at
+# ใน controller
+class Admin::PostsController < ApplicationController
+  def export
+    @posts = Post.includes(:user).order(created_at: :desc)
+    
+    respond_to do |format|
+      format.csv do
+        send_data PostCsvSerializer.serialize(@posts),
+          filename: "posts-#{Date.current}.csv",
+          type: "text/csv"
+      end
+      format.xlsx do
+        render xlsx: 'export', filename: "posts-#{Date.current}.xlsx"
+      end
+    end
+  end
+end
+```
+
+## ขั้นตอนที่ 1053: Real-time Data Serialization
+
+```ruby
+# ActionCable serialization
+class PostsChannel < ApplicationCable::Channel
+  def subscribed
+    stream_from "posts_channel"
+  end
+  
+  def receive(data)
+    post = Post.find(data['id'])
+    broadcast_post(post)
+  end
+  
+  private
+  
+  def broadcast_post(post)
+    ActionCable.server.broadcast "posts_channel",
+      PostSerializer.new(post).serializable_hash
+  end
+end
+```
+
+## ขั้นตอนที่ 1054: Serialization Middleware
+
+```ruby
+# app/middleware/json_response_formatter.rb
+class JsonResponseFormatter
+  def initialize(app)
+    @app = app
+  end
+  
+  def call(env)
+    status, headers, body = @app.call(env)
+    
+    if headers['Content-Type']&.include?('application/json')
+      json_body = body.map { |chunk| chunk }.join
+      
+      begin
+        parsed = JSON.parse(json_body)
+        
+        # เพิ่ม request metadata
+        parsed['_meta'] = {
+          timestamp: Time.current.iso8601,
+          request_id: env['action_dispatch.request_id'],
+          version: 'v1'
+        }
+        
+        body = [parsed.to_json]
+        headers['Content-Length'] = body.first.bytesize.to_s
+      rescue JSON::ParserError
+        # ถ้า parse ไม่ได้ ปล่อยผ่านไปเลย
+      end
+    end
+    
+    [status, headers, body]
+  end
+end
+```
+
+## ขั้นตอนที่ 1055: Performance Benchmarks
+
+```ruby
+# Benchmark serializers
+require 'benchmark'
+
+posts = Post.includes(:user, :tags).limit(100)
+
+Benchmark.bm(25) do |x|
+  x.report("to_json:") { posts.to_json }
+  x.report("jbuilder:") { ApplicationController.render('api/v1/posts/index.json.jbuilder', assigns: { posts: posts }) }
+  x.report("ams:") { ActiveModel::SerializableResource.new(posts).to_json }
+  x.report("jsonapi-serializer:") { PostSerializer.new(posts).serializable_hash.to_json }
+  x.report("blueprinter:") { PostBlueprint.render(posts) }
+end
 ```
 
 ---
 
-## สรุป
+## แบบฝึกหัด: JSON Serialization (20 ข้อ)
 
-ในบทนี้เราได้เรียนรู้:
+### ข้อที่ 1: Override as_json
+```
+Override as_json ใน Post model ให้ส่งคืนเฉพาะ
+id, title, excerpt (200 chars), author_name, published_at
+```
 
-1. **as_json/to_json** - วิธีพื้นฐานที่ง่ายแต่ไม่ flexible
-2. **Jbuilder** - ดีสำหรับ complex views, template-based
-3. **Active Model Serializers** - full-featured, ช้ากว่า
-4. **Blueprinter** - เร็ว, clean API, recommended สำหรับ production
-5. **jsonapi-serializer** - เร็วมาก, JSON:API spec compliant
-6. **Custom Serializers** - maximum control
+### ข้อที่ 2: Jbuilder View
+```
+สร้าง show.json.jbuilder ที่รวม:
+- ข้อมูล post
+- ผู้เขียน
+- tags
+- 5 comments ล่าสุด
+```
 
-**แนะนำ:** ใช้ Blueprinter หรือ jsonapi-serializer สำหรับ production APIs เพราะเร็วและ maintain ง่าย
+### ข้อที่ 3: Blueprinter
+```
+สร้าง ProductBlueprint ที่มี views:
+- :summary (id, name, price)
+- :detail (ทุก field + reviews)
+```
+
+### ข้อที่ 4: jsonapi-serializer
+```
+สร้าง OrderSerializer ที่ serialize:
+- order attributes
+- customer (belongs_to user)
+- items (has_many order_items)
+```
+
+### ข้อที่ 5: Conditional Attributes
+```
+สร้าง serializer ที่แสดง sensitive data เฉพาะ admin
+```
+
+**เฉลย:**
+```ruby
+class UserSerializer
+  include JSONAPI::Serializer
+  attributes :name, :email
+  
+  attribute :phone do |user, params|
+    user.phone if params[:current_user]&.admin? || params[:current_user] == user
+  end
+  
+  attribute :internal_notes do |user, params|
+    user.internal_notes if params[:current_user]&.admin?
+  end
+end
+```
+
+### ข้อที่ 6-20 (แบบสรุป)
+
+**ข้อ 6:** Test serializer ด้วย RSpec
+**ข้อ 7:** Performance optimization ด้วย eager loading
+**ข้อ 8:** JSON columns ใน PostgreSQL
+**ข้อ 9:** CSV serialization
+**ข้อ 10:** Nested serializer หลายระดับ
+**ข้อ 11:** Cache serialized responses
+**ข้อ 12:** Serializer สำหรับ error responses
+**ข้อ 13:** to_xml ด้วย custom builder
+**ข้อ 14:** Streaming large JSON responses
+**ข้อ 15:** JSON schema validation
+**ข้อ 16:** ActionCable serialization
+**ข้อ 17:** Benchmark serializers
+**ข้อ 18:** Polymorphic association serialization
+**ข้อ 19:** Dynamic fields ใน serializer
+**ข้อ 20:** Internationalization ใน serializer
+
+---
+
+## สรุป: JSON Serialization
+
+| Tool | ข้อดี | ข้อเสีย |
+|------|-------|--------|
+| as_json/to_json | Built-in, ง่าย | ไม่ structured |
+| Jbuilder | Template-based, flexible | ช้า, ยากทดสอบ |
+| Blueprinter | เร็ว, views | น้อย features |
+| jsonapi-serializer | JSONAPI spec, relationships | ซับซ้อนกว่า |
+| AMS | Mature, easy | ช้ากว่า |
+
+**Key Takeaways:**
+1. ใช้ Jbuilder สำหรับ views ที่ซับซ้อน
+2. jsonapi-serializer เหมาะสำหรับ JSON:API spec
+3. Blueprinter เร็วและง่าย
+4. Eager loading สำคัญมากสำหรับ performance
+5. Cache serialized responses เมื่อทำได้

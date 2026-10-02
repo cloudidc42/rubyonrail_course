@@ -1,1491 +1,890 @@
-# ตอนที่ 28: Debugging เชิงลึก (Steps 606-625)
+# ตอนที่ 28: Debugging ใน Ruby (ขั้นตอนที่ 606-625)
 
-## บทนำ
-
-Debugging คือกระบวนการค้นหาและแก้ไข bugs ในโค้ด ทักษะ debugging ที่ดีเป็นสิ่งจำเป็นสำหรับ developer ทุกคน บทนี้จะสอนเครื่องมือและเทคนิคการ debug ใน Ruby อย่างละเอียด
+Debugging คือกระบวนการค้นหาและแก้ไข Bug ใน Code Ruby มีเครื่องมือ Debugging ที่หลากหลาย ตั้งแต่วิธีง่ายๆ อย่าง `puts` ไปจนถึง Interactive Debugger เช่น Pry และ Byebug
 
 ---
 
-## Step 606: puts / p / pp สำหรับ Debug
+## ขั้นตอนที่ 606: puts/p/pp Debugging
 
-### puts - Print ค่าและ newline
-
-```ruby
-# puts แปลง object เป็น string ด้วย to_s
-name = "สมชาย"
-age = 25
-data = [1, 2, 3]
-
-puts name      # => สมชาย
-puts age       # => 25
-puts data      # แสดงแต่ละ element บนบรรทัดใหม่:
-               # 1
-               # 2
-               # 3
-
-puts nil       # แสดงบรรทัดว่าง
-puts true      # => true
-puts [nil, 1]  # แสดง nil เป็นบรรทัดว่าง, แล้ว 1
-```
-
-### p - Debug-friendly output
+### วิธีพื้นฐาน
 
 ```ruby
-# p ใช้ inspect method - แสดงข้อมูลตามจริง
-name = "สมชาย"
-p name      # => "สมชาย"  (มี quotes)
+# puts - แสดงผลและขึ้นบรรทัดใหม่
+puts "Debug: ถึงจุดนี้แล้ว"
+puts variable_name
+puts array.inspect
 
-nil_val = nil
-p nil_val   # => nil  (ไม่ใช่ blank line)
+# p - แสดงผล inspect (ดีกว่า puts สำหรับ Debug)
+p variable_name        # แสดง inspect result
+p "hello"              # "hello" (มี Quotes)
+p [1, 2, 3]            # [1, 2, 3]
+p nil                  # nil
+p false                # false
 
-arr = [1, "two", :three, nil]
-p arr       # => [1, "two", :three, nil]
-
-# p returns ค่า (useful สำหรับ debug ใน chain)
-result = p [1, 2, 3].map { |n| n * 2 }
-# พิมพ์: [2, 4, 6]
-# result = [2, 4, 6]
-```
-
-### pp - Pretty Print
-
-```ruby
+# pp - Pretty Print (จัดรูปแบบสวยกว่า p)
 require 'pp'
 
-# pp จัดรูปแบบ output ให้อ่านง่ายสำหรับ complex objects
-user = {
-  name: "สมชาย",
-  age: 25,
-  address: {
-    street: "ถนนสุขุมวิท",
-    city: "กรุงเทพ",
-    zip: "10110"
-  },
-  hobbies: ["อ่านหนังสือ", "เล่นกีตาร์", "โปรแกรมมิ่ง"]
+complex_hash = {
+  user: { name: 'สมชาย', age: 30 },
+  orders: [1, 2, 3],
+  settings: { theme: 'dark', language: 'th' }
 }
 
-puts user.inspect  # ยาวมาก ยากอ่าน
-pp user            # จัดรูปแบบสวยงาม
+pp complex_hash
+# ได้ Output ที่จัดรูปแบบสวย
 
-# ผลลัพธ์ pp:
-# {:name=>"สมชาย",
-#  :age=>25,
-#  :address=>
-#   {:street=>"ถนนสุขุมวิท", :city=>"กรุงเทพ", :zip=>"10110"},
-#  :hobbies=>["อ่านหนังสือ", "เล่นกีตาร์", "โปรแกรมมิ่ง"]}
+# เทคนิค Debug ด้วย tap
+result = [1, 2, 3, 4, 5]
+  .tap { |a| puts "Before filter: #{a}" }
+  .select { |n| n > 2 }
+  .tap { |a| puts "After filter: #{a}" }
+  .map { |n| n * 2 }
+  .tap { |a| puts "After map: #{a}" }
+
+# then/yield_self สำหรับ Debug
+value = "  Hello World  "
+  .then { |v| puts "Original: '#{v}'"; v }
+  .strip
+  .then { |v| puts "Stripped: '#{v}'"; v }
+  .downcase
+  .then { |v| puts "Downcased: '#{v}'"; v }
 ```
 
-### Debug Output with Context
+### Debug Helper
 
 ```ruby
-# เพิ่ม context ให้กับ debug output
-def debug_print(label, value)
-  puts "DEBUG [#{caller_locations.first}] #{label}: #{value.inspect}"
+# Debug Helper Module
+module Debug
+  def self.log(label, value, caller_info: caller(1).first)
+    puts "[DEBUG] #{caller_info} - #{label}: #{value.inspect}"
+    value  # คืนค่า value เพื่อ Method Chaining
+  end
+  
+  def self.trace(label = nil)
+    caller.first(5).each { |c| puts "  #{c}" }
+  end
+  
+  def self.inspect_all(binding_ctx)
+    binding_ctx.local_variables.each do |var|
+      val = binding_ctx.local_variable_get(var)
+      puts "  #{var} = #{val.inspect}"
+    end
+  end
 end
 
-# หรือใช้ __method__ และ __LINE__
-def some_method
-  x = 42
-  puts "DEBUG #{__method__}:#{__LINE__} x=#{x.inspect}"
+# การใช้งาน
+x = 10
+y = Debug.log("x", x)
+z = Debug.log("y * 2", y * 2)
+
+def complex_method(a, b)
+  result = a + b
+  Debug.inspect_all(binding)  # แสดงทุก Local Variable
+  result
 end
 
-# เปิด/ปิด debug โดยใช้ ENV variable
-DEBUG = ENV['DEBUG'] == 'true'
-
-def debug(*args)
-  return unless DEBUG
-  puts "[DEBUG] #{args.map(&:inspect).join(', ')}"
-end
-
-# รัน: DEBUG=true ruby myprogram.rb
+complex_method(5, 3)
 ```
 
 ---
 
-## Step 607: pp vs inspect vs to_s
+## ขั้นตอนที่ 607: Pry Debugger
 
-### ความแตกต่าง
-
-```ruby
-class Person
-  attr_accessor :name, :age
-
-  def initialize(name, age)
-    @name = name
-    @age = age
-  end
-
-  def to_s
-    "#{@name} (#{@age} ปี)"
-  end
-
-  def inspect
-    "#<Person name=#{@name.inspect} age=#{@age.inspect}>"
-  end
-end
-
-person = Person.new("สมชาย", 25)
-
-puts person.to_s       # => สมชาย (25 ปี)
-puts person.inspect    # => #<Person name="สมชาย" age=25>
-puts person            # เรียก to_s => สมชาย (25 ปี)
-p person               # เรียก inspect => #<Person name="สมชาย" age=25>
-pp person              # เรียก inspect พร้อม pretty print
-```
-
-### เมื่อไหร่ใช้อะไร?
-
-```ruby
-# to_s: สำหรับแสดงให้ผู้ใช้เห็น
-puts "ยินดีต้อนรับ #{person}"  # => ยินดีต้อนรับ สมชาย (25 ปี)
-
-# inspect: สำหรับ debugging
-puts person.inspect  # => #<Person name="สมชาย" age=25>
-
-# p: ใช้ใน debug session
-p person             # เหมือน puts person.inspect
-
-# pp: สำหรับ complex nested objects
-data = {
-  users: [person, Person.new("สมหญิง", 30)],
-  count: 2
-}
-pp data
-
-# ผลลัพธ์:
-# {:users=>[#<Person name="สมชาย" age=25>, #<Person name="สมหญิง" age=30>],
-#  :count=>2}
-```
-
----
-
-## Step 608: Pry Debugger
-
-### ติดตั้ง Pry
+### การติดตั้งและใช้งาน Pry
 
 ```bash
-# ติดตั้ง
-gem install pry pry-byebug pry-rails
-
-# Gemfile
-group :development, :test do
-  gem 'pry-byebug'
-  gem 'pry-rails'  # สำหรับ Rails
-end
+gem install pry
+gem install pry-doc
+gem install pry-byebug  # สำหรับ Debugging
 ```
-
-### การใช้งาน Pry พื้นฐาน
 
 ```ruby
-# เพิ่ม binding.pry ในจุดที่ต้องการ debug
-def calculate_total(cart_items)
-  binding.pry  # โปรแกรมจะหยุดตรงนี้
+require 'pry'
 
-  total = cart_items.sum { |item| item[:price] * item[:quantity] }
-  tax = total * 0.07
-  total + tax
+# รัน Pry Session
+def process_user(user)
+  data = prepare_data(user)
+  binding.pry  # หยุดและเปิด Pry Session ที่นี่
+  result = calculate(data)
+  result
 end
 
-cart = [
-  { name: "Ruby Book", price: 350, quantity: 2 },
-  { name: "Rails Guide", price: 420, quantity: 1 }
-]
-
-calculate_total(cart)
+# ใน Pry Session สามารถ:
+# - ดูค่า Variable
+# - รัน Ruby Code
+# - ดู Method Definition
+# - Navigate Stack Frame
 ```
 
-### Pry Session ตัวอย่าง
+### Pry Commands
 
 ```
-From: app.rb @ line 3 Object#calculate_total:
+# พื้นฐาน
+help          # แสดงคำสั่งทั้งหมด
+exit          # ออกจาก Pry Session
+quit          # ออกจาก Pry Session
+!!!           # ออกจาก Pry Session ทันที
 
-    1: def calculate_total(cart_items)
- => 3:   binding.pry
-    4:
-    5:   total = cart_items.sum { |item| item[:price] * item[:quantity] }
-    6:   tax = total * 0.07
-    7:   total + tax
-    8: end
+# Navigation
+ls            # แสดง Methods และ Variables ที่ available
+ls -l         # แสดง Local Variables
+ls User       # แสดง Methods ของ User class
+cd user       # เข้าไปใน user object's context
+nesting       # ดู Context Nesting
+cd ..         # กลับ Context ก่อนหน้า
 
-[1] pry(main)> cart_items
-=> [{:name=>"Ruby Book", :price=>350, :quantity=>2},
-    {:name=>"Rails Guide", :price=>420, :quantity=>1}]
+# Introspection  
+show-method   # แสดง Source Code ของ Method
+? method_name # ดู Documentation
+wtf?          # แสดง Exception ล่าสุด
+$             # แสดง Exception ล่าสุด (เหมือน wtf?)
 
-[2] pry(main)> cart_items.first[:price]
-=> 350
+# History
+hist          # แสดง History
+hist --replay # รัน Commands ใหม่
 
-[3] pry(main)> cart_items.sum { |item| item[:price] * item[:quantity] }
-=> 1120
+# Edit
+edit          # เปิด Editor ปัจจุบัน
+edit -n       # Edit ที่บรรทัด n
+```
+
+### Pry Configuration
+
+```ruby
+# .pryrc (ในโฟลเดอร์ Home)
+Pry.config.editor = 'vim'
+
+# Custom Prompt
+Pry.config.prompt = Pry::Prompt.new(
+  'custom',
+  'Custom Prompt',
+  [
+    proc { |obj, nest_level, _| "#{RUBY_VERSION} (#{obj})> " },
+    proc { |obj, nest_level, _| "#{RUBY_VERSION} (#{obj})* " }
+  ]
+)
+
+# ตั้งค่า Colors
+Pry.config.color = true
+
+# History
+Pry.config.history_save = true
+Pry.config.history_file = '~/.pry_history'
+
+# เพิ่ม Commands
+Pry::Commands.block_command 'hello' do
+  puts "สวัสดีจาก Custom Pry Command!"
+end
+
+# Aliases
+Pry.config.command_prefix = '%'
 ```
 
 ---
 
-## Step 609: binding.pry - เข้า Debugger ตรงจุด
+## ขั้นตอนที่ 608: binding.pry
 
-### ใช้ binding.pry ใน Methods ต่างๆ
+### ใช้ binding.pry ใน Code
 
 ```ruby
 class OrderProcessor
   def process(order)
     validate_order(order)
-    calculate_totals(order)
-    apply_discounts(order)
-    finalize(order)
+    
+    binding.pry  # หยุดที่นี่เพื่อ Debug
+    
+    calculate_total(order)
+    charge_payment(order)
+    send_confirmation(order)
   end
-
+  
   private
-
+  
   def validate_order(order)
-    binding.pry if order[:items].empty?  # conditional breakpoint
-    # ...
+    raise "Invalid order" unless order.valid?
   end
+  
+  def calculate_total(order)
+    order.items.sum { |item| item.price * item.quantity }
+  end
+  
+  def charge_payment(order)
+    PaymentGateway.charge(order.payment_method, order.total)
+  end
+  
+  def send_confirmation(order)
+    OrderMailer.confirmation(order).deliver_later
+  end
+end
 
-  def calculate_totals(order)
-    subtotal = order[:items].sum { |i| i[:price] * i[:quantity] }
-    binding.pry  # ดู subtotal ก่อนไปต่อ
-    order[:subtotal] = subtotal
+# เมื่อรันโค้ด จะหยุดที่ binding.pry และเปิด Pry Session
+# ดู Variables ที่ Available:
+# [1] pry(#<OrderProcessor>)> order
+# => #<Order id=123, status="pending", total=nil>
+# [2] pry(#<OrderProcessor>)> order.items.count
+# => 3
+# [3] pry(#<OrderProcessor>)> calculate_total(order)
+# => 1500
+```
+
+### Conditional Breakpoint
+
+```ruby
+def process_items(items)
+  items.each_with_index do |item, index|
+    binding.pry if item[:price] > 10_000  # Conditional Breakpoint!
+    
+    process_item(item)
+  end
+end
+
+# หยุดเฉพาะเมื่อ price > 10,000
+
+# Pry ใน Rails
+class UsersController < ApplicationController
+  def update
+    @user = User.find(params[:id])
+    
+    if @user.update(user_params)
+      redirect_to @user
+    else
+      binding.pry if Rails.env.development?  # Debug เฉพาะใน Development
+      render :edit
+    end
   end
 end
 ```
 
-### binding.pry ใน Blocks และ Loops
-
-```ruby
-[1, 2, 3, "four", 5].each do |item|
-  binding.pry if item.is_a?(String)  # หยุดเมื่อเจอ string
-  result = item * 2
-end
-
-# ใน Rails - debug ใน view
-# app/views/products/index.html.erb
-# <% binding.pry %>
-# <% @products.each do |product| %>
-#   ...
-# <% end %>
-```
-
-### Pry ใน IRB
-
-```ruby
-# เริ่ม pry แบบ standalone
-require 'pry'
-
-x = 42
-binding.pry  # เข้า pry session
-
-# ในไฟล์ .pryrc (home directory)
-# Pry.config.prompt = Pry::Prompt[:simple]
-# Pry.config.editor = 'vim'
-```
-
 ---
 
-## Step 610: Pry Commands
+## ขั้นตอนที่ 609: Byebug
 
-### ls - แสดง methods และ variables
+### การใช้งาน Byebug
 
+```bash
+gem install byebug
 ```
-[1] pry(main)> ls String
-Constants from String:
-  BINARY, UTF_8
-
-Class methods from String:
-  new, try_convert
-
-Instance methods from String:
-  %, *, +, <<, <=>, ==, =~, [], []=, ascii_only?, b, bytes, bytesize,
-  byteslice, capitalize, capitalize!, center, chars, chomp, chomp!, chop,
-  chop!, chr, clear, codepoints, count, crypt, delete, ...
-
-[2] pry(main)> user = { name: "สมชาย", age: 25 }
-[3] pry(main)> ls user
-Hash#methods:
-  ... (hash methods)
-locals: user
-```
-
-### cd - เปลี่ยน context
-
-```
-[1] pry(main)> class Dog
-[1] pry(main)*   def initialize(name)
-[1] pry(main)*     @name = name
-[1] pry(main)*   end
-[1] pry(main)*   def bark
-[1] pry(main)*     "Woof!"
-[1] pry(main)*   end
-[1] pry(main)* end
-[2] pry(main)> dog = Dog.new("บัดดี้")
-[3] pry(main)> cd dog
-[4] pry(#<Dog>)> @name
-=> "บัดดี้"
-[5] pry(#<Dog>)> bark
-=> "Woof!"
-[6] pry(#<Dog>)> cd ..  # กลับ
-```
-
-### show-source
-
-```
-[1] pry(main)> show-source Array#flatten
-
-From: array.c @ line 6323:
-Owner: Array
-Visibility: public
-Number of lines: 10
-
-static VALUE
-rb_ary_flatten(int argc, VALUE *argv, VALUE ary)
-{
-  ...
-}
-
-[2] pry(main)> show-source String#upcase
-
-# Ruby source code จะแสดง
-```
-
-### whereami และ commands อื่นๆ
-
-```
-[1] pry(main)> whereami
-
-From: example.rb @ line 15 Object#my_method:
-
-    10: def my_method
-    11:   x = 5
-    12:   y = 10
-    13:   
-    14:   # Comment
- => 15:   binding.pry
-    16:   
-    17:   x + y
-    18: end
-
-# Commands อื่นๆ
-[2] pry(main)> help      # แสดง commands ทั้งหมด
-[3] pry(main)> history   # แสดง command history
-[4] pry(main)> exit      # ออกจาก pry
-[5] pry(main)> !!!       # exit โดยโยน exception
-[6] pry(main)> show-doc Array#each  # แสดง documentation
-```
-
----
-
-## Step 611: Byebug
-
-### ติดตั้งและใช้งาน
 
 ```ruby
-# gem 'byebug'
-
 require 'byebug'
 
-def factorial(n)
-  byebug  # เริ่ม byebug session
-  return 1 if n <= 1
-  n * factorial(n - 1)
+def divide(a, b)
+  byebug  # Pause และเปิด Debugger
+  result = a / b
+  result
 end
 
-factorial(5)
+divide(10, 2)
 ```
 
 ### Byebug Commands
 
 ```
-# step - เข้าไปใน method
-# next - ข้ามไปบรรทัดถัดไป (ไม่เข้าใน method)
-# continue/c - ทำงานต่อจนถึง breakpoint ถัดไป
-# break/b - ตั้ง breakpoint
-# list/l - แสดงโค้ดรอบๆ ตำแหน่งปัจจุบัน
-# where/bt - แสดง backtrace
-# display - แสดงค่าตัวแปรอัตโนมัติ
+# Execution Control
+next (n)    - ไปบรรทัดถัดไป (ไม่เข้า Method)
+step (s)    - ไปบรรทัดถัดไป (เข้า Method)
+continue (c) - ทำงานต่อจนถึง Breakpoint ถัดไป
+finish (f)  - ออกจาก Method ปัจจุบัน
+quit (q)    - ออกจาก Byebug
 
-(byebug) step
-[1, 9] in factorial.rb
-    1: require 'byebug'
-    2:
-    3: def factorial(n)
-    4:   byebug
-=>  5:   return 1 if n <= 1
-    6:   n * factorial(n - 1)
-    7: end
-    8:
-    9: factorial(5)
+# Breakpoints
+break n         - ตั้ง Breakpoint ที่บรรทัด n
+break Class#method - Breakpoint ที่ต้น Method
+info break      - แสดง Breakpoints ทั้งหมด
+delete n        - ลบ Breakpoint n
 
-(byebug) n  # next line
-(byebug) p n  # print n
-5
-(byebug) b 6  # set breakpoint at line 6
-Breakpoint 1 at factorial.rb:6
-(byebug) c  # continue
-Breakpoint 1 at factorial.rb:6
-(byebug) p n
-4
-```
+# Information
+list            - แสดงโค้ด
+up              - ขึ้นไป Stack Frame ข้างบน
+down            - ลงมา Stack Frame ข้างล่าง
+where           - แสดง Stack Trace ปัจจุบัน
+info locals     - แสดง Local Variables
+info args       - แสดง Arguments ของ Method ปัจจุบัน
 
-### Conditional Breakpoints
-
-```ruby
-def process_items(items)
-  items.each_with_index do |item, index|
-    byebug if item[:price] > 1000  # หยุดเมื่อราคาเกิน 1000
-    process_single(item)
-  end
-end
-
-# Breakpoint ใน byebug
-# (byebug) break 15 if n > 3
+# Evaluate
+eval expression - ประเมินค่า Expression
+display expr    - แสดงค่า expr ทุกครั้งที่หยุด
+undisplay n     - หยุด Auto Display
 ```
 
 ---
 
-## Step 612: Ruby Debugger (debug gem, Ruby 3.1+)
+## ขั้นตอนที่ 610: Ruby Debugger (debug gem, Ruby 3.1+)
 
-### การใช้งาน debug gem
+### debug Gem
+
+```bash
+# Ruby 3.1+ มี debug gem built-in
+gem install debug
+```
 
 ```ruby
-# ติดตั้ง (built-in Ruby 3.1+)
-# gem 'debug'
-
 require 'debug'
 
-def calculate(a, b)
+def factorial(n)
   debugger  # หรือ binding.break
-  result = a + b
-  result
+  return 1 if n <= 1
+  n * factorial(n - 1)
 end
 
-calculate(5, 3)
+puts factorial(5)
 ```
 
-### Debug Commands (Ruby debugger)
+### Debug Commands
 
 ```
-# คล้าย byebug แต่มีฟีเจอร์เพิ่มเติม
-(rdbg) s    # step
-(rdbg) n    # next
-(rdbg) c    # continue
-(rdbg) q    # quit
-(rdbg) p expression  # evaluate
-(rdbg) bt   # backtrace
-(rdbg) l    # list
-(rdbg) b 10  # break at line 10
-(rdbg) b MyClass#method  # break at method
-(rdbg) watch @variable  # watch variable
-(rdbg) catch ExceptionName  # catch exception
+# REPL Commands
+p expr        - แสดง inspect
+pp expr       - Pretty Print
+info           - แสดง Local Variables
+
+# Flow Control
+s[tep]        - Step into
+n[ext]        - Next line
+fin[ish]      - Finish current frame
+c[ontinue]    - Continue
+
+# Breakpoints
+b[reak] line  - ตั้ง Breakpoint
+b Class#method
+catch ExceptionClass
+del[ete] n    - ลบ Breakpoint
+
+# Stack
+bt            - Backtrace
+frame n       - ไปที่ Frame n
+up            - ขึ้น Frame
+down          - ลง Frame
 ```
 
 ### Remote Debugging
 
 ```ruby
-# เริ่ม debug server
-# RUBY_DEBUG_PORT=12345 ruby myapp.rb
+# เปิด Debug Server
+require 'debug'
+DEBUGGER__::CONFIG[:port] = 12345
+DEBUGGER__::CONFIG[:host] = '0.0.0.0'
 
-# หรือในโค้ด
-require 'debug/open'
-DEBUGGER__::open(port: 12345)
-binding.break
+binding.break  # รอ Connection
 
-# Connect จาก terminal อื่น
-# rdbg --attach 12345
+# Connect จาก Terminal อื่น
+rdbg -A 12345
 ```
 
 ---
 
-## Step 613: อ่าน Ruby Error Messages
+## ขั้นตอนที่ 611: อ่าน Stack Trace
 
-### Stack Trace
+### ตัวอย่าง Stack Trace
 
 ```
 Traceback (most recent call last):
-        4: from test.rb:10:in `<main>'
-        3: from test.rb:7:in `a'
-        2: from test.rb:4:in `b'
-        1: from test.rb:1:in `c'
-test.rb:1:in `c': undefined method `upcase' for nil (NoMethodError)
+        5: from /path/to/app.rb:25:in `<main>'
+        4: from /path/to/app.rb:18:in `process_order'
+        3: from /path/to/app.rb:12:in `calculate_discount'
+        2: from /path/to/app.rb:8:in `apply_coupon'
+        1: from /path/to/app.rb:4:in `validate_coupon'
+/path/to/app.rb:4:in `validate_coupon': undefined method `expired?' for nil:NilClass (NoMethodError)
 ```
 
-**วิธีอ่าน:**
-1. อ่านจากล่างขึ้นบน (หรือจากบนลงล่าง แต่ส่วนล่างคือต้นตอ)
-2. `test.rb:1:in 'c'` = ไฟล์ test.rb บรรทัด 1 ใน method c
-3. Error message: `undefined method 'upcase' for nil (NoMethodError)`
+### วิธีอ่าน Stack Trace
 
 ```ruby
-# โค้ดที่ทำให้เกิด error
-def c
-  nil.upcase  # บรรทัดที่ 1 ของ c
+# อ่านจากล่างขึ้นบน:
+# บรรทัดสุดท้าย: Error ที่เกิด (NoMethodError: expired?)
+# บรรทัด 1: ตำแหน่งที่ Error เกิด (app.rb:4 in validate_coupon)
+# บรรทัด 2-5: Call Stack (เรียกมาจากไหน)
+
+# Debug: ตรวจสอบว่า coupon เป็น nil ทำไม
+def validate_coupon(code)
+  coupon = Coupon.find_by(code: code)  # อาจ return nil
+  
+  # ปัญหา: ไม่ check nil
+  if coupon.expired?  # NoMethodError เมื่อ coupon เป็น nil!
+    raise "Coupon หมดอายุแล้ว"
+  end
+  coupon
 end
 
-def b
-  c           # เรียก c
+# Fix: ตรวจสอบ nil ก่อน
+def validate_coupon(code)
+  coupon = Coupon.find_by(code: code)
+  raise "ไม่พบ Coupon" if coupon.nil?
+  raise "Coupon หมดอายุแล้ว" if coupon.expired?
+  coupon
 end
 
-def a
-  b           # เรียก b
+# หรือใช้ Safe Navigation Operator
+def validate_coupon(code)
+  coupon = Coupon.find_by(code: code)
+  raise "ไม่พบ Coupon" unless coupon&.valid_code?
+  coupon
 end
-
-a             # เรียก a
 ```
 
 ---
 
-## Step 614: Common Errors และวิธีแก้
+## ขั้นตอนที่ 612: Common Ruby Errors
 
-### NoMethodError
+### Error Types และวิธีแก้
 
 ```ruby
-# Error
+# 1. NoMethodError
 nil.upcase
-# => NoMethodError: undefined method 'upcase' for nil:NilClass
+# => NoMethodError: undefined method `upcase' for nil:NilClass
 
-# วิธีแก้ 1: ตรวจสอบ nil
+# Fix:
 str = nil
-str.upcase if str  # ปลอดภัย
+str&.upcase  # Safe Navigation - คืน nil แทน Error
+str.to_s.upcase  # แปลงเป็น String ก่อน
 
-# วิธีแก้ 2: Safe navigation operator
-str&.upcase  # => nil ถ้า str เป็น nil
+# 2. NameError / Undefined Variable
+puts undefined_var
+# => NameError: undefined local variable or method `undefined_var'
 
-# วิธีแก้ 3: Default value
-str = nil
-(str || "").upcase  # => ""
-
-# วิธีแก้ 4: Raise ด้วย message ที่ชัดเจน
-def process(str)
-  raise ArgumentError, "str ต้องไม่เป็น nil" if str.nil?
-  str.upcase
+# 3. ArgumentError - ส่ง Arguments ผิดจำนวน
+def greet(name)
+  "สวัสดี #{name}"
 end
-```
 
-### NameError
+greet  # ArgumentError: wrong number of arguments (given 0, expected 1)
+greet("ก", "ข")  # ArgumentError: wrong number of arguments (given 2, expected 1)
 
-```ruby
-# Error
-puts undefined_variable
-# => NameError: undefined local variable or method 'undefined_variable'
-
-# หรือ
-class MyClass
-  def my_method
-    @instance_var = 42
-  end
-
-  def another_method
-    puts instance_var  # ลืม @
-    # => NameError: undefined local variable or method 'instance_var'
-  end
+# Fix: ใช้ Default Arguments
+def greet(name = "ทุกคน")
+  "สวัสดี #{name}"
 end
-```
 
-### TypeError
-
-```ruby
-# Error
+# 4. TypeError
 "hello" + 5
 # => TypeError: no implicit conversion of Integer into String
 
-# วิธีแก้
-"hello" + 5.to_s   # => "hello5"
-"hello" + "5"      # => "hello5"
-"hello #{5}"       # => "hello5"  (interpolation แปลงอัตโนมัติ)
-
-# ตัวอย่างอื่น
-nil + 1
-# => NoMethodError: undefined method '+' for nil:NilClass
-```
-
-### ArgumentError
-
-```ruby
-# Error - argument ผิดจำนวน
-def greet(name, greeting)
-  "#{greeting}, #{name}!"
-end
-
-greet("สมชาย")
-# => ArgumentError: wrong number of arguments (given 1, expected 2)
-
-# วิธีแก้
-greet("สมชาย", "สวัสดี")  # ให้ arguments ครบ
-
-# หรือใช้ default argument
-def greet(name, greeting = "สวัสดี")
-  "#{greeting}, #{name}!"
-end
-
-greet("สมชาย")           # => "สวัสดี, สมชาย!"
-greet("สมชาย", "Hello")  # => "Hello, สมชาย!"
-```
-
-### LoadError / Require Error
-
-```ruby
-require 'nonexistent_gem'
-# => LoadError: cannot load such file -- nonexistent_gem
-
-# วิธีแก้
-# ตรวจสอบ gem ใน Gemfile
-# bundle install
-
-# หรือ require จากไฟล์ที่ถูก path
-require_relative '../lib/my_module'
-require './config/settings'
-```
-
-### SystemStackError (Stack Overflow)
-
-```ruby
-# Error - Infinite recursion
-def infinite
-  infinite
-end
-
-infinite
-# => SystemStackError: stack level too deep
-
-# วิธีแก้ - ตรวจสอบ base case
-def factorial(n)
-  return 1 if n <= 1  # base case จำเป็น!
-  n * factorial(n - 1)
-end
-```
-
-### FrozenError
-
-```ruby
-# Error
-str = "hello".freeze
-str << " world"
-# => FrozenError: can't modify frozen String: "hello"
-
-# วิธีแก้
-str = "hello"
-str << " world"  # ไม่ freeze
-
-# หรือสร้างใหม่
-str = "hello".freeze
-new_str = str + " world"  # สร้าง string ใหม่
-```
-
----
-
-## Step 615: Logger Class
-
-### ใช้ Logger
-
-```ruby
-require 'logger'
-
-# สร้าง logger
-logger = Logger.new(STDOUT)  # หรือ STDERR
-
-# หรือ log ไปยังไฟล์
-logger = Logger.new('app.log')
-
-# ตั้ง log level
-logger.level = Logger::DEBUG  # DEBUG, INFO, WARN, ERROR, FATAL
-
-# Log messages
-logger.debug("Debug information")
-logger.info("Process started")
-logger.warn("Low disk space")
-logger.error("File not found")
-logger.fatal("System crash!")
-
-# ผลลัพธ์:
-# D, [2024-01-15T10:30:00.000000 #12345] DEBUG -- : Debug information
-# I, [2024-01-15T10:30:00.000001 #12345]  INFO -- : Process started
-```
-
-### Logger ใน Rails
-
-```ruby
-# config/environments/development.rb
-config.log_level = :debug
-
-# ใช้ใน Controllers, Models
-class OrdersController < ApplicationController
-  def create
-    Rails.logger.info("Creating order for user #{current_user.id}")
-    
-    @order = Order.new(order_params)
-    if @order.save
-      Rails.logger.info("Order #{@order.id} created successfully")
-      redirect_to @order
-    else
-      Rails.logger.warn("Order creation failed: #{@order.errors.full_messages}")
-      render :new
-    end
-  end
-end
-```
-
-### Structured Logging
-
-```ruby
-class AppLogger
-  def initialize
-    @logger = Logger.new(STDOUT)
-    @logger.formatter = proc do |severity, datetime, progname, msg|
-      log_entry = {
-        severity: severity,
-        timestamp: datetime.utc.iso8601(3),
-        message: msg
-      }
-      log_entry[:progname] = progname if progname
-      "#{log_entry.to_json}\n"
-    end
-  end
-
-  def info(message, context = {})
-    @logger.info(context.empty? ? message : "#{message} | #{context.inspect}")
-  end
-
-  def error(message, exception = nil, context = {})
-    if exception
-      @logger.error("#{message} | #{exception.class}: #{exception.message} | #{context.inspect}")
-      @logger.error(exception.backtrace.join("\n"))
-    else
-      @logger.error("#{message} | #{context.inspect}")
-    end
-  end
-end
-
-logger = AppLogger.new
-logger.info("User logged in", user_id: 42, ip: "192.168.1.1")
-```
-
----
-
-## Step 616: Remote Debugging
-
-### Remote Debug ด้วย debug gem
-
-```ruby
-# ในโค้ด
-require 'debug/open'
-
-# Server รอ connection
-DEBUGGER__::open(port: 12345, host: '0.0.0.0')
-
-# Client connect
-# rdbg --attach 12345 --host localhost
-```
-
-### Debug ใน Docker Container
-
-```dockerfile
-# Dockerfile.development
-FROM ruby:3.2
-
-ENV RUBY_DEBUG_PORT=12345
-ENV RUBY_DEBUG_HOST=0.0.0.0
-
-RUN gem install debug
-```
-
-```yaml
-# docker-compose.yml
-services:
-  app:
-    build: .
-    ports:
-      - "3000:3000"
-      - "12345:12345"  # debug port
-    environment:
-      - RUBY_DEBUG_OPEN=true
-      - RUBY_DEBUG_PORT=12345
-```
-
----
-
-## Step 617: Debugging Rails
-
-### pry-rails
-
-```ruby
-# Gemfile
-group :development, :test do
-  gem 'pry-rails'
-  gem 'pry-byebug'
-end
-
-# ใช้ใน Rails console
-# rails console → เป็น pry console อัตโนมัติ
-
-# ใน model
-class User < ApplicationRecord
-  def full_name
-    binding.pry  # debug ใน Rails context
-    "#{first_name} #{last_name}"
-  end
-end
-```
-
-### better_errors
-
-```ruby
-# Gemfile (development only)
-group :development do
-  gem 'better_errors'
-  gem 'binding_of_caller'  # enable REPL ใน browser
-end
-
-# เมื่อเกิด error ใน development
-# browser จะแสดง:
-# - error message พร้อม backtrace
-# - local variables
-# - REPL ที่ context ที่ error
-# - Source code ที่เกิด error
-```
-
-### Debug ใน Test
-
-```ruby
-# RSpec + Pry
-describe "User creation" do
-  it "creates a user" do
-    user = User.new(name: "สมชาย", email: "somchai@test.com")
-    binding.pry  # หยุดใน test
-    expect(user.save).to be true
-  end
-end
-
-# Minitest + Byebug
-class UserTest < ActiveSupport::TestCase
-  test "creates a user" do
-    user = User.new(name: "สมชาย")
-    byebug  # หยุดใน test
-    assert user.save
-  end
-end
-```
-
----
-
-## Step 618: Debugging Techniques Advanced
-
-### Tracing Method Calls
-
-```ruby
-# set_trace_func
-set_trace_func proc { |event, file, line, id, binding, classname|
-  case event
-  when 'call'
-    puts "CALL #{classname}##{id} at #{file}:#{line}"
-  when 'return'
-    puts "RETURN #{classname}##{id}"
-  end
-}
-
-def add(a, b)
-  a + b
-end
-
-add(1, 2)
-
-set_trace_func nil  # ปิด tracing
-```
-
-### Object Inspection
-
-```ruby
-obj = "Hello"
-
-# Methods ที่ object มี
-puts obj.methods.sort.inspect
-puts obj.respond_to?(:upcase)   # => true
-puts obj.respond_to?(:nonexistent)  # => false
-
-# Instance variables
-class Person
-  def initialize(name, age)
-    @name = name
-    @age = age
-  end
-end
-
-p = Person.new("สมชาย", 25)
-puts p.instance_variables.inspect
-# => [:@name, :@age]
-
-puts p.instance_variable_get(:@name)  # => "สมชาย"
-p.instance_variable_set(:@name, "ใหม่")
-
-# Class hierarchy
-puts "Hello".class              # => String
-puts "Hello".class.superclass  # => Object
-puts "Hello".is_a?(String)     # => true
-puts "Hello".kind_of?(Object)  # => true
-```
-
-### Caller และ Backtrace
-
-```ruby
-# ดู call stack
-def level_three
-  puts caller.inspect  # array of strings
-  puts caller(0, 5).inspect  # แสดง 5 levels
-end
-
-def level_two
-  level_three
-end
-
-def level_one
-  level_two
-end
-
-level_one
-
-# caller_locations - structured version
-def where_am_i
-  location = caller_locations.first
-  puts "#{location.path}:#{location.lineno}:in `#{location.label}'"
-end
-```
-
----
-
-## Step 619: ตัวอย่าง Debugging Real-world Problems
-
-### Debug N+1 Query
-
-```ruby
-# ปัญหา
-class OrdersController
-  def index
-    @orders = Order.all  # ดึง orders ทั้งหมด
-    # ใน view: @orders.each { |o| o.user.name }  # N+1!
-  end
-end
-
-# Debug ด้วย Bullet gem
-# Gemfile
-# gem 'bullet', group: :development
-
-# config/environments/development.rb
-config.after_initialize do
-  Bullet.enable = true
-  Bullet.alert = true
-  Bullet.rails_logger = true
-  Bullet.add_footer = true
-end
-
-# แก้ไข
-@orders = Order.includes(:user).all
-```
-
-### Debug Memory Leak
-
-```ruby
-# ตรวจหา memory leak
-class PotentialLeak
-  @@instances = []  # Class variable เก็บทุก instance - LEAK!
-
-  def initialize(data)
-    @data = data
-    @@instances << self  # ป้องกัน GC
-  end
-end
-
-# Debug ด้วย ObjectSpace
-require 'objspace'
-
-before = ObjectSpace.count_objects[:T_OBJECT]
-
-100.times { PotentialLeak.new("some data") }
-
-GC.start
-after = ObjectSpace.count_objects[:T_OBJECT]
-
-puts "Objects increased: #{after - before}"
-# ถ้าเพิ่มขึ้น = memory leak
-
-# แก้ไข
-class FixedClass
-  def initialize(data)
-    @data = data
-    # ไม่เก็บ reference ใน class variable
-  end
-end
-```
-
----
-
-## แบบฝึกหัด 20 ข้อ
-
-### ข้อที่ 1: ใช้ p และ pp
-```ruby
-# โจทย์: Debug โค้ดต่อไปนี้
-def process_users(users)
-  users.map { |u| { name: u[:name].upcase, age: u[:age] + 1 } }
-end
-
-users = [
-  { name: "สมชาย", age: 25 },
-  { name: nil, age: 30 }  # จะเกิด error!
-]
-
-# เฉลย: เพิ่ม p/pp เพื่อ debug
-def process_users_debug(users)
-  users.map do |u|
-    p u  # ดูแต่ละ user
-    name = u[:name]
-    p name  # ดู name ก่อน upcase
-    { name: name&.upcase || "UNKNOWN", age: u[:age] + 1 }
-  end
-end
-```
-
-### ข้อที่ 2: อ่าน Stack Trace
-```
-# โจทย์: Stack trace ต่อไปนี้บอกอะไร?
-# example.rb:5:in 'multiply': undefined method '*' for nil:NilClass (NoMethodError)
-# from example.rb:10:in 'calculate'
-# from example.rb:15:in '<main>'
-
-# เฉลย:
-# - Error เกิดที่ line 5 ใน method 'multiply'
-# - nil ไม่มี method '*'
-# - Call chain: main -> calculate -> multiply
-# - แก้ไข: ตรวจสอบ nil ก่อน multiply
-```
-
-### ข้อที่ 3: Fix NoMethodError
-```ruby
-# เฉลย
-def get_username(user)
-  return "ไม่ระบุ" unless user
-  return "ไม่ระบุ" if user[:name].nil?
-  user[:name].upcase
-end
-
-# หรือแบบสั้น
-def get_username_clean(user)
-  user&.dig(:name)&.upcase || "ไม่ระบุ"
-end
-```
-
-### ข้อที่ 4: Debug ด้วย binding.pry
-```ruby
-# เฉลย
-def calculate_discount(price, discount_percent)
-  binding.pry  # เพิ่มตรงนี้เพื่อ debug
-  discount = price * (discount_percent / 100.0)
-  price - discount
-end
-
-# ใน pry session:
-# price, discount_percent ต้องไม่เป็น 0 หรือ nil
-puts calculate_discount(1000, 20)  # => 800.0
-```
-
-### ข้อที่ 5: ใช้ Logger
-```ruby
-# เฉลย
-require 'logger'
-
-logger = Logger.new('debug.log')
-logger.level = Logger::DEBUG
-
-class Calculator
-  def initialize(logger)
-    @logger = logger
-  end
-
-  def divide(a, b)
-    @logger.debug("divide called with a=#{a}, b=#{b}")
-
-    if b.zero?
-      @logger.error("Attempted to divide #{a} by zero!")
-      raise ArgumentError, "Cannot divide by zero"
-    end
-
-    result = a / b.to_f
-    @logger.info("#{a} / #{b} = #{result}")
-    result
-  end
-end
-
-calc = Calculator.new(logger)
-calc.divide(10, 2)
-calc.divide(10, 0) rescue nil
-```
-
-### ข้อที่ 6: Debug Infinite Loop
-```ruby
-# โจทย์: หาและแก้ infinite loop
-def countdown(n)
-  while n > 0
-    puts n
-    # Bug: ลืม n -= 1
-  end
-end
-
-# เฉลย
-def countdown_fixed(n)
-  while n > 0
-    puts n
-    n -= 1  # จำเป็น!
-  end
-  puts "Blastoff!"
-end
-
-countdown_fixed(5)
-```
-
-### ข้อที่ 7: Trace Method Calls
-```ruby
-# เฉลย
-class OrderProcessor
-  def process(order)
-    log_call(__method__, order)
-    validate(order)
-    calculate(order)
-    save(order)
-  end
-
-  private
-
-  def log_call(method, *args)
-    puts "TRACE: #{self.class}##{method} called"
-  end
-
-  def validate(order)
-    log_call(__method__, order)
-    raise "Invalid order" unless order[:items].any?
-  end
-
-  def calculate(order)
-    log_call(__method__, order)
-    order[:total] = order[:items].sum { |i| i[:price] }
-  end
-
-  def save(order)
-    log_call(__method__, order)
-    puts "Order saved: #{order.inspect}"
-  end
-end
-```
-
-### ข้อที่ 8: Debug TypeError
-```ruby
-# โจทย์
-def concatenate(a, b)
-  a + b
-end
-
-concatenate("Hello", 5)  # TypeError!
-
-# เฉลย
-def concatenate_safe(a, b)
-  [a, b].map(&:to_s).join
-end
-
-# หรือ
-def concatenate_typed(a, b)
-  raise TypeError, "a ต้องเป็น String" unless a.is_a?(String)
-  raise TypeError, "b ต้องเป็น String" unless b.is_a?(String)
-  a + b
-end
-```
-
-### ข้อที่ 9: Debug ArgumentError
-```ruby
-# เฉลย
-def create_user(name:, email:, age: nil)
-  # keyword arguments ช่วยให้ error message ชัดเจน
-  raise ArgumentError, "name ต้องไม่ว่าง" if name.to_s.empty?
-  raise ArgumentError, "email ต้องมี @" unless email.include?('@')
-
-  {
-    name: name,
-    email: email,
-    age: age
-  }
-end
-
-begin
-  create_user(name: "", email: "invalid")
-rescue ArgumentError => e
-  puts "Error: #{e.message}"
-end
-```
-
-### ข้อที่ 10: ใช้ byebug ใน Loop
-```ruby
-# เฉลย
-require 'byebug'
-
-def process_batch(items)
-  items.each_with_index do |item, i|
-    byebug if i == 2  # หยุดที่ item ที่ 3
-
-    puts "Processing: #{item}"
-  end
-end
-
-process_batch(["a", "b", "c", "d", "e"])
-# จะหยุดก่อน process "c"
-```
-
-### ข้อที่ 11: Debug ด้วย rescue และ re-raise
-```ruby
-# เฉลย
-def risky_operation(data)
-  data[:value].upcase
-rescue NoMethodError => e
-  puts "DEBUG: data = #{data.inspect}"
-  puts "DEBUG: data[:value] class = #{data[:value].class}"
-  raise  # re-raise ด้วย original backtrace
-end
-
-begin
-  risky_operation({ value: nil })
-rescue => e
-  puts "Caught: #{e.message}"
-end
-```
-
-### ข้อที่ 12-20: Additional Exercises
-
-**ข้อที่ 12:** สร้าง Debug middleware สำหรับ Ruby app
-```ruby
-# เฉลย
-module DebugMiddleware
-  def self.wrap(klass, method_name)
-    original = klass.instance_method(method_name)
-    klass.define_method(method_name) do |*args, &block|
-      puts "[DEBUG] #{klass}##{method_name} called with #{args.inspect}"
-      start = Time.now
-      result = original.bind(self).call(*args, &block)
-      elapsed = Time.now - start
-      puts "[DEBUG] #{klass}##{method_name} returned #{result.inspect} in #{elapsed.round(4)}s"
-      result
-    end
-  end
-end
-
-class Calculator
-  def add(a, b); a + b; end
-  def multiply(a, b); a * b; end
-end
-
-DebugMiddleware.wrap(Calculator, :add)
-DebugMiddleware.wrap(Calculator, :multiply)
-
-calc = Calculator.new
-calc.add(2, 3)
-calc.multiply(4, 5)
-```
-
-**ข้อที่ 13:** เขียน assert helper สำหรับ debugging
-```ruby
-# เฉลย
-def assert(condition, message = "Assertion failed")
-  unless condition
-    location = caller_locations.first
-    raise "#{message} at #{location.path}:#{location.lineno}"
-  end
-  true
-end
-
-def divide(a, b)
-  assert(!b.zero?, "Cannot divide by zero (b=#{b})")
+# Fix:
+"hello" + 5.to_s  # "hello5"
+"hello #{5}"      # "hello5"
+
+# 5. ZeroDivisionError
+10 / 0
+# => ZeroDivisionError: divided by 0
+
+# Fix:
+def safe_divide(a, b)
+  return nil if b.zero?
   a / b
 end
 
-divide(10, 2)  # ok
-divide(10, 0)  # => RuntimeError: Cannot divide by zero (b=0) at...
-```
+# 6. LoadError
+require 'nonexistent_gem'
+# => LoadError: cannot load such file
 
-**ข้อที่ 14:** Debug with ObjectSpace
-```ruby
-# เฉลย - หา string ที่ใหญ่ที่สุดใน memory
-require 'objspace'
+# Fix: ตรวจสอบ Gemfile
 
-ObjectSpace.each_object(String).select { |s| s.length > 100 }.first(5).each do |s|
-  puts "#{s.length} chars: #{s[0..50]}..."
+# 7. FrozenError
+str = "hello".freeze
+str << " world"
+# => FrozenError: can't modify frozen String
+
+# Fix: dup ก่อน modify
+str = "hello".freeze
+mutable = str.dup
+mutable << " world"  # OK
+
+# 8. StackOverflow
+def infinite_recursion
+  infinite_recursion
+end
+# => SystemStackError: stack level too deep
+
+# Fix: เพิ่ม Base Case
+def factorial(n)
+  return 1 if n <= 1  # Base Case
+  n * factorial(n - 1)
 end
 
-# นับ objects ตาม class
-counts = Hash.new(0)
-ObjectSpace.each_object { |obj| counts[obj.class] += 1 }
-counts.sort_by { |_, v| -v }.first(10).each do |klass, count|
-  puts "#{klass}: #{count}"
+# 9. Encoding::UndefinedConversionError
+# เมื่อแปลง Encoding ไม่ได้
+str = "\xFF\xFE".encode('UTF-8', 'ASCII')
+# => Encoding::UndefinedConversionError
+
+# Fix:
+str = "\xFF\xFE".encode('UTF-8', 'ASCII', invalid: :replace, undef: :replace)
+
+# 10. Timeout::Error
+require 'timeout'
+
+begin
+  Timeout.timeout(5) do
+    # Code ที่อาจใช้เวลานาน
+    sleep(10)
+  end
+rescue Timeout::Error
+  puts "หมดเวลา!"
 end
 ```
 
-**ข้อที่ 15:** สร้าง Error Reporter
+---
+
+## ขั้นตอนที่ 613: Logger
+
+### Ruby Logger
+
 ```ruby
-# เฉลย
-class ErrorReporter
-  def self.report(error, context = {})
-    puts "=" * 50
-    puts "ERROR REPORT"
-    puts "=" * 50
-    puts "Time: #{Time.now}"
-    puts "Error: #{error.class}: #{error.message}"
-    puts "Context: #{context.inspect}" unless context.empty?
-    puts "\nBacktrace:"
-    error.backtrace.first(10).each_with_index do |line, i|
-      puts "  #{i + 1}: #{line}"
+require 'logger'
+
+# สร้าง Logger
+logger = Logger.new(STDOUT)  # Log ไปยัง Console
+
+# Log ไปยังไฟล์
+file_logger = Logger.new('/var/log/app.log')
+
+# Log ไปยัง STDERR
+error_logger = Logger.new(STDERR)
+
+# Rotating Log File
+rotating_logger = Logger.new('app.log', 'daily')    # ล้างทุกวัน
+monthly_logger  = Logger.new('app.log', 'monthly')  # ล้างทุกเดือน
+size_logger     = Logger.new('app.log', 5, 10.megabytes)  # Max 5 files, 10MB each
+
+# Log Levels
+logger.level = Logger::DEBUG  # แสดงทุก Level
+
+logger.debug("Debug: ข้อมูล Debug")
+logger.info("Info: การทำงานปกติ")
+logger.warn("Warn: สิ่งที่น่าเป็นห่วง")
+logger.error("Error: Error ที่จัดการได้")
+logger.fatal("Fatal: Error ร้ายแรง")
+
+# Format
+logger.formatter = proc do |severity, datetime, progname, msg|
+  "[#{datetime.strftime('%Y-%m-%d %H:%M:%S')}] #{severity}: #{msg}\n"
+end
+
+# การใช้งานใน Class
+class PaymentService
+  def initialize
+    @logger = Logger.new(STDOUT)
+    @logger.progname = 'PaymentService'
+  end
+  
+  def process(payment)
+    @logger.info("กำลังประมวลผลการชำระเงิน #{payment[:id]}")
+    
+    begin
+      result = gateway.charge(payment)
+      @logger.info("ชำระเงินสำเร็จ: #{result[:transaction_id]}")
+      result
+    rescue PaymentError => e
+      @logger.error("ชำระเงินไม่สำเร็จ: #{e.message}")
+      @logger.debug("Payment data: #{payment.inspect}")
+      raise
     end
-    puts "=" * 50
+  end
+end
+```
+
+### Rails Logger
+
+```ruby
+# ใน Rails ใช้ Rails.logger
+Rails.logger.debug "Debug message"
+Rails.logger.info  "Info message"
+Rails.logger.warn  "Warning"
+Rails.logger.error "Error occurred"
+
+# Log ใน Controller
+class OrdersController < ApplicationController
+  def create
+    Rails.logger.tagged("OrdersController", "create") do
+      Rails.logger.info "สร้าง Order สำหรับ User #{current_user.id}"
+      
+      @order = Order.create!(order_params)
+      
+      Rails.logger.info "Order ##{@order.id} สร้างสำเร็จ"
+      
+      redirect_to @order
+    end
+  rescue ActiveRecord::RecordInvalid => e
+    Rails.logger.warn "Order สร้างไม่สำเร็จ: #{e.message}"
+    render :new
+  end
+end
+
+# Structured Logging
+Rails.logger.info({
+  event: 'order_created',
+  order_id: order.id,
+  user_id: current_user.id,
+  amount: order.total,
+  timestamp: Time.current.iso8601
+}.to_json)
+
+# Log Level ใน Development
+# config/environments/development.rb
+config.log_level = :debug
+
+# Production
+# config.log_level = :info
+
+# Silence Logger (ปิดชั่วคราว)
+Rails.logger.silence do
+  # Code ที่ไม่ต้องการ Log
+  bulk_import_data
+end
+```
+
+---
+
+## ขั้นตอนที่ 614-618: Advanced Debugging
+
+### Exception Handling สำหรับ Debug
+
+```ruby
+# ดักจับ Exception แบบละเอียด
+begin
+  complex_operation
+rescue => e
+  puts "Exception Class: #{e.class}"
+  puts "Message: #{e.message}"
+  puts "Backtrace:"
+  e.backtrace.first(10).each { |line| puts "  #{line}" }
+  raise  # Re-raise เพื่อให้ Program หยุด
+end
+
+# rescue สำหรับหลาย Exception Types
+begin
+  risky_operation
+rescue ArgumentError => e
+  puts "Argument Error: #{e.message}"
+rescue RuntimeError => e
+  puts "Runtime Error: #{e.message}"
+rescue StandardError => e
+  puts "Other Error: #{e.class} - #{e.message}"
+ensure
+  puts "ทำงานเสมอ (cleanup)"
+end
+
+# Custom Exception สำหรับ Debug
+class OrderValidationError < StandardError
+  attr_reader :order, :field
+  
+  def initialize(message, order: nil, field: nil)
+    super(message)
+    @order = order
+    @field = field
+  end
+end
+
+def validate_order(order)
+  unless order.items.any?
+    raise OrderValidationError.new(
+      "Order ต้องมีสินค้าอย่างน้อย 1 รายการ",
+      order: order,
+      field: :items
+    )
   end
 end
 
 begin
-  nil.upcase
-rescue => e
-  ErrorReporter.report(e, user_id: 42, action: "process_payment")
+  validate_order(empty_order)
+rescue OrderValidationError => e
+  puts e.message
+  puts "Order ID: #{e.order&.id}"
+  puts "Field: #{e.field}"
 end
 ```
 
-**ข้อที่ 16:** Debug Rails Request Cycle
+### Debugging Rails
+
 ```ruby
-# เฉลย
-# config/initializers/debug_request.rb
-if Rails.env.development?
-  ActiveSupport::Notifications.subscribe('process_action.action_controller') do |*args|
-    event = ActiveSupport::Notifications::Event.new(*args)
-    puts "[REQUEST] #{event.payload[:controller]}##{event.payload[:action]}"
-    puts "[REQUEST] Duration: #{event.duration.round(2)}ms"
-    puts "[REQUEST] DB: #{event.payload[:db_runtime]&.round(2)}ms"
-    puts "[REQUEST] View: #{event.payload[:view_runtime]&.round(2)}ms"
-  end
+# ใช้ debug gem ใน Rails
+# Gemfile
+# gem 'debug', group: [:development, :test]
+
+# ใน Code
+def complex_action
+  order = Order.find(params[:id])
+  debugger  # หรือ binding.break
+  order.process!
 end
+
+# Web Console (ใน Development)
+# Gemfile: gem 'web-console', group: :development
+# ใน View:
+# <% console %>
+
+# Better Errors (ใน Development)
+# Gemfile: gem 'better_errors', group: :development
+# ให้ Error Page ที่ดีกว่าพร้อม REPL
+
+# Rails Console
+# rails console
+# ดีสำหรับ Explore Database
+
+# reload! - Reload Code ใน Console
+# reload!
+
+# ค้นหา Object
+User.find_by(email: 'test@example.com')
+Order.where(status: :pending).count
+Product.pluck(:name, :price)
 ```
 
-**ข้อที่ 17:** ใช้ warn สำหรับ deprecation warnings
+---
+
+## แบบฝึกหัดบทที่ 28 (20 ข้อ)
+
+**ข้อ 1:** ใช้ `tap` Debug Method Chain ที่ซับซ้อน
+
+**ข้อ 2:** สร้าง Debug Helper Module ที่มี log, trace, inspect_all
+
+**ข้อ 3:** ใช้ Pry สำรวจ Ruby Class และ Method Documentation
+
+**ข้อ 4:** Debug Code ที่มี N+1 Query Problem ด้วย Bullet gem
+
+**ข้อ 5:** สร้าง Custom Logger ที่เขียน Log ไปยังทั้ง File และ STDOUT
+
+**ข้อ 6:** Debug Race Condition ด้วย Thread.current[:name]
+
+**ข้อ 7:** ใช้ `binding.pry` Debug Complex Recursion
+
+**ข้อ 8:** อ่านและอธิบาย Stack Trace ของ Exception
+
+**ข้อ 9:** สร้าง Error Tracking โดย Catch และ Log Exception
+
+**ข้อ 10:** Debug Memory Leak ด้วย ObjectSpace
+
+**ข้อ 11:** ใช้ Byebug Debug Algorithm ทีละ Step
+
+**ข้อ 12:** สร้าง Conditional Breakpoint ด้วย Pry
+
+**ข้อ 13:** Debug Rails Controller ด้วย Request Logging
+
+**ข้อ 14:** ใช้ `pp` Debug Complex Nested Hash/Array
+
+**ข้อ 15:** สร้าง Performance Logger ที่วัดเวลาทำงาน
+
+**ข้อ 16:** Debug ด้วย `caller` และ `__method__`
+
+**ข้อ 17:** ใช้ debug gem ตั้ง Breakpoint แบบ Conditional
+
+**ข้อ 18:** สร้าง Exception Reporter ที่ส่ง Error ไปยัง Slack
+
+**ข้อ 19:** Debug Encoding Issues ใน Thai Text Processing
+
+**ข้อ 20:** ตั้งค่า Rails Logger สำหรับ Production ด้วย Structured Logging
+
+---
+
+### เฉลยตัวอย่าง ข้อ 5: Custom Logger
+
 ```ruby
-# เฉลย
-def old_method
-  warn "[DEPRECATED] old_method จะถูกลบใน version 2.0, ใช้ new_method แทน"
-  warn caller.first  # แสดงว่าถูกเรียกจากไหน
-  new_method
-end
-
-def new_method
-  "ผลลัพธ์ใหม่"
-end
-
-old_method  # จะแสดง deprecation warning
-```
-
-**ข้อที่ 18:** Debug Encoding Issues
-```ruby
-# เฉลย
-str = "สวัสดี"
-puts str.encoding     # => UTF-8
-puts str.length       # => 6 (characters)
-puts str.bytesize     # => 18 (bytes, UTF-8 Thai = 3 bytes/char)
-puts str.valid_encoding?  # => true
-
-# แก้ encoding issue
-def fix_encoding(str)
-  return str if str.valid_encoding?
-  str.encode('UTF-8', invalid: :replace, undef: :replace, replace: '?')
-end
-```
-
-**ข้อที่ 19:** สร้าง Debug Proxy
-```ruby
-# เฉลย
-class DebugProxy
-  def initialize(target, logger)
-    @target = target
-    @logger = logger
-  end
-
-  def method_missing(name, *args, &block)
-    if @target.respond_to?(name)
-      @logger.debug("Calling #{@target.class}##{name}(#{args.map(&:inspect).join(', ')})")
-      result = @target.send(name, *args, &block)
-      @logger.debug("  => #{result.inspect}")
-      result
-    else
-      super
-    end
-  end
-
-  def respond_to_missing?(name, include_private = false)
-    @target.respond_to?(name, include_private) || super
-  end
-end
-
 require 'logger'
-logger = Logger.new(STDOUT)
-proxy = DebugProxy.new([1, 2, 3], logger)
-proxy.length
-proxy.map { |n| n * 2 }
-```
 
-**ข้อที่ 20:** Debug Concurrent Code
-```ruby
-# เฉลย
-require 'thread'
-
-class ConcurrentCounter
-  def initialize
-    @count = 0
-    @mutex = Mutex.new
-    @debug_log = []
+class AppLogger
+  LEVELS = %i[debug info warn error fatal].freeze
+  
+  def initialize(log_file: nil, level: :info)
+    @loggers = []
+    
+    # Console Logger
+    console_logger = Logger.new(STDOUT)
+    console_logger.formatter = method(:format_message)
+    @loggers << console_logger
+    
+    # File Logger (ถ้าระบุ)
+    if log_file
+      FileUtils.mkdir_p(File.dirname(log_file))
+      file_logger = Logger.new(log_file, 'daily')
+      file_logger.formatter = method(:format_json)
+      @loggers << file_logger
+    end
+    
+    set_level(level)
   end
-
-  def increment(thread_id)
-    @mutex.synchronize do
-      old_value = @count
-      @count += 1
-      @debug_log << "Thread #{thread_id}: #{old_value} -> #{@count}"
+  
+  LEVELS.each do |level|
+    define_method(level) do |message, context = {}|
+      log(level, message, context)
     end
   end
-
-  def value
-    @count
+  
+  def tagged(*tags)
+    old_tags = Thread.current[:log_tags] || []
+    Thread.current[:log_tags] = old_tags + tags
+    yield
+  ensure
+    Thread.current[:log_tags] = old_tags
   end
-
-  def debug_log
-    @debug_log
+  
+  def silence
+    original_level = @loggers.first.level
+    @loggers.each { |l| l.level = Logger::FATAL + 1 }
+    yield
+  ensure
+    @loggers.each { |l| l.level = original_level }
+  end
+  
+  private
+  
+  def log(level, message, context = {})
+    @loggers.each { |logger| logger.send(level, message) }
+  end
+  
+  def set_level(level)
+    log_level = Logger.const_get(level.upcase)
+    @loggers.each { |l| l.level = log_level }
+  end
+  
+  def format_message(severity, datetime, _progname, msg)
+    tags = Thread.current[:log_tags]&.map { |t| "[#{t}]" }&.join(' ')
+    prefix = tags ? "#{tags} " : ""
+    
+    color = case severity
+    when 'DEBUG' then "\e[37m"
+    when 'INFO'  then "\e[32m"
+    when 'WARN'  then "\e[33m"
+    when 'ERROR' then "\e[31m"
+    when 'FATAL' then "\e[35m"
+    else ""
+    end
+    
+    "#{color}[#{datetime.strftime('%H:%M:%S')}] #{severity}: #{prefix}#{msg}\e[0m\n"
+  end
+  
+  def format_json(severity, datetime, _progname, msg)
+    {
+      timestamp: datetime.iso8601,
+      level: severity,
+      message: msg.to_s,
+      tags: Thread.current[:log_tags] || [],
+      thread_id: Thread.current.object_id
+    }.to_json + "\n"
   end
 end
 
-counter = ConcurrentCounter.new
+# การใช้งาน
+logger = AppLogger.new(
+  log_file: 'logs/app.log',
+  level: :debug
+)
 
-threads = 5.times.map do |i|
-  Thread.new do
-    10.times { counter.increment(i) }
-  end
+logger.info "Application เริ่มทำงาน"
+logger.debug "Debug mode เปิดอยู่"
+
+logger.tagged("Request", "123") do
+  logger.info "รับ Request"
+  logger.warn "Response ช้า"
 end
 
-threads.each(&:join)
+logger.error "เกิดข้อผิดพลาด"
 
-puts "Final count: #{counter.value}"  # => 50
-puts "\nDebug log (first 10):"
-counter.debug_log.first(10).each { |entry| puts entry }
+logger.silence do
+  logger.debug "ข้อความนี้จะไม่แสดง"
+end
+
+logger.info "หลัง Silence"
 ```
 
 ---
 
-## สรุป
-
-Debugging ใน Ruby มีเครื่องมือหลายอย่าง:
-
-1. **puts/p/pp** - เร็วและง่าย เหมาะสำหรับ debug เบื้องต้น
-2. **Pry** - powerful REPL debugger ที่ใช้กันมาก
-3. **byebug** - debugger แบบ step-through
-4. **debug gem** - built-in ใน Ruby 3.1+
-5. **Logger** - สำหรับ structured logging
-6. **better_errors** - สำหรับ Rails development
-
-**Best Practices:**
-- อ่าน error message ก่อน
-- อ่าน stack trace จากล่างขึ้นบน
-- ลด scope ของปัญหาด้วย binary search
-- เพิ่ม logging ที่ strategic points
-- ใช้ conditional breakpoints เพื่อประหยัดเวลา
-
----
-
-*ต่อไป: ตอนที่ 29 - Security ใน Ruby*
+*สรุปบทที่ 28: Debugging เป็นทักษะสำคัญที่ต้องพัฒนา ตั้งแต่วิธีพื้นฐานอย่าง puts/p/pp ไปจนถึง Interactive Debugger อย่าง Pry และ Byebug การอ่าน Stack Trace ให้เป็น การใช้ Logger อย่างเหมาะสม และการตั้ง Conditional Breakpoints ช่วยให้หา Bug ได้เร็วและมีประสิทธิภาพมากขึ้น*

@@ -1,371 +1,396 @@
-# ตอนที่ 4: Numbers และ Math
-
-## Ruby Programming Course สำหรับผู้เริ่มต้นภาษาไทย
-
----
+# ตอนที่ 4: Numbers และ Math (Steps 46-60)
 
 ## บทนำ
 
-ในตอนที่ 4 เราจะเรียนรู้เกี่ยวกับตัวเลขและการคำนวณใน Ruby อย่างละเอียด Ruby มีการรองรับตัวเลขหลายประเภทและมี Math module ที่ทรงพลัง
-
-**สิ่งที่จะได้เรียนรู้:**
-- Integer และ Float อย่างละเอียด
-- การดำเนินการทางคณิตศาสตร์
-- Math module
-- BigDecimal สำหรับการเงิน
-- เลขฐานต่างๆ
-- Random numbers
-- Numeric Conversions
+Ruby รองรับตัวเลขหลายประเภท ตั้งแต่จำนวนเต็ม (Integer) จำนวนทศนิยม (Float) จนถึงจำนวนตรรกยะ (Rational) และจำนวนเชิงซ้อน (Complex) มี Math module ที่ให้ฟังก์ชันทางคณิตศาสตร์ครบครัน รวมถึง BigDecimal สำหรับการคำนวณทางการเงินที่ต้องการความแม่นยำสูง
 
 ---
 
-## Step 46: Integer อย่างละเอียด
+## Step 46: Integer Literals
 
-### 46.1 Integer Literals
+### รูปแบบการเขียน Integer
+
+Ruby รองรับการเขียน Integer ในหลายรูปแบบ
 
 ```ruby
-# ตัวเลขจำนวนเต็มธรรมดา
-age = 25
-negative = -100
-zero = 0
+# ทศนิยม (Decimal) - รูปแบบปกติ
+puts 42           # => 42
+puts 1000000      # => 1000000
+puts -255         # => -255
 
-# ใช้ underscore แทน comma เพื่อให้อ่านง่าย
-population = 70_000_000     # 70 ล้าน
-distance   = 384_400        # ระยะทางไปดวงจันทร์ กม.
-bytes      = 1_073_741_824  # 1 GiB
-
-puts population  # => 70000000
-puts distance    # => 384400
-puts bytes       # => 1073741824
-
-# Integer ฐานต่างๆ
-binary  = 0b1010_1010   # ฐาน 2 = 170
-octal   = 0o377         # ฐาน 8 = 255
-decimal = 255           # ฐาน 10
-hex     = 0xFF          # ฐาน 16 = 255
-
-puts binary   # => 170
-puts octal    # => 255
-puts hex      # => 255
+# ใช้ underscore เพื่อให้อ่านง่าย (ไม่มีผลต่อค่า)
+puts 1_000_000    # => 1000000
+puts 1_234_567    # => 1234567
+puts 9_999_999.99 # => 9999999.99 (ใช้กับ Float ได้ด้วย)
 ```
 
 ```ruby
-# Ruby Integer ไม่มีขีดจำกัด (Arbitrary Precision)
-# ใน Ruby เก่า: Fixnum (<= 2^62-1) และ Bignum (ใหญ่กว่า)
-# ใน Ruby 2.4+: รวมเป็น Integer เดียว
+# เลขฐานสอง (Binary) - ขึ้นต้นด้วย 0b
+puts 0b1010       # => 10
+puts 0b1111_1111  # => 255
+puts 0b0000_0001  # => 1
+puts 0b1000_0000  # => 128
 
-puts 2**100
-# => 1267650600228229401496703205376
-
-factorial = 1
-(1..20).each { |n| factorial *= n }
-puts factorial  # => 2432902008176640000
-
-# ตรวจสอบ class
-puts 42.class          # => Integer
-puts (2**100).class    # => Integer
-```
-
-### 46.2 Integer Methods
-
-```ruby
-n = -42
-
-# ค่าสัมบูรณ์
-puts n.abs    # => 42
-
-# เครื่องหมาย
-puts n.sign rescue nil  # ไม่มี method นี้
-puts n.negative?  # => true
-puts n.positive?  # => false
-puts n.zero?      # => false
-puts n.nonzero?   # => -42 (คืนค่าตัวเองถ้าไม่ใช่ 0, คืน nil ถ้า 0)
-puts 0.nonzero?.inspect  # => nil
-
-# Ceiling Division
-puts 7.ceildiv(3)   # => 3 (Ruby 3.2+, เหมือน (7.0/3).ceil)
-
-# นับ bits
-puts 255.bit_length  # => 8
-puts 256.bit_length  # => 9
-puts 1.bit_length    # => 1
+# แปลงกลับ
+puts 10.to_s(2)   # => "1010" (แสดง binary representation)
+puts 255.to_s(2)  # => "11111111"
 ```
 
 ```ruby
-# Integer Arithmetic
-a = 17
-b = 5
+# เลขฐานสิบหก (Hexadecimal) - ขึ้นต้นด้วย 0x
+puts 0xFF         # => 255
+puts 0x1F         # => 31
+puts 0xDEAD_BEEF  # => 3735928559
+puts 0x00FF_FFFF  # => 16777215 (สีขาวใน RGB)
 
-puts a + b    # => 22 (addition)
-puts a - b    # => 12 (subtraction)
-puts a * b    # => 85 (multiplication)
-puts a / b    # => 3  (integer division - ตัดทศนิยม!)
-puts a % b    # => 2  (modulo - เศษ)
-puts a ** b   # => 1419857 (exponentiation)
-puts -a % b   # => 3  (ระวัง: -17 % 5 = 3 ใน Ruby)
-
-# divmod - ได้ทั้ง quotient และ remainder
-quotient, remainder = 17.divmod(5)
-puts "#{quotient}, #{remainder}"  # => 3, 2
-
-# remainder vs modulo
-puts (-7).remainder(3)  # => -1 (เก็บเครื่องหมาย dividend)
-puts (-7) % 3           # => 2  (ผลลัพธ์เป็น positive เสมอ)
+# แปลงกลับ
+puts 255.to_s(16)  # => "ff"
+puts 255.to_s(16).upcase  # => "FF"
 ```
 
 ```ruby
-# Integer ที่ใช้บ่อย
-# GCD (Greatest Common Divisor / ห.ร.ม.)
-puts 12.gcd(8)    # => 4
-puts 15.gcd(10)   # => 5
-puts 100.gcd(75)  # => 25
+# เลขฐานแปด (Octal) - ขึ้นต้นด้วย 0o
+puts 0o777    # => 511
+puts 0o644    # => 420 (Unix file permission: rw-r--r--)
+puts 0o755    # => 493 (Unix file permission: rwxr-xr-x)
 
-# LCM (Least Common Multiple / ค.ร.น.)
-puts 4.lcm(6)    # => 12
-puts 3.lcm(5)    # => 15
-puts 12.lcm(18)  # => 36
+# แปลงกลับ
+puts 511.to_s(8)  # => "777"
+puts 420.to_s(8)  # => "644"
+```
 
-# กำลังสอง
-puts 9.integer_sqrt rescue nil  # ไม่มี
-require 'isqrt' rescue nil
-puts Math.sqrt(9).to_i   # => 3 (ทางอ้อม)
-puts Integer.sqrt(9)     # => 3 (Ruby 2.5+)
-puts Integer.sqrt(10)    # => 3 (floor square root)
-puts Integer.sqrt(16)    # => 4
+```ruby
+# ขนาดของ Integer ใน Ruby
+puts 2**31 - 1   # => 2147483647 (Max 32-bit signed)
+puts 2**63 - 1   # => 9223372036854775807 (Max 64-bit signed)
+puts 2**100      # => 1267650600228229401496703205376 (Ruby รองรับ BigInteger!)
+
+# Ruby จัดการ Integer ขนาดใหญ่ได้โดยอัตโนมัติ (ไม่ overflow)
+factorial_20 = (1..20).reduce(:*)
+puts factorial_20  # => 2432902008176640000
 ```
 
 ---
 
-## Step 47: Float อย่างละเอียด
+## Step 47: Float Literals
 
-### 47.1 Float Literals
+### จำนวนทศนิยม
 
 ```ruby
-# Float literals
-pi    = 3.14159265358979
-e     = 2.71828182845905
-price = 29.99
-small = 0.001
-large = 1.5e10   # 1.5 × 10^10
+# Float ปกติ
+puts 3.14         # => 3.14
+puts -2.718       # => -2.718
+puts 0.5          # => 0.5
+puts 100.0        # => 100.0
 
-puts pi     # => 3.14159265358979
-puts small  # => 0.001
-puts large  # => 15000000000.0
+# ต้องมีตัวเลขทั้งสองด้านของ .
+# puts 1.  # SyntaxError
+# puts .5  # SyntaxError
+puts 1.0  # => 1.0 (ถูกต้อง)
+puts 0.5  # => 0.5 (ถูกต้อง)
+```
 
+```ruby
 # Scientific notation
-puts 1.5e10   # => 15000000000.0
-puts 1.5e-3   # => 0.0015
-puts 2.5E8    # => 250000000.0
+puts 1.0e10    # => 10000000000.0
+puts 1.5e-3    # => 0.0015
+puts 2.5e+8    # => 250000000.0
+puts 6.022e23  # => 6.022e+23 (Avogadro's number)
 
-# Float precision
-puts 1.0 / 3.0   # => 0.3333333333333333
-puts (1.0 / 3.0) * 3  # => 1.0
+# ความแม่นยำของ Float
+puts 0.1 + 0.2         # => 0.30000000000000004 (floating point issue!)
+puts (0.1 + 0.2).round(1)  # => 0.3
 ```
 
-### 47.2 Float Constants
-
 ```ruby
-puts Float::INFINITY        # => Infinity
-puts -Float::INFINITY       # => -Infinity
-puts Float::NAN             # => NaN
-puts Float::DIG             # => 15 (decimal digits of precision)
-puts Float::EPSILON         # => 2.220446049250313e-16 (smallest diff from 1.0)
-puts Float::MAX             # => 1.7976931348623157e+308
-puts Float::MIN             # => 5.0e-324 (smallest positive)
-puts Float::MANT_DIG        # => 53 (mantissa digits)
-puts Float::MAX_EXP         # => 1024
-puts Float::MIN_EXP         # => -1021
-```
-
-### 47.3 Float Methods
-
-```ruby
-num = 3.75
-
-# Rounding
-puts num.ceil      # => 4 (ปัดขึ้น)
-puts num.floor     # => 3 (ปัดลง)
-puts num.round     # => 4 (ปัดใกล้สุด)
-puts num.truncate  # => 3 (ตัดทศนิยม)
-
-# ปัดหลายตำแหน่ง
-pi = 3.14159
-puts pi.ceil(2)      # => 3.15
-puts pi.floor(2)     # => 3.14
-puts pi.round(2)     # => 3.14
-puts pi.round(4)     # => 3.1416
-puts pi.truncate(3)  # => 3.141
-
-# Checking
-puts 1.0.finite?         # => true
-puts (1.0/0).finite?     # => false
-puts Float::NAN.nan?     # => true
-puts 1.0.nan?            # => false
-puts (1.0/0).infinite?   # => 1
-puts (-1.0/0).infinite?  # => -1
-puts 1.0.infinite?       # => nil
+# Float precision limits
+puts Float::MAX         # => 1.7976931348623157e+308
+puts Float::MIN         # => 2.2250738585072014e-308
+puts Float::EPSILON     # => 2.220446049250313e-16 (ความแม่นยำสูงสุด)
+puts Float::DIG         # => 15 (จำนวนหลักทศนิยมที่แม่นยำ)
+puts Float::INFINITY    # => Infinity
+puts -Float::INFINITY   # => -Infinity
+puts Float::NAN         # => NaN
 ```
 
 ---
 
 ## Step 48: Arithmetic Operations
 
-### 48.1 Basic Operations
+### การคำนวณพื้นฐาน
 
 ```ruby
-# Integer Operations
-puts 10 + 3    # => 13
-puts 10 - 3    # => 7
-puts 10 * 3    # => 30
-puts 10 / 3    # => 3 (Integer division!)
+# บวก ลบ คูณ หาร
+puts 10 + 3   # => 13
+puts 10 - 3   # => 7
+puts 10 * 3   # => 30
+puts 10 / 3   # => 3 (Integer division!)
+puts 10.0 / 3 # => 3.3333333333333335
+puts 10 / 3.0 # => 3.3333333333333335
+```
+
+```ruby
+# Integer vs Float Division - สำคัญมาก!
+# Integer / Integer = Integer (ตัดทศนิยมออก)
+puts 7 / 2    # => 3 (ไม่ใช่ 3.5!)
+puts 7 / 2.0  # => 3.5
+puts 7.0 / 2  # => 3.5
+puts 7.fdiv(2) # => 3.5 (Float division method)
+
+# ข้อควรระวัง: ใน Rails คำนวณ percentage
+students = 30
+passed = 25
+# ผิด:
+rate = passed / students * 100
+puts rate  # => 83 (ไม่ถูกต้อง, ควรเป็น 83.33...)
+
+# ถูก:
+rate = passed.to_f / students * 100
+puts rate.round(2)  # => 83.33
+```
+
+```ruby
+# Modulo (%)  - เศษจากการหาร
 puts 10 % 3    # => 1
-puts 10 ** 3   # => 1000
+puts 17 % 5    # => 2
+puts -7 % 3    # => 2 (Ruby modulo: ผลลัพธ์มีเครื่องหมายเหมือน divisor)
+puts 7 % -3    # => -2
 
-# Float Operations
-puts 10.0 + 3  # => 13.0
-puts 10.0 - 3  # => 7.0
-puts 10.0 * 3  # => 30.0
-puts 10.0 / 3  # => 3.3333333333333335
-puts 10.0 % 3  # => 1.0
-puts 10.0 ** 3 # => 1000.0
+# ใช้ modulo ตรวจสอบคู่/คี่
+puts 4 % 2 == 0  # => true (คู่)
+puts 5 % 2 == 0  # => false (คี่)
+
+# ใช้ modulo ใน circular indexing
+days = ["จันทร์", "อังคาร", "พุธ", "พฤหัส", "ศุกร์", "เสาร์", "อาทิตย์"]
+(0..13).each do |i|
+  puts "วันที่ #{i}: #{days[i % 7]}"
+end
 ```
 
 ```ruby
-# Compound Assignment Operators
-x = 10
-x += 5   # x = x + 5  => 15
-x -= 3   # x = x - 3  => 12
-x *= 2   # x = x * 2  => 24
-x /= 4   # x = x / 4  => 6
-x %= 4   # x = x % 4  => 2
-x **= 3  # x = x ** 3 => 8
+# ยกกำลัง (**)
+puts 2 ** 10   # => 1024
+puts 3 ** 3    # => 27
+puts 2 ** 0.5  # => 1.4142135623730951 (square root)
+puts 8 ** (1.0/3)  # => 2.0 (cube root)
 
-puts x  # => 8
-
-# Integer ไม่มี ++ และ -- (เหมือน C/Java)
-# ต้องใช้ += 1 หรือ -= 1
-count = 0
-count += 1
-count += 1
-puts count  # => 2
-```
-
-### 48.2 Integer vs Float Division
-
-```ruby
-# Integer Division (ตัดทศนิยม - Truncation)
-puts 7 / 2     # => 3 (ไม่ใช่ 3.5!)
-puts -7 / 2    # => -4 (Ruby rounds toward -infinity)
-puts 7 / -2    # => -4
-
-# Float Division
-puts 7.0 / 2   # => 3.5
-puts 7 / 2.0   # => 3.5
-puts 7.0 / 2.0 # => 3.5
-
-# แปลงเป็น Float ก่อนหาร
-a = 7
-b = 2
-puts a.to_f / b  # => 3.5
-puts a / b.to_f  # => 3.5
-
-# Rational (เศษส่วน)
-puts 7.to_r / 2   # => 7/2 (Rational)
-puts (7.to_r / 2).to_f  # => 3.5
-```
-
-```ruby
-# ระวัง Integer Division Bug
-total_price = 100  # บาท
-num_items   = 3
-
-# ผิด
-avg_price_wrong = total_price / num_items
-puts avg_price_wrong  # => 33 (ผิด!)
-
-# ถูก
-avg_price_correct = total_price.to_f / num_items
-puts avg_price_correct  # => 33.333...
-
-# หรือ
-avg_price_float = total_price / num_items.to_f
-puts avg_price_float  # => 33.333...
-
-# ตัวอย่างจริง: คำนวณเปอร์เซ็นต์
-correct_answers = 17
-total_questions = 20
-
-# ผิด
-percent_wrong = correct_answers / total_questions * 100
-puts percent_wrong  # => 80 (อาจถูกต้องบังเอิญ แต่ไม่น่าเชื่อถือ)
-
-# ถูก
-percent_correct = correct_answers.to_f / total_questions * 100
-puts percent_correct  # => 85.0
-
-# หรือ
-percent_reliable = (correct_answers * 100) / total_questions
-puts percent_reliable  # => 85 (Integer แต่แม่นยำ)
+# Integer#pow กับ modulus (สำหรับ cryptography)
+puts 2.pow(10, 1000)  # => 24 (2^10 mod 1000) - เร็วกว่า (2**10) % 1000 มาก
 ```
 
 ---
 
-## Step 49: Math Module
+## Step 49: Integer Methods
 
-### 49.1 Math Constants
-
-```ruby
-puts Math::PI   # => 3.141592653589793
-puts Math::E    # => 2.718281828459045
-
-# ใช้ include Math เพื่อไม่ต้องพิมพ์ Math::
-include Math
-puts PI         # => 3.141592653589793
-puts E          # => 2.718281828459045
-```
-
-### 49.2 Math Methods
+### เมธอดของ Integer
 
 ```ruby
-# Square Root
-puts Math.sqrt(9)      # => 3.0
-puts Math.sqrt(2)      # => 1.4142135623730951
-puts Math.sqrt(0)      # => 0.0
-puts Math.sqrt(0.25)   # => 0.5
+# Odd and Even
+puts 4.even?   # => true
+puts 5.even?   # => false
+puts 4.odd?    # => false
+puts 5.odd?    # => true
 
-# Cube Root (ไม่มี method ตรงๆ)
-puts 8 ** (1.0/3)    # => 2.0
-puts 27 ** (1.0/3)   # => 3.0 (หรือ 2.9999...)
+# Zero
+puts 0.zero?   # => true
+puts 1.zero?   # => false
 
-# Exponent
-puts Math.exp(1)    # => 2.718281828459045 (e^1)
-puts Math.exp(2)    # => 7.38905609893065  (e^2)
-puts Math.exp(0)    # => 1.0               (e^0)
-
-# Logarithm
-puts Math.log(Math::E)   # => 1.0 (natural log)
-puts Math.log(1)         # => 0.0
-puts Math.log(100, 10)   # => 2.0 (log base 10)
-puts Math.log10(100)     # => 2.0 (log base 10)
-puts Math.log2(8)        # => 3.0 (log base 2)
-puts Math.log2(1024)     # => 10.0
+# Sign methods
+puts 5.positive?   # => true
+puts -5.positive?  # => false
+puts -5.negative?  # => true
+puts 0.positive?   # => false
+puts 0.negative?   # => false
+puts 0.zero?       # => true
 ```
 
 ```ruby
-# Trigonometry (angles in radians)
-puts Math.sin(0)               # => 0.0
-puts Math.sin(Math::PI / 2)    # => 1.0
-puts Math.cos(0)               # => 1.0
-puts Math.cos(Math::PI)        # => -1.0
-puts Math.tan(Math::PI / 4)    # => 0.9999... (≈1.0)
+# Absolute value
+puts (-5).abs   # => 5
+puts 5.abs      # => 5
+puts (-100).abs # => 100
 
-# Inverse Trig
-puts Math.asin(1)   # => π/2 = 1.5707963...
-puts Math.acos(1)   # => 0.0
-puts Math.atan(1)   # => π/4 = 0.7853981...
-puts Math.atan2(1, 1)  # => π/4 (atan with x,y)
+# GCD and LCM
+puts 12.gcd(8)   # => 4 (Greatest Common Divisor)
+puts 12.lcm(8)   # => 24 (Least Common Multiple)
+puts 15.gcd(10)  # => 5
+puts 15.lcm(10)  # => 30
 
-# Convert Degrees to Radians
+# กรณีใช้งานจริง: ทำ fraction ให้ง่ายที่สุด
+def simplify_fraction(num, den)
+  g = num.gcd(den)
+  [num / g, den / g]
+end
+
+puts simplify_fraction(12, 8).inspect   # => [3, 2]
+puts simplify_fraction(6, 9).inspect    # => [2, 3]
+```
+
+```ruby
+# digits - แยกตัวเลขเป็น array (จากหลักน้อยไปหลักมาก)
+puts 1234.digits.inspect     # => [4, 3, 2, 1]
+puts 1234.digits(10).inspect # => [4, 3, 2, 1] (base 10)
+puts 255.digits(16).inspect  # => [15, 15] (base 16: FF)
+
+# ใช้งาน: หาผลรวมของทุก digit
+def digit_sum(n)
+  n.abs.digits.sum
+end
+
+puts digit_sum(1234)    # => 10 (1+2+3+4)
+puts digit_sum(99)      # => 18 (9+9)
+puts digit_sum(12345)   # => 15
+```
+
+```ruby
+# to_s กับ base - แปลงเป็น string ในฐานต่างๆ
+puts 255.to_s     # => "255"
+puts 255.to_s(2)  # => "11111111" (binary)
+puts 255.to_s(8)  # => "377" (octal)
+puts 255.to_s(16) # => "ff" (hexadecimal)
+puts 10.to_s(36)  # => "a" (base 36)
+puts 35.to_s(36)  # => "z"
+
+# แปลงกลับ: String#to_i กับ base
+puts "11111111".to_i(2)  # => 255
+puts "ff".to_i(16)       # => 255
+puts "377".to_i(8)       # => 255
+```
+
+```ruby
+# Integer iteration methods
+# times - วนซ้ำตามจำนวนครั้ง
+3.times { |i| puts "ครั้งที่ #{i + 1}" }
+# => ครั้งที่ 1
+# => ครั้งที่ 2
+# => ครั้งที่ 3
+
+# upto - วนจากน้อยไปมาก
+1.upto(5) { |i| print "#{i} " }
+puts  # => 1 2 3 4 5
+
+# downto - วนจากมากไปน้อย
+5.downto(1) { |i| print "#{i} " }
+puts  # => 5 4 3 2 1
+
+# step - วนด้วย step ที่กำหนด
+1.step(10, 2) { |i| print "#{i} " }
+puts  # => 1 3 5 7 9
+```
+
+---
+
+## Step 50: Float Methods
+
+### เมธอดของ Float
+
+```ruby
+pi = 3.14159265358979
+
+# round - ปัดเศษ
+puts pi.round      # => 3 (ปัดเป็น integer)
+puts pi.round(2)   # => 3.14
+puts pi.round(4)   # => 3.1416
+puts 2.5.round     # => 3 (หลักปัด: >= 0.5 ปัดขึ้น)
+puts 2.4.round     # => 2
+
+# ceil - ปัดขึ้นเสมอ
+puts pi.ceil       # => 4
+puts pi.ceil(2)    # => 3.15
+puts 2.1.ceil      # => 3
+
+# floor - ปัดลงเสมอ
+puts pi.floor      # => 3
+puts pi.floor(2)   # => 3.14
+puts 2.9.floor     # => 2
+```
+
+```ruby
+# truncate - ตัดทศนิยมออก (ไม่ปัด)
+puts 3.9.truncate   # => 3
+puts (-3.9).truncate # => -3 (ต่างจาก floor ซึ่งจะได้ -4)
+puts 3.14.truncate(1) # => 3.1
+
+# abs
+puts (-3.14).abs  # => 3.14
+puts 3.14.abs     # => 3.14
+```
+
+```ruby
+# การตรวจสอบ special values
+puts (1.0/0).infinite?    # => 1 (บวก infinity)
+puts (-1.0/0).infinite?   # => -1 (ลบ infinity)
+puts 3.14.infinite?       # => nil (ไม่ใช่ infinity)
+
+puts (0.0/0).nan?         # => true (NaN - Not a Number)
+puts 3.14.nan?            # => false
+
+puts 3.14.finite?         # => true
+puts (1.0/0).finite?      # => false
+
+# ป้องกัน NaN ใน calculation
+def safe_divide(a, b)
+  return 0.0 if b.zero?
+  result = a.to_f / b
+  result.nan? || result.infinite? ? 0.0 : result
+end
+
+puts safe_divide(10, 3)    # => 3.3333333333333335
+puts safe_divide(10, 0)    # => 0.0
+puts safe_divide(0, 0)     # => 0.0
+```
+
+```ruby
+# การแปลง Float
+puts 3.9.to_i    # => 3 (เหมือน truncate)
+puts 3.9.floor   # => 3
+puts 3.9.ceil    # => 4
+puts 3.9.round   # => 4
+
+# Float arithmetic precision issue
+puts 0.1 + 0.2   # => 0.30000000000000004
+
+# วิธีแก้: ใช้ round
+result = (0.1 + 0.2).round(10)
+puts result        # => 0.3
+puts result == 0.3 # => true
+```
+
+---
+
+## Step 51: Math Module
+
+### ฟังก์ชันทางคณิตศาสตร์
+
+```ruby
+# Constants
+puts Math::PI    # => 3.141592653589793
+puts Math::E     # => 2.718281828459045
+
+# Square root และ Cube root
+puts Math.sqrt(16)    # => 4.0
+puts Math.sqrt(2)     # => 1.4142135623730951
+puts Math.cbrt(27)    # => 3.0
+puts Math.cbrt(8)     # => 2.0
+
+# หรือใช้ ** operator
+puts 16 ** 0.5        # => 4.0
+puts 27 ** (1.0/3)    # => 3.0
+```
+
+```ruby
+# Logarithms
+puts Math.log(Math::E)    # => 1.0 (natural log, base e)
+puts Math.log(100, 10)    # => 2.0 (log base 10)
+puts Math.log2(8)         # => 3.0 (log base 2)
+puts Math.log10(1000)     # => 3.0 (log base 10)
+puts Math.exp(1)          # => 2.718281828459045 (e^1)
+puts Math.exp(2)          # => 7.38905609893065 (e^2)
+```
+
+```ruby
+# Trigonometric functions (ใช้ Radian)
+# แปลง degree เป็น radian
 def deg_to_rad(degrees)
   degrees * Math::PI / 180
 end
@@ -374,762 +399,762 @@ def rad_to_deg(radians)
   radians * 180 / Math::PI
 end
 
-puts Math.sin(deg_to_rad(30)).round(4)  # => 0.5
-puts Math.cos(deg_to_rad(60)).round(4)  # => 0.5
-puts rad_to_deg(Math::PI).round(2)      # => 180.0
+puts Math.sin(deg_to_rad(90))   # => 1.0
+puts Math.cos(deg_to_rad(0))    # => 1.0
+puts Math.tan(deg_to_rad(45))   # => 0.9999999999999999 (≈ 1.0)
+
+puts Math.sin(Math::PI / 2)     # => 1.0
+puts Math.cos(Math::PI)         # => -1.0
 ```
 
 ```ruby
-# Hyperbolic Functions
-puts Math.sinh(1)   # => 1.1752011936438014
-puts Math.cosh(1)   # => 1.5430806348152437
-puts Math.tanh(0)   # => 0.0
-puts Math.tanh(1)   # => 0.7615941559557649
+# Inverse trigonometric
+puts rad_to_deg(Math.asin(1.0))   # => 90.0
+puts rad_to_deg(Math.acos(1.0))   # => 0.0
+puts rad_to_deg(Math.atan(1.0))   # => 45.0
+puts rad_to_deg(Math.atan2(1, 1)) # => 45.0 (atan2 บอก quadrant ด้วย)
 
-# Power and Roots
-puts Math.hypot(3, 4)   # => 5.0 (hypotenuse: sqrt(3^2 + 4^2))
-puts Math.hypot(5, 12)  # => 13.0
+# Hyperbolic functions
+puts Math.sinh(1)  # => 1.1752011936438014
+puts Math.cosh(1)  # => 1.5430806348152437
+puts Math.tanh(1)  # => 0.7615941559557649
+```
 
-# Ceiling/Floor for float in different contexts
-puts Math.cbrt(27)   # => 3.0 (cube root, Ruby 2.4+) หรือ 27**(1.0/3)
+```ruby
+# hypot - คำนวณ hypotenuse (ด้านตรงข้ามมุมฉาก)
+puts Math.hypot(3, 4)    # => 5.0 (Pythagorean: 3² + 4² = 5²)
+puts Math.hypot(5, 12)   # => 13.0
 
-# Frexp and Ldexp (Float decomposition)
-mantissa, exponent = Math.frexp(0.5)
-puts "mantissa=#{mantissa}, exp=#{exponent}"  # => 0.5, 0
+# ใช้งานจริง: หาระยะห่างระหว่าง 2 จุด
+def distance(x1, y1, x2, y2)
+  Math.hypot(x2 - x1, y2 - y1)
+end
 
-puts Math.ldexp(0.5, 0)  # => 0.5
+puts distance(0, 0, 3, 4)    # => 5.0
+puts distance(1, 1, 4, 5)    # => 5.0
 ```
 
 ---
 
-## Step 50: Number Formatting
+## Step 52: Number Formatting
 
-### 50.1 Rounding
+### การจัดรูปแบบตัวเลข
 
 ```ruby
-num = 3.14159265358979
-
-# round - ปัดเศษ
-puts num.round      # => 3 (ปัดเป็น Integer)
-puts num.round(0)   # => 3.0 (ปัดเป็น Float ทศนิยม 0 ตำแหน่ง)
-puts num.round(1)   # => 3.1
-puts num.round(2)   # => 3.14
-puts num.round(3)   # => 3.142
-puts num.round(4)   # => 3.1416
-
-# ceil - ปัดขึ้น
-puts 3.1.ceil    # => 4
-puts 3.9.ceil    # => 4
-puts (-3.1).ceil # => -3 (ปัดขึ้นสำหรับ negative = ใกล้ 0)
-
-# floor - ปัดลง
-puts 3.9.floor    # => 3
-puts (-3.1).floor # => -4
-
-# truncate - ตัดทศนิยม
-puts 3.9.truncate   # => 3
-puts (-3.9).truncate # => -3 (แตกต่างจาก floor)
-
-# round ด้วย half: mode
-puts 2.5.round                    # => 3 (default: half up)
-puts 2.5.round(half: :up)         # => 3
-puts 2.5.round(half: :down)       # => 2
-puts 2.5.round(half: :even)       # => 2 (Banker's rounding)
-puts 3.5.round(half: :even)       # => 4 (ปัดเป็นเลขคู่)
+# ใช้ sprintf / format
+puts sprintf("%.2f", 3.14159)      # => 3.14
+puts sprintf("%d", 42.9)           # => 42
+puts sprintf("%05d", 42)           # => 00042
+puts sprintf("%+.2f", 3.14)       # => +3.14
+puts sprintf("%-10s|", "hello")   # => hello     |
+puts sprintf("%10s|", "hello")    # => "     hello|"
 ```
 
 ```ruby
-# Format ตัวเลขสำหรับแสดงผล
-def format_currency(amount, symbol = "฿")
-  "#{symbol}#{"%.2f" % amount}"
+# Number separator (ด้วย monkey patching หรือ custom method)
+def number_with_commas(n)
+  n.to_s.reverse.gsub(/(\d{3})(?=\d)/, '\\1,').reverse
 end
 
-def format_number_with_commas(number)
-  # แบบง่าย (สำหรับ Integer)
-  number.to_s.reverse.gsub(/(\d{3})(?=\d)/, '\1,').reverse
+puts number_with_commas(1234567)      # => 1,234,567
+puts number_with_commas(9876543210)   # => 9,876,543,210
+puts number_with_commas(42)           # => 42
+
+# สำหรับ Float
+def format_currency(amount, currency = "฿")
+  integer_part, decimal_part = ("%.2f" % amount).split(".")
+  "#{currency}#{number_with_commas(integer_part.to_i)}.#{decimal_part}"
 end
 
-puts format_currency(1234.5)     # => ฿1234.50
-puts format_currency(0.99)       # => ฿0.99
-puts format_number_with_commas(1234567)  # => 1,234,567
-puts format_number_with_commas(1234)     # => 1,234
+puts format_currency(1234567.89)      # => ฿1,234,567.89
+puts format_currency(42.5)            # => ฿42.50
+puts format_currency(9999999.0)       # => ฿9,999,999.00
+```
 
-# ใช้ sprintf
-puts sprintf("%.2f", 3.14159)       # => 3.14
-puts sprintf("%10.2f", 3.14)        # => "      3.14"
-puts sprintf("%-10.2f", 3.14)       # => "3.14      "
-puts sprintf("%+.2f", 3.14)         # => +3.14
-puts sprintf("%+.2f", -3.14)        # => -3.14
+```ruby
+# การ format เปอร์เซ็นต์
+def format_percent(value, decimals = 2)
+  "#{(value * 100).round(decimals)}%"
+end
+
+puts format_percent(0.1234)    # => 12.34%
+puts format_percent(0.5)       # => 50.0%
+puts format_percent(1.0)       # => 100.0%
+puts format_percent(0.1234, 0) # => 12%
+
+# การ format filesize
+def format_filesize(bytes)
+  units = %w[B KB MB GB TB PB]
+  size = bytes.to_f
+  unit_index = 0
+  
+  while size >= 1024 && unit_index < units.length - 1
+    size /= 1024
+    unit_index += 1
+  end
+  
+  if unit_index == 0
+    "#{size.to_i} #{units[unit_index]}"
+  else
+    "#{size.round(2)} #{units[unit_index]}"
+  end
+end
+
+puts format_filesize(1023)           # => 1023 B
+puts format_filesize(1024)           # => 1.0 KB
+puts format_filesize(1_048_576)      # => 1.0 MB
+puts format_filesize(1_073_741_824)  # => 1.0 GB
+puts format_filesize(5_368_709_120)  # => 5.0 GB
 ```
 
 ---
 
-## Step 51: Integer Methods
+## Step 53: BigDecimal
 
-### 51.1 Odd, Even, Times
-
-```ruby
-# Odd และ Even
-puts 5.odd?    # => true
-puts 4.odd?    # => false
-puts 4.even?   # => true
-puts 5.even?   # => false
-puts 0.even?   # => true
-puts 0.odd?    # => false
-
-# times - วนซ้ำ n ครั้ง
-5.times { |i| print "#{i} " }  # => 0 1 2 3 4
-puts
-
-3.times { print "Ruby! " }  # => Ruby! Ruby! Ruby!
-puts
-
-# upto - วนจาก n ถึง m
-1.upto(5) { |i| print "#{i} " }   # => 1 2 3 4 5
-puts
-
-# downto - วนจาก n ลงถึง m
-5.downto(1) { |i| print "#{i} " }  # => 5 4 3 2 1
-puts
-
-# step - วนด้วย increment
-1.step(10, 2) { |i| print "#{i} " }   # => 1 3 5 7 9
-puts
-
-10.step(1, -3) { |i| print "#{i} " }  # => 10 7 4 1
-puts
-```
+### การคำนวณที่ต้องการความแม่นยำสูง
 
 ```ruby
-# abs - ค่าสัมบูรณ์
-puts (-42).abs   # => 42
-puts 42.abs      # => 42
-puts 0.abs       # => 0
-
-# digits - แยกหลัก (จากขวาไปซ้าย)
-puts 12345.digits.inspect     # => [5, 4, 3, 2, 1]
-puts 12345.digits(10).inspect # => [5, 4, 3, 2, 1]
-
-# digits ฐานต่างๆ
-puts 255.digits(16).inspect   # => [15, 15] (0xFF)
-puts 8.digits(2).inspect      # => [0, 0, 0, 1] (0b1000)
-
-# to_s ฐานต่างๆ
-puts 255.to_s(2)   # => "11111111" (binary)
-puts 255.to_s(16)  # => "ff" (hex)
-puts 255.to_s(8)   # => "377" (octal)
-```
-
-```ruby
-# pow - ยกกำลัง
-puts 2.pow(10)     # => 1024
-puts 2 ** 10       # => 1024 (เหมือนกัน)
-
-# pow with modulo (modular exponentiation - ใช้ใน cryptography)
-puts 2.pow(10, 1000)  # => 24 (2^10 mod 1000)
-
-# Integer.sqrt (Ruby 2.5+)
-puts Integer.sqrt(9)    # => 3
-puts Integer.sqrt(10)   # => 3 (floor)
-puts Integer.sqrt(100)  # => 10
-puts Integer.sqrt(0)    # => 0
-```
-
----
-
-## Step 52: Float Methods
-
-### 52.1 NaN, Infinite, Finite
-
-```ruby
-# สร้าง Special Float values
-infinity     = Float::INFINITY
-neg_infinity = -Float::INFINITY
-not_a_number = Float::NAN
-regular      = 3.14
-
-# nan?
-puts not_a_number.nan?  # => true
-puts infinity.nan?      # => false
-puts regular.nan?       # => false
-puts (0.0/0.0).nan?     # => true
-
-# infinite?
-puts infinity.infinite?      # => 1
-puts neg_infinity.infinite?  # => -1
-puts regular.infinite?       # => nil
-puts (1.0/0.0).infinite?     # => 1
-
-# finite?
-puts regular.finite?         # => true
-puts infinity.finite?        # => false
-puts not_a_number.finite?    # => false
-```
-
-```ruby
-# Float Comparison Edge Cases
-nan = Float::NAN
-
-# NaN ไม่เท่ากับอะไร รวมถึงตัวเอง!
-puts nan == nan    # => false
-puts nan != nan    # => true
-puts nan < 1       # => false
-puts nan > 1       # => false
-
-# ตรวจสอบ NaN
-puts nan.nan?      # => true
-
-# Infinity Arithmetic
-inf = Float::INFINITY
-puts inf + 1       # => Infinity
-puts inf + inf     # => Infinity
-puts inf - inf     # => NaN
-puts inf * 2       # => Infinity
-puts inf / inf     # => NaN
-puts 1 / inf       # => 0.0
-puts inf * 0       # => NaN
-```
-
-```ruby
-# Float เปรียบเทียบ
-a = 0.1 + 0.2
-b = 0.3
-
-puts a == b         # => false! (floating point issue)
-puts a.round(10) == b.round(10)  # => true
-puts (a - b).abs < Float::EPSILON * 10  # => true
-
-# ฟังก์ชัน compare_float
-def float_equal?(a, b, tolerance = Float::EPSILON * 100)
-  (a - b).abs <= tolerance
-end
-
-puts float_equal?(0.1 + 0.2, 0.3)  # => true
-```
-
----
-
-## Step 53: BigDecimal สำหรับการเงิน
-
-### 53.1 BigDecimal Basics
-
-```ruby
-require 'bigdecimal'
-require 'bigdecimal/util'  # เพิ่ม .to_d method
-
-# สร้าง BigDecimal
-price1 = BigDecimal("19.99")
-price2 = BigDecimal("5.01")
-tax_rate = BigDecimal("0.07")
-
-puts price1 + price2   # => 0.25e2 (25.0)
-puts price1 * tax_rate # => 0.13993e1 (1.3993)
-
-# แสดงผลที่อ่านง่าย
-total = price1 + price2
-puts total.to_s("F")   # => 25.0 (Fixed notation)
-puts total.to_f        # => 25.0
-
-tax = price1 * tax_rate
-puts tax.to_s("F")     # => 1.3993
-```
-
-```ruby
-# ทำไมต้องใช้ BigDecimal สำหรับการเงิน?
-# ปัญหาของ Float
-puts 0.1 + 0.2 == 0.3  # => false!
-
-# BigDecimal แก้ปัญหา
-a = BigDecimal("0.1")
-b = BigDecimal("0.2")
-c = BigDecimal("0.3")
-
-puts a + b == c  # => true!
-puts (a + b).to_s("F")  # => 0.3
-
-# การคำนวณราคา
-item_price = BigDecimal("99.95")
-quantity   = 3
-tax_rate   = BigDecimal("0.07")
-discount   = BigDecimal("0.1")  # 10%
-
-subtotal = item_price * quantity
-discounted = subtotal * (1 - discount)
-tax = discounted * tax_rate
-total = discounted + tax
-
-puts "ราคาต่อชิ้น: #{item_price.to_s("F")}"
-puts "จำนวน: #{quantity}"
-puts "ก่อนส่วนลด: #{subtotal.to_s("F")}"
-puts "หลังส่วนลด 10%: #{discounted.to_s("F")}"
-puts "ภาษี 7%: #{tax.to_s("F")}"
-puts "รวมทั้งสิ้น: #{total.to_s("F")}"
-```
-
-```ruby
-# BigDecimal Rounding Modes
-require 'bigdecimal'
-
-amount = BigDecimal("2.5")
-
-puts amount.round(0, BigDecimal::ROUND_UP)        # => 3
-puts amount.round(0, BigDecimal::ROUND_DOWN)      # => 2
-puts amount.round(0, BigDecimal::ROUND_CEILING)   # => 3
-puts amount.round(0, BigDecimal::ROUND_FLOOR)     # => 2
-puts amount.round(0, BigDecimal::ROUND_HALF_UP)   # => 3
-puts amount.round(0, BigDecimal::ROUND_HALF_DOWN) # => 2
-puts amount.round(0, BigDecimal::ROUND_HALF_EVEN) # => 2 (Banker's rounding)
-
-# ใช้ .to_d จาก bigdecimal/util
-"99.99".to_d   # => BigDecimal("99.99")
-99.99.to_d     # => BigDecimal (จาก Float - ระวัง precision)
-puts "99.99".to_d.to_s("F")  # => 99.99 (แม่นยำ)
-puts 99.99.to_d.to_s("F")    # => 99.989999... (ไม่แม่นยำ!)
-```
-
----
-
-## Step 54: Number Bases
-
-### 54.1 Binary, Octal, Hexadecimal
-
-```ruby
-# Literals
-binary  = 0b1010_1100   # ฐาน 2
-octal   = 0o377         # ฐาน 8
-decimal = 172           # ฐาน 10
-hex     = 0xAC          # ฐาน 16
-
-# ทั้งหมดเท่ากับ 172
-puts binary   # => 172
-puts octal    # => 255 (ไม่เท่ากัน! 0o377 = 255)
-puts decimal  # => 172
-puts hex      # => 172
-
-# แปลงเป็นฐานต่างๆ
-n = 255
-puts n.to_s(2)   # => "11111111" (binary)
-puts n.to_s(8)   # => "377" (octal)
-puts n.to_s(10)  # => "255" (decimal)
-puts n.to_s(16)  # => "ff" (hex)
-puts n.to_s(36)  # => "73" (base 36)
-
-# กลับจาก String
-puts "11111111".to_i(2)   # => 255 (from binary)
-puts "377".to_i(8)        # => 255 (from octal)
-puts "ff".to_i(16)        # => 255 (from hex)
-puts "FF".to_i(16)        # => 255 (case insensitive)
-```
-
-```ruby
-# Bitwise Operations
-a = 0b1010  # 10
-b = 0b1100  # 12
-
-puts (a & b).to_s(2)   # => "1000" (AND) = 8
-puts (a | b).to_s(2)   # => "1110" (OR)  = 14
-puts (a ^ b).to_s(2)   # => "0110" (XOR) = 6
-puts (~a)              # => -11 (NOT, two's complement)
-
-# Bit Shifting
-puts (1 << 4)   # => 16 (เลื่อนซ้าย 4 bit = คูณ 2^4)
-puts (16 >> 4)  # => 1  (เลื่อนขวา 4 bit = หาร 2^4)
-
-# ใช้ Bitwise ในทางปฏิบัติ
-# Flags
-READ    = 0b001  # 1
-WRITE   = 0b010  # 2
-EXECUTE = 0b100  # 4
-
-permissions = READ | WRITE  # 3
-puts "Can read?   #{(permissions & READ) != 0}"     # => true
-puts "Can write?  #{(permissions & WRITE) != 0}"    # => true
-puts "Can execute? #{(permissions & EXECUTE) != 0}" # => false
-
-# เพิ่ม permission
-permissions |= EXECUTE
-puts "Can execute now? #{(permissions & EXECUTE) != 0}"  # => true
-```
-
----
-
-## Step 55: Random Numbers
-
-### 55.1 rand
-
-```ruby
-# rand ไม่มี argument - Float ระหว่าง 0.0 และ 1.0
-puts rand           # => 0.5488135 (random)
-
-# rand(n) - Integer ระหว่าง 0 และ n-1
-puts rand(10)       # => 0 ถึง 9
-puts rand(100)      # => 0 ถึง 99
-
-# rand(range) - ตัวเลขใน range
-puts rand(1..6)     # => 1 ถึง 6 (dice)
-puts rand(1...6)    # => 1 ถึง 5 (exclusive end)
-puts rand(1.0..2.0) # => Float ระหว่าง 1.0 ถึง 2.0
-
-# ตัวอย่างการใช้งาน
-def roll_dice(sides = 6)
-  rand(1..sides)
-end
-
-puts roll_dice        # => 1-6
-puts roll_dice(20)    # => 1-20 (D&D style)
-
-# สุ่ม element จาก Array
-fruits = ["แอปเปิ้ล", "กล้วย", "มะม่วง", "ส้ม"]
-puts fruits.sample           # => random fruit
-puts fruits.sample(2).inspect  # => 2 random fruits
-```
-
-```ruby
-# Random.new - สร้าง Random object ด้วย seed
-rng = Random.new(42)  # seed 42
-puts rng.rand         # => เสมอได้ค่าเดิมถ้า seed เดิม
-puts rng.rand(100)    # => เสมอได้ค่าเดิมถ้า seed เดิม
-puts rng.rand(1..10)  # => เสมอได้ค่าเดิมถ้า seed เดิม
-
-# ใช้ seed สำหรับ reproducible results (testing)
-rng1 = Random.new(42)
-rng2 = Random.new(42)
-
-5.times do
-  puts "#{rng1.rand(100)} == #{rng2.rand(100)}: #{rng1.rand(100) == rng2.rand(100)}"
-end
-
-# srand - ตั้ง global seed
-srand(42)
-puts rand(100)  # => เสมอได้ค่าเดิมเมื่อ seed เดิม
-
-srand          # reset to random seed
-puts rand(100) # => random
-```
-
-```ruby
-# การสุ่มจาก Distribution ต่างๆ
-# Uniform distribution (rand ปกติ)
-# ใน Ruby built-in ไม่มี Gaussian โดยตรง แต่สร้างได้
-
-def gaussian_rand(mean = 0, std_dev = 1)
-  # Box-Muller transform
-  u1 = rand
-  u2 = rand
-  z0 = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math::PI * u2)
-  z0 * std_dev + mean
-end
-
-# สร้างตัวเลขที่กระจายตาม Normal Distribution
-samples = 1000.times.map { gaussian_rand(0, 1) }
-mean = samples.sum / samples.length
-puts "Mean: #{mean.round(2)}"  # ≈ 0
-puts "StdDev: #{Math.sqrt(samples.map { |x| (x - mean)**2 }.sum / samples.length).round(2)}"  # ≈ 1
-```
-
----
-
-## Step 56: Numeric Conversions
-
-### 56.1 การแปลงระหว่างประเภท
-
-```ruby
-# to_i - แปลงเป็น Integer
-puts "42".to_i       # => 42
-puts "3.14".to_i     # => 3 (ตัดทศนิยม)
-puts "0xFF".to_i(16) # => 255
-puts "0b1010".to_i(2) # => 10 (หรือ "1010".to_i(2))
-puts 3.14.to_i       # => 3
-puts nil.to_i        # => 0
-puts true.to_i rescue puts "ไม่สามารถแปลงได้"
-
-# to_f - แปลงเป็น Float
-puts "3.14".to_f     # => 3.14
-puts "42".to_f       # => 42.0
-puts nil.to_f        # => 0.0
-puts 42.to_f         # => 42.0
-
-# to_r - แปลงเป็น Rational
-puts "3/4".to_r      # => 3/4
-puts 0.5.to_r        # => 1/2
-puts 42.to_r         # => 42/1
-puts 3.14.to_r       # => 7070651414971679/2251799813685248 (exact)
-puts 3.14.rationalize(0.001)  # => 22/7 (approximate)
-
-# to_c - แปลงเป็น Complex
-puts 42.to_c         # => 42+0i
-puts 3.14.to_c       # => 3.14+0i
-puts "3+4i".to_c     # => 3+4i
-```
-
-```ruby
-# Integer() และ Float() - Strict Conversion
-puts Integer("42")      # => 42
-puts Integer("0xFF")    # => 255
-puts Integer("0b1010")  # => 10
-puts Float("3.14")      # => 3.14
-
-begin
-  Integer("abc")
-rescue ArgumentError => e
-  puts "Error: #{e.message}"  # invalid value for Integer()
-end
-
-begin
-  Float("abc")
-rescue ArgumentError => e
-  puts "Error: #{e.message}"  # invalid value for Float()
-end
-
-# Kernel#Integer vs to_i
-puts "42abc".to_i       # => 42 (ไม่ error)
-Integer("42abc") rescue puts "Error!"  # => Error!
-```
-
-```ruby
-# Rational Numbers
-r1 = Rational(1, 3)    # 1/3
-r2 = Rational(1, 6)    # 1/6
-
-puts r1 + r2    # => 1/2
-puts r1 * r2    # => 1/18
-puts r1 / r2    # => 2/1
-puts r1.to_f    # => 0.3333...
-puts r2.to_f    # => 0.1666...
-
-# สำหรับการคำนวณที่ต้องการความแม่นยำ
-puts Rational(1, 3) + Rational(1, 3) + Rational(1, 3)  # => 1/1 (= 1 แน่นอน!)
-puts 1.0/3 + 1.0/3 + 1.0/3  # => 0.9999... (ไม่แม่นยำ)
-
-# Complex Numbers
-c1 = Complex(3, 4)    # 3 + 4i
-c2 = Complex(1, -2)   # 1 - 2i
-
-puts c1 + c2    # => 4+2i
-puts c1 * c2    # => 11-2i
-puts c1.abs     # => 5.0 (magnitude)
-puts c1.angle   # => 0.9272... (in radians)
-puts c1.conjugate  # => 3-4i
-```
-
----
-
-## Step 57: Numeric Comparisons
-
-### 57.1 Comparison Operators
-
-```ruby
-puts 5 == 5     # => true
-puts 5 == 5.0   # => true (Integer == Float if values equal)
-puts 5.eql?(5)   # => true
-puts 5.eql?(5.0) # => false (eql? checks type too)
-
-puts 5 <=> 3    # => 1
-puts 5 <=> 5    # => 0
-puts 5 <=> 7    # => -1
-
-# between? และ clamp
-puts 5.between?(1, 10)  # => true
-puts 15.between?(1, 10) # => false
-
-puts 5.clamp(1, 10)   # => 5
-puts 0.clamp(1, 10)   # => 1
-puts 15.clamp(1, 10)  # => 10
-
-# clamp with range (Ruby 2.7+)
-puts 5.clamp(1..10)   # => 5
-puts 0.clamp(1..10)   # => 1
-puts 15.clamp(1..10)  # => 10
-
-# clamp with endless/beginless range
-puts (-5).clamp(0..)  # => 0 (minimum 0)
-puts 5.clamp(..10)    # => 5
-puts 15.clamp(..10)   # => 10
-```
-
----
-
-## Step 58: Number Utilities
-
-### 58.1 เพิ่มเติม
-
-```ruby
-# Infinity arithmetic
-puts Float::INFINITY + 1         # => Infinity
-puts Float::INFINITY > 9999999   # => true
-
-# ใช้ infinity เพื่อหา min/max โดยไม่มี initial value
-numbers = [3, 1, 4, 1, 5, 9, 2, 6]
-min_val = Float::INFINITY
-max_val = -Float::INFINITY
-
-numbers.each do |n|
-  min_val = n if n < min_val
-  max_val = n if n > max_val
-end
-
-puts "Min: #{min_val}, Max: #{max_val}"  # => Min: 1, Max: 9
-
-# Ruby way ที่ง่ายกว่า
-puts numbers.min  # => 1
-puts numbers.max  # => 9
-```
-
-```ruby
-# Numeric Utilities
-# divmod
-puts 13.divmod(4).inspect  # => [3, 1] (quotient, remainder)
-
-# fdiv - Float division
-puts 7.fdiv(2)    # => 3.5 (Float division สำหรับ Integer)
-
-# modulo และ %
-puts 13.modulo(4)  # => 1
-puts 13 % 4        # => 1
-
-# remainder (ต่างจาก modulo สำหรับ negative)
-puts (-13).remainder(4)  # => -1
-puts (-13) % 4           # => 3
-
-# ceil, floor สำหรับ Integer
-puts 13.ceil(-1)    # => 20 (ปัดขึ้นเป็น 10s)
-puts 13.floor(-1)   # => 10
-puts 17.ceil(-1)    # => 20
-puts 13.round(-1)   # => 10
-puts 15.round(-1)   # => 20 (ปัดขึ้น)
-puts 15.round(-1, half: :even)  # => 20 (banker's rounding)
-```
-
----
-
-## Step 59: Performance Tips
-
-### 59.1 ประสิทธิภาพการคำนวณ
-
-```ruby
-require 'benchmark'
-
-n = 1_000_000
-
-# Integer vs Float
-Benchmark.bm(15) do |x|
-  x.report("integer +") { n.times { 1 + 1 } }
-  x.report("float +")   { n.times { 1.0 + 1.0 } }
-  x.report("integer *") { n.times { 100 * 100 } }
-  x.report("float *")   { n.times { 100.0 * 100.0 } }
-  x.report("integer /") { n.times { 100 / 3 } }
-  x.report("float /")   { n.times { 100.0 / 3.0 } }
-end
-```
-
-```ruby
-# Memoization สำหรับการคำนวณซ้ำ
-# โดยไม่มี memoization
-def fib_slow(n)
-  return n if n <= 1
-  fib_slow(n-1) + fib_slow(n-2)
-end
-
-# ด้วย memoization
-def fib_fast(n, memo = {})
-  return memo[n] if memo.key?(n)
-  return n if n <= 1
-  memo[n] = fib_fast(n-1, memo) + fib_fast(n-2, memo)
-end
-
-# แตกต่างมาก!
-require 'benchmark'
-Benchmark.bm do |x|
-  x.report("slow:") { fib_slow(30) }
-  x.report("fast:") { fib_fast(50) }  # 50 ทำได้เพราะ memoization
-end
-```
-
----
-
-## Step 60: แบบฝึกหัด
-
-### แบบฝึกหัดที่ 1
-คำนวณดอกเบี้ยทบต้น
-
-```ruby
-# เฉลย
 require 'bigdecimal'
 require 'bigdecimal/util'
 
-def compound_interest(principal, rate, years, compounds_per_year = 12)
-  r = rate.to_d / 100
-  n = compounds_per_year
-  t = years
-  p = principal.to_d
+# ปัญหาของ Float ในการเงิน
+price1 = 0.1
+price2 = 0.2
+puts price1 + price2              # => 0.30000000000000004 (ผิด!)
+puts (price1 + price2) == 0.3     # => false (ผิด!)
+
+# แก้ด้วย BigDecimal
+bd_price1 = BigDecimal("0.1")
+bd_price2 = BigDecimal("0.2")
+sum = bd_price1 + bd_price2
+puts sum                          # => 0.3e0 (= 0.3)
+puts sum.to_s("F")                # => "0.3"
+puts sum == BigDecimal("0.3")     # => true (ถูกต้อง!)
+```
+
+```ruby
+require 'bigdecimal'
+
+# การคำนวณทางการเงิน
+def calculate_interest(principal, rate, years)
+  p = BigDecimal(principal.to_s)
+  r = BigDecimal(rate.to_s)
+  n = BigDecimal(years.to_s)
   
-  # A = P(1 + r/n)^(nt)
-  amount = p * (1 + r/n) ** (n * t)
-  interest = amount - p
+  # Compound interest: A = P(1 + r)^n
+  amount = p * (1 + r) ** n.to_i
+  amount.round(2, BigDecimal::ROUND_HALF_UP)
+end
+
+principal = 100_000
+rate = 0.05  # 5%
+years = 10
+
+result = calculate_interest(principal, rate, years)
+puts "เงินต้น: #{principal.to_s}"
+puts "ดอกเบี้ย: #{(rate * 100)}% ต่อปี"
+puts "ระยะเวลา: #{years} ปี"
+puts "ยอดเงิน: #{result.to_s("F")} บาท"
+```
+
+```ruby
+require 'bigdecimal'
+
+# VAT calculation
+def calculate_vat(amount_before_vat, vat_rate = BigDecimal("0.07"))
+  amount = BigDecimal(amount_before_vat.to_s)
+  rate = BigDecimal(vat_rate.to_s)
+  
+  vat = (amount * rate).round(2, BigDecimal::ROUND_HALF_UP)
+  total = amount + vat
   
   {
-    principal: p.round(2).to_s("F"),
-    total: amount.round(2).to_s("F"),
-    interest: interest.round(2).to_s("F")
+    before_vat: amount,
+    vat: vat,
+    total: total
   }
 end
 
-result = compound_interest(100_000, 3.5, 10)
-puts "เงินต้น: #{result[:principal]} บาท"
-puts "ดอกเบี้ย: #{result[:interest]} บาท"
-puts "รวม: #{result[:total]} บาท"
+result = calculate_vat(1000)
+puts "ก่อน VAT: #{result[:before_vat].to_s("F")} บาท"
+puts "VAT 7%:   #{result[:vat].to_s("F")} บาท"
+puts "รวม:      #{result[:total].to_s("F")} บาท"
 ```
 
-### แบบฝึกหัดที่ 2
-เขียน Calculator ด้วย BigDecimal
+```ruby
+require 'bigdecimal'
+require 'bigdecimal/math'
+
+# BigDecimal Math operations
+include BigMath
+
+puts BigMath::PI(50).to_s  # PI ด้วยความแม่นยำ 50 หลัก
+puts BigMath::E(20).to_s   # E ด้วยความแม่นยำ 20 หลัก
+```
+
+---
+
+## Step 54: Random Numbers
+
+### การสร้างตัวเลขสุ่ม
+
+```ruby
+# rand - สุ่มตัวเลข
+puts rand        # => 0.12345... (Float ระหว่าง 0.0 และ 1.0)
+puts rand(10)    # => 0-9 (Integer ระหว่าง 0 ถึง 9)
+puts rand(1..6)  # => 1-6 (สุ่มลูกเต๋า)
+puts rand(50..100) # => 50-100
+
+# สุ่มซ้ำได้ (reproducible) ด้วย seed
+srand(42)        # ตั้ง seed
+puts rand(100)   # => เลขเดิมทุกครั้งถ้า seed เหมือนกัน
+puts rand(100)
+puts rand(100)
+```
+
+```ruby
+# Random class - สร้าง random number generator แยก
+rng = Random.new        # seed สุ่ม
+puts rng.rand(10)       # => 0-9
+puts rng.rand(1.0)      # => 0.0 ถึง 1.0
+
+rng2 = Random.new(42)   # seed คงที่
+puts rng2.rand(100)     # => เลขเดิมทุกครั้ง
+puts rng2.rand(100)
+
+# Random::DEFAULT - global RNG
+puts Random::DEFAULT.rand(10)
+```
+
+```ruby
+# ใช้งานจริง: สุ่มชื่อ, รหัส, etc.
+def generate_password(length = 12)
+  chars = ('A'..'Z').to_a + ('a'..'z').to_a + ('0'..'9').to_a + %w[! @ # $ %]
+  length.times.map { chars.sample }.join
+end
+
+puts generate_password        # => e.g., "xK3@mN9!rP2#"
+puts generate_password(8)     # => e.g., "aB3!xY7z"
+
+# สุ่มลำดับ
+items = ["แอปเปิล", "กล้วย", "ส้ม", "องุ่น", "มะม่วง"]
+puts items.shuffle.inspect         # => สุ่มลำดับใหม่ทุกครั้ง
+puts items.sample                  # => สุ่ม 1 ชิ้น
+puts items.sample(3).inspect       # => สุ่ม 3 ชิ้น
+```
+
+```ruby
+# Gaussian random (ใกล้เคียงการกระจายปกติ)
+def gaussian_rand(mean = 0, std_dev = 1)
+  theta = 2 * Math::PI * rand
+  rho = Math.sqrt(-2 * Math.log(1 - rand))
+  mean + std_dev * rho * Math.cos(theta)
+end
+
+# สร้างข้อมูลทดสอบที่มีการกระจายปกติ
+scores = 100.times.map { gaussian_rand(75, 10).round.clamp(0, 100) }
+puts "เฉลี่ย: #{(scores.sum.to_f / scores.length).round(2)}"
+puts "ต่ำสุด: #{scores.min}"
+puts "สูงสุด: #{scores.max}"
+```
+
+---
+
+## Step 55: Numeric Conversions
+
+### การแปลงประเภทตัวเลข
+
+```ruby
+# to_i - แปลงเป็น Integer
+puts "42".to_i         # => 42
+puts "42.9".to_i       # => 42 (ตัดทศนิยม)
+puts "3.14".to_i       # => 3
+puts "hello".to_i      # => 0 (ถ้าแปลงไม่ได้)
+puts "12abc".to_i      # => 12 (อ่านได้เท่าไหร่ก็เอามา)
+puts "0xff".to_i(16)   # => 255 (แปลง hex string)
+puts "0b1010".to_i(2)  # => 10 (แปลง binary string)
+```
+
+```ruby
+# to_f - แปลงเป็น Float
+puts "3.14".to_f      # => 3.14
+puts "42".to_f        # => 42.0
+puts "hello".to_f     # => 0.0
+puts "1.5e3".to_f     # => 1500.0
+
+# Integer() vs to_i - ต่างกันยังไง?
+puts Integer("42")    # => 42
+puts Integer("42.9")  # => ArgumentError! (ไม่ยอมรับ float string)
+puts Integer("0xFF")  # => 255 (รับ hex ได้)
+# puts Integer("hello") # => ArgumentError (เข้มงวดกว่า to_i)
+
+# Float() vs to_f
+puts Float("3.14")    # => 3.14
+# puts Float("hello") # => ArgumentError
+```
+
+```ruby
+# to_r - แปลงเป็น Rational (จำนวนตรรกยะ)
+puts 3.to_r         # => 3/1
+puts 3.5.to_r       # => 7/2
+puts "2/3".to_r     # => 2/3
+puts 0.1.to_r       # => 3602879701896397/36028797018963968 (exact float representation!)
+
+# Rational literal
+r = Rational(2, 3)
+puts r              # => 2/3
+puts r.to_f         # => 0.6666666666666666
+puts r + Rational(1, 3)  # => 1/1
+
+# ใช้ Rational สำหรับการคำนวณที่แม่นยำ
+puts Rational(1, 10) + Rational(2, 10)  # => 3/10 (ไม่มี floating point error!)
+```
+
+```ruby
+# to_c - แปลงเป็น Complex (จำนวนเชิงซ้อน)
+puts 3.to_c         # => (3+0i)
+puts Complex(3, 4)  # => (3+4i)
+
+c = Complex(3, 4)
+puts c.real         # => 3
+puts c.imaginary    # => 4
+puts c.abs          # => 5.0 (magnitude = sqrt(3²+4²))
+puts c.conjugate    # => (3-4i)
+puts c * Complex(1, -1)  # => (7+(-1)i)
+```
+
+---
+
+## Step 56: Numeric Comparison
+
+### การเปรียบเทียบตัวเลข
+
+```ruby
+# เปรียบเทียบพื้นฐาน
+puts 5 == 5.0    # => true (Integer == Float ถ้าค่าเท่ากัน)
+puts 5.eql?(5.0) # => false (eql? ตรวจสอบ type ด้วย!)
+puts 5.equal?(5) # => true (small integers ชี้ไปที่ object เดียวกัน)
+
+# Spaceship operator
+puts 1 <=> 2    # => -1
+puts 2 <=> 2    # => 0
+puts 3 <=> 2    # => 1
+puts 1 <=> "a"  # => nil (ต่างประเภท)
+
+# Comparable methods (ได้จาก Integer/Float ที่ include Comparable)
+puts 5.between?(1, 10)  # => true
+puts 5.between?(6, 10)  # => false
+puts 5.clamp(1, 10)     # => 5
+puts 0.clamp(1, 10)     # => 1 (ต่ำกว่า min)
+puts 15.clamp(1, 10)    # => 10 (สูงกว่า max)
+```
+
+```ruby
+# Float comparison pitfall
+a = 0.1 + 0.2
+b = 0.3
+puts a == b          # => false! (floating point error)
+puts (a - b).abs < 1e-10  # => true (วิธีที่ถูกต้อง)
+
+# Helper method สำหรับ float comparison
+def float_equal?(a, b, epsilon = 1e-10)
+  (a - b).abs < epsilon
+end
+
+puts float_equal?(0.1 + 0.2, 0.3)   # => true
+puts float_equal?(1.0, 1.0000000001) # => true
+puts float_equal?(1.0, 1.001)        # => false
+```
+
+---
+
+## Step 57: Infinity และ NaN
+
+### ค่าพิเศษของ Float
+
+```ruby
+# Infinity
+pos_inf = Float::INFINITY
+neg_inf = -Float::INFINITY
+
+puts pos_inf             # => Infinity
+puts neg_inf             # => -Infinity
+puts 1.0 / 0             # => Infinity
+puts -1.0 / 0            # => -Infinity
+
+# Operations with Infinity
+puts pos_inf + 1         # => Infinity
+puts pos_inf * 2         # => Infinity
+puts pos_inf - pos_inf   # => NaN
+puts 1 / pos_inf         # => 0.0
+
+# Comparison
+puts pos_inf > 1_000_000   # => true
+puts neg_inf < -1_000_000  # => true
+puts pos_inf.infinite?     # => 1
+puts neg_inf.infinite?     # => -1
+puts 3.14.infinite?        # => nil
+```
+
+```ruby
+# NaN - Not a Number
+nan = Float::NAN
+puts nan              # => NaN
+puts 0.0 / 0.0        # => NaN
+
+# NaN operations
+puts nan + 1          # => NaN
+puts nan * 0          # => NaN
+puts nan == nan       # => false! (NaN ไม่เท่ากับตัวเอง!)
+puts nan.nan?         # => true
+puts nan.equal?(nan)  # => true (เป็น object เดียวกัน แต่ == ยังคืน false)
+
+# ตรวจสอบ NaN อย่างถูกต้อง
+value = 0.0 / 0.0
+puts value.nan?       # => true (วิธีที่ถูกต้อง)
+puts value != value   # => true (อีกวิธี: NaN เป็นค่าเดียวที่ != ตัวเอง)
+```
+
+```ruby
+# ใช้งานจริง: ป้องกัน Infinity และ NaN
+def safe_calculation(a, b)
+  result = a.to_f / b.to_f
+  
+  if result.nan?
+    raise ArgumentError, "การคำนวณได้ผล NaN"
+  elsif result.infinite?
+    raise ArgumentError, "การคำนวณได้ผล Infinity"
+  end
+  
+  result
+end
+
+begin
+  puts safe_calculation(10, 3)    # => 3.333...
+  puts safe_calculation(10, 0)    # => ArgumentError
+rescue ArgumentError => e
+  puts "ข้อผิดพลาด: #{e.message}"
+end
+```
+
+---
+
+## Step 58: เมธอดเพิ่มเติมของตัวเลข
+
+### Numeric Methods อื่นๆ
+
+```ruby
+# divmod - หารแล้วได้ทั้ง quotient และ remainder
+puts 13.divmod(4).inspect  # => [3, 1] (13 = 3*4 + 1)
+puts 17.divmod(5).inspect  # => [3, 2] (17 = 3*5 + 2)
+puts (-7).divmod(3).inspect # => [-3, 2] (-7 = -3*3 + 2)
+
+# fdiv - Float division
+puts 7.fdiv(2)      # => 3.5
+puts 7.div(2)       # => 3 (integer division)
+
+# modulo vs remainder
+puts 13.modulo(4)   # => 1 (เหมือน %)
+puts 13.remainder(4) # => 1
+puts (-13).modulo(4)  # => 3 (modulo: เครื่องหมายตาม divisor)
+puts (-13).remainder(4) # => -1 (remainder: เครื่องหมายตาม dividend)
+```
+
+```ruby
+# floor_div - integer division ที่ floor แทน truncate
+puts 7.div(2)          # => 3
+puts (-7).div(2)       # => -4 (floor toward -infinity)
+puts (-7).fdiv(2).ceil # => -3 (truncate toward zero)
+
+# pow กับ modulus
+puts 2.pow(10)          # => 1024
+puts 2.pow(10, 1000)    # => 24 (2^10 mod 1000)
+
+# integer? - ตรวจสอบว่าเป็น integer
+puts 42.integer?     # => true
+puts 42.0.integer?   # => false (Float ไม่มีเมธอดนี้ใน Ruby)
+puts 42.is_a?(Integer)    # => true
+puts 42.0.is_a?(Float)    # => true
+puts 42.is_a?(Numeric)    # => true (ทั้ง Integer และ Float เป็น Numeric)
+```
+
+```ruby
+# Numeric#nonzero? - คืนค่า self ถ้าไม่ใช่ 0, คืน nil ถ้าเป็น 0
+puts 5.nonzero?    # => 5
+puts 0.nonzero?    # => nil (ดีกว่า nil สำหรับ conditional)
+
+# ใช้งาน: หาร ถ้าไม่ใช่ศูนย์
+denominator = 0
+result = 10.0 / (denominator.nonzero? || 1)
+puts result  # => 10.0 (แทนที่จะ divide by zero)
+
+# coerce - แปลงประเภทสำหรับ mixed arithmetic
+puts 1.coerce(2.5).inspect  # => [2.5, 1.0] (แปลงทั้งคู่เป็น Float)
+```
+
+---
+
+## Step 59: Number Iteration Patterns
+
+### รูปแบบการวนซ้ำด้วยตัวเลข
+
+```ruby
+# Fibonacci sequence
+def fibonacci(n)
+  return n if n <= 1
+  
+  a, b = 0, 1
+  (n - 1).times { a, b = b, a + b }
+  b
+end
+
+(0..10).each { |i| print "#{fibonacci(i)} " }
+puts
+# => 0 1 1 2 3 5 8 13 21 34 55
+
+# ด้วย Enumerator::Lazy
+fib = Enumerator.new do |y|
+  a, b = 0, 1
+  loop do
+    y << a
+    a, b = b, a + b
+  end
+end
+
+puts fib.first(10).inspect
+# => [0, 1, 1, 2, 3, 5, 8, 13, 21, 34]
+```
+
+```ruby
+# Prime numbers (Sieve of Eratosthenes)
+def primes_up_to(n)
+  sieve = Array.new(n + 1, true)
+  sieve[0] = sieve[1] = false
+  
+  (2..Math.sqrt(n)).each do |i|
+    if sieve[i]
+      (i*i..n).step(i) { |j| sieve[j] = false }
+    end
+  end
+  
+  (2..n).select { |i| sieve[i] }
+end
+
+puts primes_up_to(50).inspect
+# => [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47]
+```
+
+```ruby
+# Numeric ranges และ iteration
+(1..5).each { |i| print "#{i} " }
+puts  # => 1 2 3 4 5
+
+(1...5).each { |i| print "#{i} " }
+puts  # => 1 2 3 4
+
+# step
+(0..1).step(0.25) { |i| print "#{i} " }
+puts  # => 0.0 0.25 0.5 0.75 1.0
+
+# map กับ Range
+squares = (1..10).map { |i| i ** 2 }
+puts squares.inspect
+# => [1, 4, 9, 16, 25, 36, 49, 64, 81, 100]
+```
+
+---
+
+## Step 60: Numeric Utility Patterns
+
+### รูปแบบการใช้งานตัวเลขในชีวิตจริง
+
+```ruby
+# Unit conversion
+module UnitConverter
+  CONVERSIONS = {
+    km_to_miles: 0.621371,
+    miles_to_km: 1.60934,
+    kg_to_lbs: 2.20462,
+    lbs_to_kg: 0.453592,
+    celsius_to_fahrenheit: ->(c) { c * 9.0/5 + 32 },
+    fahrenheit_to_celsius: ->(f) { (f - 32) * 5.0/9 }
+  }
+  
+  def self.convert(value, type)
+    conversion = CONVERSIONS[type]
+    case conversion
+    when Numeric then value * conversion
+    when Proc then conversion.call(value)
+    else raise ArgumentError, "Unknown conversion: #{type}"
+    end
+  end
+end
+
+puts UnitConverter.convert(100, :km_to_miles).round(2)      # => 62.14
+puts UnitConverter.convert(70, :kg_to_lbs).round(2)         # => 154.32
+puts UnitConverter.convert(100, :celsius_to_fahrenheit)      # => 212.0
+puts UnitConverter.convert(37, :celsius_to_fahrenheit)       # => 98.6
+```
+
+```ruby
+# Statistics helper
+module Statistics
+  def self.mean(numbers)
+    numbers.sum.to_f / numbers.length
+  end
+  
+  def self.median(numbers)
+    sorted = numbers.sort
+    n = sorted.length
+    n.odd? ? sorted[n / 2] : (sorted[n/2 - 1] + sorted[n/2]) / 2.0
+  end
+  
+  def self.mode(numbers)
+    freq = Hash.new(0)
+    numbers.each { |n| freq[n] += 1 }
+    max_freq = freq.values.max
+    freq.select { |_, v| v == max_freq }.keys
+  end
+  
+  def self.std_dev(numbers)
+    m = mean(numbers)
+    variance = numbers.sum { |n| (n - m) ** 2 } / numbers.length
+    Math.sqrt(variance)
+  end
+  
+  def self.range_stat(numbers)
+    numbers.max - numbers.min
+  end
+end
+
+data = [4, 8, 15, 16, 23, 42, 8, 15, 16, 16]
+puts "ข้อมูล: #{data.sort.inspect}"
+puts "Mean: #{Statistics.mean(data).round(2)}"
+puts "Median: #{Statistics.median(data)}"
+puts "Mode: #{Statistics.mode(data).inspect}"
+puts "Std Dev: #{Statistics.std_dev(data).round(2)}"
+puts "Range: #{Statistics.range_stat(data)}"
+```
+
+---
+
+## แบบฝึกหัดตอนที่ 4: Numbers (15 ข้อ)
+
+### ข้อ 1-5: พื้นฐาน
+
+**ข้อ 1**: เขียนโปรแกรมแปลงอุณหภูมิระหว่าง Celsius, Fahrenheit, และ Kelvin
+
+```ruby
+# เฉลย
+def celsius_to_fahrenheit(c)
+  (c * 9.0 / 5) + 32
+end
+
+def celsius_to_kelvin(c)
+  c + 273.15
+end
+
+def fahrenheit_to_celsius(f)
+  (f - 32) * 5.0 / 9
+end
+
+def kelvin_to_celsius(k)
+  k - 273.15
+end
+
+temperatures = [0, 100, -40, 37]
+puts "%-12s | %-12s | %-12s" % ["Celsius", "Fahrenheit", "Kelvin"]
+puts "-" * 40
+temperatures.each do |c|
+  f = celsius_to_fahrenheit(c)
+  k = celsius_to_kelvin(c)
+  puts "%-12.1f | %-12.1f | %-12.2f" % [c, f, k]
+end
+```
+
+**ข้อ 2**: เขียนโปรแกรมคำนวณ BMI
+
+```ruby
+# เฉลย
+def calculate_bmi(weight_kg, height_cm)
+  height_m = height_cm / 100.0
+  bmi = weight_kg / (height_m ** 2)
+  
+  category = case bmi
+  when 0...18.5 then "ผอมเกินไป"
+  when 18.5...23 then "ปกติ"
+  when 23...25   then "ท้วม"
+  when 25...30   then "อ้วน"
+  else "อ้วนมาก"
+  end
+  
+  { bmi: bmi.round(2), category: category }
+end
+
+people = [
+  { name: "สมชาย", weight: 70, height: 175 },
+  { name: "สมหญิง", weight: 55, height: 165 },
+  { name: "สมศักดิ์", weight: 90, height: 170 }
+]
+
+people.each do |person|
+  result = calculate_bmi(person[:weight], person[:height])
+  puts "#{person[:name]}: BMI = #{result[:bmi]} (#{result[:category]})"
+end
+```
+
+**ข้อ 3**: เขียนโปรแกรมคำนวณดอกเบี้ยแบบต่างๆ
 
 ```ruby
 # เฉลย
 require 'bigdecimal'
-require 'bigdecimal/util'
 
-class Calculator
-  def initialize
-    @memory = BigDecimal("0")
-  end
-  
-  def calculate(expression)
-    # ง่ายๆ: parse 2 operands และ 1 operator
-    if (m = expression.match(/^([\d.]+)\s*([+\-*\/])\s*([\d.]+)$/))
-      a = m[1].to_d
-      op = m[2]
-      b = m[3].to_d
-      
-      result = case op
-               when "+" then a + b
-               when "-" then a - b
-               when "*" then a * b
-               when "/" then b.zero? ? "Error: Division by zero" : a / b
-               end
-      
-      result.is_a?(BigDecimal) ? result.to_s("F") : result
-    else
-      "Error: Invalid expression"
-    end
-  end
-  
-  def store(value)
-    @memory = value.to_d
-  end
-  
-  def recall
-    @memory.to_s("F")
-  end
+def simple_interest(principal, rate, years)
+  p = BigDecimal(principal.to_s)
+  r = BigDecimal(rate.to_s)
+  n = BigDecimal(years.to_s)
+  interest = p * r * n
+  {
+    principal: p,
+    interest: interest.round(2),
+    total: (p + interest).round(2)
+  }
 end
 
-calc = Calculator.new
-puts calc.calculate("19.99 + 5.01")  # => 25.0
-puts calc.calculate("100 * 0.07")    # => 7.0
-puts calc.calculate("10 / 3")        # => 3.333333...
+def compound_interest(principal, rate, years, n_per_year = 12)
+  p = BigDecimal(principal.to_s)
+  r = BigDecimal(rate.to_s)
+  n = BigDecimal(n_per_year.to_s)
+  t = BigDecimal(years.to_s)
+  
+  # A = P(1 + r/n)^(nt)
+  total = p * (1 + r/n) ** (n * t).to_i
+  total = total.round(2)
+  
+  {
+    principal: p,
+    interest: (total - p).round(2),
+    total: total
+  }
+end
+
+principal = 100_000
+rate = 0.05
+years = 10
+
+simple = simple_interest(principal, rate, years)
+compound = compound_interest(principal, rate, years)
+
+puts "=== เงินต้น: #{principal} บาท, อัตราดอกเบี้ย: #{rate*100}%, #{years} ปี ==="
+puts "\nดอกเบี้ยแบบง่าย:"
+puts "  ดอกเบี้ย: #{simple[:interest]} บาท"
+puts "  ยอดรวม: #{simple[:total]} บาท"
+puts "\nดอกเบี้ยแบบทบต้น (คิดรายเดือน):"
+puts "  ดอกเบี้ย: #{compound[:interest]} บาท"
+puts "  ยอดรวม: #{compound[:total]} บาท"
 ```
 
-### แบบฝึกหัดที่ 3
-หาจำนวนเฉพาะ (Prime Numbers)
+**ข้อ 4**: เขียนฟังก์ชัน is_prime? และสร้าง prime factorization
 
 ```ruby
 # เฉลย
@@ -1138,443 +1163,252 @@ def prime?(n)
   return true if n == 2
   return false if n.even?
   
-  (3..Math.sqrt(n).to_i).step(2).none? { |i| n % i == 0 }
+  (3..Math.sqrt(n)).step(2).none? { |i| n % i == 0 }
 end
 
-def primes_up_to(limit)
-  (2..limit).select { |n| prime?(n) }
-end
-
-# Sieve of Eratosthenes (เร็วกว่า)
-def sieve_of_eratosthenes(limit)
-  is_prime = Array.new(limit + 1, true)
-  is_prime[0] = is_prime[1] = false
+def prime_factorization(n)
+  factors = []
+  divisor = 2
   
-  (2..Math.sqrt(limit).to_i).each do |i|
-    if is_prime[i]
-      (i*i..limit).step(i) { |j| is_prime[j] = false }
+  while n > 1
+    while n % divisor == 0
+      factors << divisor
+      n /= divisor
     end
+    divisor += divisor == 2 ? 1 : 2
   end
   
-  (2..limit).select { |i| is_prime[i] }
+  factors
 end
 
-primes = sieve_of_eratosthenes(100)
-puts "จำนวนเฉพาะถึง 100: #{primes.inspect}"
-puts "จำนวนทั้งหมด: #{primes.length}"
+numbers = [2, 7, 12, 13, 100, 97, 360]
+numbers.each do |n|
+  if prime?(n)
+    puts "#{n}: เป็น prime"
+  else
+    factors = prime_factorization(n)
+    puts "#{n}: ไม่ใช่ prime = #{factors.join(' × ')}"
+  end
+end
 ```
 
-### แบบฝึกหัดที่ 4
-ลำดับ Fibonacci
+**ข้อ 5**: เขียนโปรแกรมแปลงเลขโรมัน
 
 ```ruby
 # เฉลย
-def fibonacci(n)
-  return [] if n <= 0
-  return [0] if n == 1
-  return [0, 1] if n == 2
-  
-  fib = [0, 1]
-  (n - 2).times { fib << fib[-1] + fib[-2] }
-  fib
-end
-
-# Fibonacci ด้วย Enumerator (lazy)
-fib_enum = Enumerator.new do |y|
-  a, b = 0, 1
-  loop do
-    y << a
-    a, b = b, a + b
-  end
-end
-
-puts fibonacci(10).inspect
-# => [0, 1, 1, 2, 3, 5, 8, 13, 21, 34]
-
-puts fib_enum.first(10).inspect
-# => [0, 1, 1, 2, 3, 5, 8, 13, 21, 34]
-
-# หา Fibonacci ที่น้อยกว่า 1000
-big_fib = fib_enum.take_while { |n| n < 1000 }
-puts big_fib.inspect
-```
-
-### แบบฝึกหัดที่ 5
-Statistical Functions
-
-```ruby
-# เฉลย
-module Statistics
-  def self.mean(data)
-    return 0.0 if data.empty?
-    data.sum.to_f / data.length
-  end
-  
-  def self.median(data)
-    return nil if data.empty?
-    sorted = data.sort
-    n = sorted.length
-    
-    if n.odd?
-      sorted[n / 2].to_f
-    else
-      (sorted[n/2 - 1] + sorted[n/2]) / 2.0
-    end
-  end
-  
-  def self.mode(data)
-    frequency = data.tally
-    max_freq = frequency.values.max
-    frequency.select { |_, v| v == max_freq }.keys
-  end
-  
-  def self.variance(data)
-    return 0.0 if data.length <= 1
-    m = mean(data)
-    data.sum { |x| (x - m) ** 2 } / (data.length - 1)
-  end
-  
-  def self.std_dev(data)
-    Math.sqrt(variance(data))
-  end
-  
-  def self.summary(data)
-    {
-      count: data.length,
-      min: data.min,
-      max: data.max,
-      mean: mean(data).round(4),
-      median: median(data),
-      mode: mode(data),
-      std_dev: std_dev(data).round(4)
-    }
-  end
-end
-
-data = [4, 7, 13, 16, 21, 4, 7, 7, 12, 4]
-stats = Statistics.summary(data)
-stats.each { |k, v| puts "#{k}: #{v}" }
-```
-
-### แบบฝึกหัดที่ 6
-Unit Converter
-
-```ruby
-# เฉลย
-class UnitConverter
-  CONVERSIONS = {
-    length: {
-      meter: 1.0,
-      kilometer: 1000.0,
-      mile: 1609.344,
-      yard: 0.9144,
-      foot: 0.3048,
-      inch: 0.0254,
-      centimeter: 0.01,
-      millimeter: 0.001
-    },
-    weight: {
-      kilogram: 1.0,
-      gram: 0.001,
-      pound: 0.453592,
-      ounce: 0.0283495,
-      ton: 1000.0
-    },
-    temperature: :special
-  }
-  
-  def self.convert(value, from, to, type)
-    table = CONVERSIONS[type]
-    return "ไม่รู้จัก type: #{type}" unless table
-    
-    if type == :temperature
-      convert_temperature(value, from, to)
-    else
-      return "ไม่รู้จักหน่วย" unless table[from] && table[to]
-      value * table[from] / table[to]
-    end
-  end
-  
-  def self.convert_temperature(value, from, to)
-    celsius = case from
-    when :celsius    then value
-    when :fahrenheit then (value - 32) * 5.0 / 9
-    when :kelvin     then value - 273.15
-    end
-    
-    case to
-    when :celsius    then celsius
-    when :fahrenheit then celsius * 9.0 / 5 + 32
-    when :kelvin     then celsius + 273.15
-    end
-  end
-end
-
-puts UnitConverter.convert(1, :kilometer, :mile, :length).round(4)   # => 0.6214
-puts UnitConverter.convert(100, :celsius, :fahrenheit, :temperature)  # => 212.0
-puts UnitConverter.convert(1, :kilogram, :pound, :weight).round(4)    # => 2.2046
-```
-
-### แบบฝึกหัดที่ 7
-Geometry Calculator
-
-```ruby
-# เฉลย
-module Geometry
-  PI = Math::PI
-  
-  module Circle
-    def self.area(r)       = PI * r ** 2
-    def self.circumference(r) = 2 * PI * r
-    def self.diameter(r)   = 2 * r
-  end
-  
-  module Rectangle
-    def self.area(w, h)      = w * h
-    def self.perimeter(w, h) = 2 * (w + h)
-    def self.diagonal(w, h)  = Math.hypot(w, h)
-  end
-  
-  module Triangle
-    def self.area(b, h)  = 0.5 * b * h
-    
-    def self.area_from_sides(a, b, c)
-      # Heron's formula
-      s = (a + b + c) / 2.0
-      Math.sqrt(s * (s-a) * (s-b) * (s-c))
-    end
-    
-    def self.perimeter(a, b, c) = a + b + c
-  end
-  
-  module Sphere
-    def self.volume(r)              = (4.0/3) * PI * r ** 3
-    def self.surface_area(r)        = 4 * PI * r ** 2
-  end
-end
-
-puts Geometry::Circle.area(5).round(2)               # => 78.54
-puts Geometry::Rectangle.diagonal(3, 4).round(2)     # => 5.0
-puts Geometry::Triangle.area_from_sides(3,4,5).round(2)  # => 6.0
-puts Geometry::Sphere.volume(3).round(2)              # => 113.1
-```
-
-### แบบฝึกหัดที่ 8
-Binary Number Operations
-
-```ruby
-# เฉลย
-def to_binary(n)
-  n.to_s(2).rjust(8, '0')
-end
-
-def binary_add(a, b)
-  result = []
-  carry = 0
-  
-  [a.length, b.length].max.times do |i|
-    bit_a = i < a.length ? a[-(i+1)].to_i : 0
-    bit_b = i < b.length ? b[-(i+1)].to_i : 0
-    sum = bit_a + bit_b + carry
-    result.unshift(sum % 2)
-    carry = sum / 2
-  end
-  
-  result.unshift(1) if carry > 0
-  result.join
-end
-
-a = to_binary(42)   # => "00101010"
-b = to_binary(27)   # => "00011011"
-sum_bin = binary_add(a, b)
-sum_dec = sum_bin.to_i(2)
-
-puts "#{42} = #{a}"
-puts "#{27} = #{b}"
-puts "#{42} + #{27} = #{sum_dec} = #{sum_bin}"
-# => 42 + 27 = 69 = 1000101
-```
-
-### แบบฝึกหัดที่ 9
-Loan Calculator
-
-```ruby
-# เฉลย
-require 'bigdecimal'
-require 'bigdecimal/util'
-
-class LoanCalculator
-  def initialize(principal, annual_rate, months)
-    @principal = principal.to_d
-    @monthly_rate = (annual_rate / 100.0 / 12).to_d
-    @months = months
-  end
-  
-  def monthly_payment
-    if @monthly_rate.zero?
-      @principal / @months
-    else
-      @principal * @monthly_rate / (1 - (1 + @monthly_rate) ** (-@months))
-    end
-  end
-  
-  def total_payment
-    monthly_payment * @months
-  end
-  
-  def total_interest
-    total_payment - @principal
-  end
-  
-  def amortization_schedule(show_months = 6)
-    payment = monthly_payment
-    balance = @principal
-    
-    puts "%-6s %-12s %-12s %-12s %-12s" % ["เดือน", "ผ่อน", "ดอกเบี้ย", "เงินต้น", "คงเหลือ"]
-    puts "-" * 60
-    
-    [@months, show_months].min.times do |i|
-      interest = balance * @monthly_rate
-      principal_paid = payment - interest
-      balance -= principal_paid
-      
-      printf "%-6d %-12.2f %-12.2f %-12.2f %-12.2f\n",
-             i+1, payment.to_f, interest.to_f, principal_paid.to_f, [balance.to_f, 0].max
-    end
-    
-    puts "..." if @months > show_months
-  end
-end
-
-loan = LoanCalculator.new(500_000, 5.5, 120)  # 500k, 5.5%, 10 years
-puts "ผ่อนรายเดือน: #{loan.monthly_payment.round(2)}"
-puts "รวมที่จ่าย: #{loan.total_payment.round(2)}"
-puts "ดอกเบี้ยรวม: #{loan.total_interest.round(2)}"
-puts
-loan.amortization_schedule
-```
-
-### แบบฝึกหัดที่ 10
-Number Theory
-
-```ruby
-# เฉลย
-module NumberTheory
-  def self.prime_factors(n)
-    factors = []
-    d = 2
-    
-    while d * d <= n
-      while n % d == 0
-        factors << d
-        n /= d
-      end
-      d += 1
-    end
-    
-    factors << n if n > 1
-    factors
-  end
-  
-  def self.euler_phi(n)
-    # Euler's totient function
-    count = 0
-    (1..n).each { |k| count += 1 if n.gcd(k) == 1 }
-    count
-  end
-  
-  def self.perfect?(n)
-    return false if n <= 1
-    divisors = (1...n).select { |i| n % i == 0 }
-    divisors.sum == n
-  end
-  
-  def self.abundant?(n)
-    (1...n).select { |i| n % i == 0 }.sum > n
-  end
-  
-  def self.deficient?(n)
-    (1...n).select { |i| n % i == 0 }.sum < n
-  end
-end
-
-puts NumberTheory.prime_factors(60).inspect   # => [2, 2, 3, 5]
-puts NumberTheory.euler_phi(10)               # => 4
-puts NumberTheory.perfect?(28)                # => true (1+2+4+7+14=28)
-puts NumberTheory.perfect?(6)                 # => true (1+2+3=6)
-
-puts "Perfect numbers ถึง 1000:"
-(2..1000).each do |n|
-  puts n if NumberTheory.perfect?(n)
-end
-# 6, 28, 496
-```
-
-### แบบฝึกหัดที่ 11
-Roman Numerals
-
-```ruby
-# เฉลย
-def to_roman(n)
-  values = [
-    [1000, "M"], [900, "CM"], [500, "D"], [400, "CD"],
-    [100, "C"],  [90, "XC"],  [50, "L"],  [40, "XL"],
-    [10, "X"],   [9, "IX"],   [5, "V"],   [4, "IV"], [1, "I"]
-  ]
+def to_roman(num)
+  values = [1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1]
+  symbols = %w[M CM D CD C XC L XL X IX V IV I]
   
   result = ""
-  values.each do |value, numeral|
-    while n >= value
-      result += numeral
-      n -= value
+  values.each_with_index do |value, i|
+    while num >= value
+      result += symbols[i]
+      num -= value
     end
   end
   result
 end
 
-def from_roman(str)
-  values = { "I" => 1, "V" => 5, "X" => 10, "L" => 50,
-             "C" => 100, "D" => 500, "M" => 1000 }
+def from_roman(roman)
+  values = { 'I' => 1, 'V' => 5, 'X' => 10, 'L' => 50,
+             'C' => 100, 'D' => 500, 'M' => 1000 }
   
-  total = 0
-  str.chars.each_with_index do |char, i|
-    curr = values[char]
-    next_val = values[str[i+1]] || 0
-    
-    if curr < next_val
-      total -= curr
+  result = 0
+  prev = 0
+  roman.upcase.chars.reverse.each do |char|
+    current = values[char] || 0
+    if current >= prev
+      result += current
     else
-      total += curr
+      result -= current
     end
+    prev = current
   end
-  total
+  result
 end
 
-(1..20).each { |n| puts "#{n} = #{to_roman(n)}" }
-puts from_roman("MCMXCIX")  # => 1999
-puts to_roman(2024)         # => MMXXIV
+[1, 4, 9, 14, 40, 99, 400, 1994, 2024].each do |n|
+  roman = to_roman(n)
+  back = from_roman(roman)
+  puts "#{n} => #{roman} => #{back}"
+end
 ```
 
-### แบบฝึกหัดที่ 12
-Matrix Operations
+### ข้อ 6-10: Intermediate
+
+**ข้อ 6**: สร้าง number guessing game
+
+```ruby
+# เฉลย
+def number_guessing_game(min = 1, max = 100)
+  secret = rand(min..max)
+  attempts = 0
+  max_attempts = (Math.log2(max - min + 1) + 1).ceil
+  
+  puts "เดาตัวเลขระหว่าง #{min} ถึง #{max}"
+  puts "คุณมี #{max_attempts} ครั้ง"
+  
+  loop do
+    print "เดา: "
+    guess = gets.chomp.to_i
+    attempts += 1
+    
+    if guess == secret
+      puts "ถูกต้อง! ใช้ #{attempts} ครั้ง"
+      break
+    elsif guess < secret
+      puts "น้อยเกินไป"
+    else
+      puts "มากเกินไป"
+    end
+    
+    if attempts >= max_attempts
+      puts "หมดโอกาสแล้ว! คำตอบคือ #{secret}"
+      break
+    end
+  end
+end
+
+# number_guessing_game  # ยกเลิก comment เพื่อเล่น
+puts "Game function defined (requires interactive input)"
+```
+
+**ข้อ 7**: คำนวณ statistics ของชุดข้อมูล
+
+```ruby
+# เฉลย
+def statistics(data)
+  raise ArgumentError, "Data cannot be empty" if data.empty?
+  
+  sorted = data.sort
+  n = data.length
+  
+  mean = data.sum.to_f / n
+  
+  median = if n.odd?
+    sorted[n / 2]
+  else
+    (sorted[n/2 - 1] + sorted[n/2]) / 2.0
+  end
+  
+  freq = Hash.new(0)
+  data.each { |x| freq[x] += 1 }
+  max_freq = freq.values.max
+  mode = freq.select { |_, v| v == max_freq }.keys
+  
+  variance = data.sum { |x| (x - mean) ** 2 } / n
+  std_dev = Math.sqrt(variance)
+  
+  q1 = sorted[n / 4]
+  q3 = sorted[3 * n / 4]
+  iqr = q3 - q1
+  
+  {
+    count: n,
+    sum: data.sum,
+    min: sorted.first,
+    max: sorted.last,
+    range: sorted.last - sorted.first,
+    mean: mean.round(4),
+    median: median,
+    mode: mode,
+    variance: variance.round(4),
+    std_dev: std_dev.round(4),
+    q1: q1,
+    q3: q3,
+    iqr: iqr
+  }
+end
+
+data = [23, 45, 67, 34, 89, 45, 23, 56, 78, 45, 12, 90, 34, 67, 45]
+stats = statistics(data)
+
+puts "=== Statistics ==="
+stats.each do |key, value|
+  puts "#{key.to_s.ljust(10)}: #{value}"
+end
+```
+
+**ข้อ 8**: สร้าง number formatter ที่รองรับหลายรูปแบบ
+
+```ruby
+# เฉลย
+class NumberFormatter
+  def initialize(number)
+    @number = number
+  end
+  
+  def as_currency(symbol = "฿", decimals = 2)
+    formatted = sprintf("%.#{decimals}f", @number)
+    integer, decimal = formatted.split(".")
+    grouped = integer.gsub(/(\d)(?=(\d{3})+\z)/, '\1,')
+    "#{symbol}#{grouped}.#{decimal}"
+  end
+  
+  def as_percent(decimals = 2)
+    "#{sprintf("%.#{decimals}f", @number * 100)}%"
+  end
+  
+  def as_ordinal
+    n = @number.to_i
+    suffix = if (11..13).include?(n % 100)
+      "th"
+    else
+      case n % 10
+      when 1 then "st"
+      when 2 then "nd"
+      when 3 then "rd"
+      else "th"
+      end
+    end
+    "#{n}#{suffix}"
+  end
+  
+  def as_words
+    # Simple Thai number words
+    ones = %w[ศูนย์ หนึ่ง สอง สาม สี่ ห้า หก เจ็ด แปด เก้า]
+    n = @number.to_i.abs
+    
+    return ones[n] if n < 10
+    return "#{ones[n/10]}สิบ#{n%10 > 0 ? ones[n%10] : ''}" if n < 100
+    "#{n}" # simplified for larger numbers
+  end
+end
+
+formatter = NumberFormatter.new(1234567.89)
+puts formatter.as_currency             # => ฿1,234,567.89
+puts formatter.as_currency("$")        # => $1,234,567.89
+
+pct = NumberFormatter.new(0.1567)
+puts pct.as_percent                    # => 15.67%
+
+ord = NumberFormatter.new(21)
+puts ord.as_ordinal                    # => 21st
+
+thai = NumberFormatter.new(7)
+puts thai.as_words                     # => เจ็ด
+```
+
+**ข้อ 9**: เขียน matrix operations
 
 ```ruby
 # เฉลย
 class Matrix2D
+  attr_reader :rows, :cols, :data
+  
   def initialize(data)
     @data = data
     @rows = data.length
     @cols = data[0].length
   end
   
-  def [](i, j) = @data[i][j]
-  def rows = @rows
-  def cols = @cols
+  def [](i, j)
+    @data[i][j]
+  end
   
   def +(other)
-    raise "ขนาดไม่เท่ากัน" unless @rows == other.rows && @cols == other.cols
-    
-    result = Array.new(@rows) { Array.new(@cols) }
+    result = Array.new(@rows) { Array.new(@cols, 0) }
     @rows.times do |i|
       @cols.times do |j|
         result[i][j] = @data[i][j] + other[i, j]
@@ -1584,8 +1418,6 @@ class Matrix2D
   end
   
   def *(other)
-    raise "ขนาดไม่ compatible" unless @cols == other.rows
-    
     result = Array.new(@rows) { Array.new(other.cols, 0) }
     @rows.times do |i|
       other.cols.times do |j|
@@ -1597,217 +1429,368 @@ class Matrix2D
     Matrix2D.new(result)
   end
   
-  def determinant
-    raise "ต้องเป็น square matrix" unless @rows == @cols
-    
-    if @rows == 2
-      @data[0][0] * @data[1][1] - @data[0][1] * @data[1][0]
-    else
-      # Expansion along first row
-      @cols.times.sum do |j|
-        sign = j.even? ? 1 : -1
-        @data[0][j] * sign * minor(0, j).determinant
+  def transpose
+    result = Array.new(@cols) { Array.new(@rows, 0) }
+    @rows.times do |i|
+      @cols.times do |j|
+        result[j][i] = @data[i][j]
       end
     end
-  end
-  
-  def minor(row, col)
-    data = @data.each_with_index.reject { |_, i| i == row }
-                .map { |r, _| r.each_with_index.reject { |_, j| j == col }.map(&:first) }
-    Matrix2D.new(data)
+    Matrix2D.new(result)
   end
   
   def to_s
-    @data.map { |row| row.map { |v| "%6.2f" % v }.join(" ") }.join("\n")
+    @data.map { |row| row.map { |v| v.to_s.rjust(6) }.join(" ") }.join("\n")
   end
 end
 
 a = Matrix2D.new([[1, 2], [3, 4]])
 b = Matrix2D.new([[5, 6], [7, 8]])
-puts "A * B ="
-puts (a * b).to_s
-puts "det(A) = #{a.determinant}"
+
+puts "Matrix A:"
+puts a
+puts "\nMatrix B:"
+puts b
+puts "\nA + B:"
+puts (a + b)
+puts "\nA * B:"
+puts (a * b)
+puts "\nTranspose of A:"
+puts a.transpose
 ```
 
-### แบบฝึกหัดที่ 13
-Numerical Integration
-
-```ruby
-# เฉลย
-module NumericalIntegration
-  # Trapezoidal Rule
-  def self.trapezoidal(func, a, b, n = 1000)
-    h = (b - a).to_f / n
-    sum = func.call(a) / 2.0 + func.call(b) / 2.0
-    
-    (1...n).each do |i|
-      sum += func.call(a + i * h)
-    end
-    
-    sum * h
-  end
-  
-  # Simpson's Rule
-  def self.simpsons(func, a, b, n = 1000)
-    n = n.even? ? n : n + 1
-    h = (b - a).to_f / n
-    sum = func.call(a) + func.call(b)
-    
-    (1...n).each do |i|
-      sum += (i.even? ? 2 : 4) * func.call(a + i * h)
-    end
-    
-    sum * h / 3.0
-  end
-end
-
-# คำนวณ ∫₀¹ x² dx = 1/3
-f = ->(x) { x ** 2 }
-puts NumericalIntegration.trapezoidal(f, 0, 1).round(6)  # ≈ 0.333333
-puts NumericalIntegration.simpsons(f, 0, 1).round(6)     # ≈ 0.333333
-
-# คำนวณ ∫₀^π sin(x) dx = 2
-g = ->(x) { Math.sin(x) }
-puts NumericalIntegration.simpsons(g, 0, Math::PI).round(6)  # ≈ 2.0
-```
-
-### แบบฝึกหัดที่ 14
-Number Guessing Game
-
-```ruby
-# เฉลย
-class NumberGuessingGame
-  def initialize(min: 1, max: 100)
-    @min = min
-    @max = max
-    @secret = rand(min..max)
-    @attempts = 0
-    @max_attempts = Math.log2(max - min + 1).ceil + 1
-  end
-  
-  def guess(number)
-    @attempts += 1
-    
-    if number == @secret
-      puts "ถูกต้อง! ใช้ #{@attempts} ครั้ง (optimal: #{@max_attempts})"
-      :correct
-    elsif @attempts >= @max_attempts
-      puts "หมดโอกาสแล้ว! ตัวเลขคือ #{@secret}"
-      :game_over
-    elsif number < @secret
-      puts "มากกว่า #{number}"
-      :low
-    else
-      puts "น้อยกว่า #{number}"
-      :high
-    end
-  end
-  
-  # Optimal strategy (binary search)
-  def optimal_guess
-    (@min + @max) / 2
-  end
-  
-  def auto_play
-    low = @min
-    high = @max
-    
-    until (result = guess(mid = (low + high) / 2)) == :correct
-      break if result == :game_over
-      result == :low ? low = mid + 1 : high = mid - 1
-    end
-  end
-end
-
-game = NumberGuessingGame.new
-puts "เล่นอัตโนมัติ (binary search):"
-game.auto_play
-```
-
-### แบบฝึกหัดที่ 15
-Financial Portfolio
+**ข้อ 10**: สร้าง loan calculator
 
 ```ruby
 # เฉลย
 require 'bigdecimal'
-require 'bigdecimal/util'
 
-class Portfolio
-  Investment = Struct.new(:name, :shares, :buy_price, :current_price)
+def loan_payment(principal, annual_rate, years)
+  p = BigDecimal(principal.to_s)
+  r = BigDecimal(annual_rate.to_s) / 12  # monthly rate
+  n = years * 12                          # total months
   
-  def initialize
-    @investments = []
+  # Monthly payment formula: M = P * [r(1+r)^n] / [(1+r)^n - 1]
+  if r == 0
+    return p / n
   end
   
-  def add(name, shares, buy_price, current_price)
-    @investments << Investment.new(name, shares.to_d, buy_price.to_d, current_price.to_d)
-  end
+  factor = (1 + r) ** n
+  monthly = p * (r * factor) / (factor - 1)
+  monthly.round(2, BigDecimal::ROUND_HALF_UP)
+end
+
+def amortization_schedule(principal, annual_rate, years)
+  monthly_payment = loan_payment(principal, annual_rate, years)
+  r = BigDecimal(annual_rate.to_s) / 12
+  balance = BigDecimal(principal.to_s)
   
-  def total_cost
-    @investments.sum { |inv| inv.shares * inv.buy_price }
-  end
-  
-  def total_value
-    @investments.sum { |inv| inv.shares * inv.current_price }
-  end
-  
-  def total_gain_loss
-    total_value - total_cost
-  end
-  
-  def return_percent
-    return BigDecimal("0") if total_cost.zero?
-    (total_gain_loss / total_cost * 100).round(2)
-  end
-  
-  def report
-    puts "=" * 70
-    puts "%-15s %8s %10s %10s %10s %10s" % ["ชื่อ", "จำนวน", "ราคาซื้อ", "ราคาตลาด", "ต้นทุน", "มูลค่า"]
-    puts "=" * 70
+  schedule = []
+  (years * 12).times do |i|
+    interest = (balance * r).round(2, BigDecimal::ROUND_HALF_UP)
+    principal_paid = monthly_payment - interest
+    balance -= principal_paid
+    balance = [balance, BigDecimal("0")].max  # ไม่ให้ติดลบ
     
-    @investments.each do |inv|
-      cost = inv.shares * inv.buy_price
-      value = inv.shares * inv.current_price
-      printf "%-15s %8.0f %10.2f %10.2f %10.2f %10.2f\n",
-             inv.name, inv.shares.to_f, inv.buy_price.to_f,
-             inv.current_price.to_f, cost.to_f, value.to_f
-    end
-    
-    puts "=" * 70
-    puts "ต้นทุนรวม:  #{total_cost.round(2).to_f}"
-    puts "มูลค่ารวม:  #{total_value.round(2).to_f}"
-    puts "กำไร/ขาดทุน: #{total_gain_loss.round(2).to_f}"
-    puts "ผลตอบแทน:   #{return_percent}%"
+    schedule << {
+      month: i + 1,
+      payment: monthly_payment,
+      principal: principal_paid.round(2),
+      interest: interest,
+      balance: balance.round(2)
+    }
+  end
+  
+  schedule
+end
+
+principal = 1_000_000
+rate = 0.06
+years = 10
+
+monthly = loan_payment(principal, rate, years)
+total = monthly * years * 12
+interest_total = total - principal
+
+puts "=== Loan Calculator ==="
+puts "เงินกู้: #{principal.to_s} บาท"
+puts "อัตราดอกเบี้ย: #{rate * 100}% ต่อปี"
+puts "ระยะเวลา: #{years} ปี"
+puts "ผ่อนรายเดือน: #{monthly.to_s("F")} บาท"
+puts "ดอกเบี้ยรวม: #{interest_total.to_s("F")} บาท"
+puts "ยอดชำระรวม: #{total.to_s("F")} บาท"
+
+puts "\n=== ตาราง Amortization (12 เดือนแรก) ==="
+schedule = amortization_schedule(principal, rate, years)
+puts "%-6s | %-12s | %-12s | %-12s | %-15s" % ["เดือน", "เงินผ่อน", "เงินต้น", "ดอกเบี้ย", "ยอดคงเหลือ"]
+puts "-" * 65
+schedule.first(12).each do |row|
+  puts "%-6d | %-12s | %-12s | %-12s | %-15s" % [
+    row[:month],
+    row[:payment].to_s("F"),
+    row[:principal].to_s("F"),
+    row[:interest].to_s("F"),
+    row[:balance].to_s("F")
+  ]
+end
+```
+
+### ข้อ 11-15: Advanced
+
+**ข้อ 11**: เขียน base converter (แปลงระหว่างฐานต่างๆ)
+
+```ruby
+# เฉลย
+def convert_base(number_str, from_base, to_base)
+  # แปลงเป็น decimal ก่อน
+  decimal = number_str.to_s.upcase.chars.reduce(0) do |sum, digit|
+    value = digit.match?(/\d/) ? digit.to_i : digit.ord - 'A'.ord + 10
+    raise ArgumentError, "Invalid digit #{digit} for base #{from_base}" if value >= from_base
+    sum * from_base + value
+  end
+  
+  # แปลงจาก decimal ไปยัง to_base
+  return "0" if decimal == 0
+  
+  digits = []
+  while decimal > 0
+    remainder = decimal % to_base
+    digits.unshift(remainder < 10 ? remainder.to_s : (remainder - 10 + 'A'.ord).chr)
+    decimal /= to_base
+  end
+  
+  digits.join
+end
+
+conversions = [
+  ["1010", 2, 10],    # binary to decimal
+  ["FF", 16, 10],     # hex to decimal
+  ["255", 10, 2],     # decimal to binary
+  ["255", 10, 16],    # decimal to hex
+  ["777", 8, 10],     # octal to decimal
+]
+
+conversions.each do |num, from, to|
+  result = convert_base(num, from, to)
+  puts "#{num} (base #{from}) = #{result} (base #{to})"
+end
+```
+
+**ข้อ 12**: เขียนโปรแกรมคำนวณ geometric progression
+
+```ruby
+# เฉลย
+def geometric_sequence(first_term, ratio, n_terms)
+  n_terms.times.map { |i| first_term * ratio ** i }
+end
+
+def geometric_sum(first_term, ratio, n_terms)
+  if ratio == 1
+    first_term * n_terms
+  else
+    first_term * (ratio ** n_terms - 1) / (ratio - 1)
   end
 end
 
-portfolio = Portfolio.new
-portfolio.add("Apple Inc.", 100, 150.00, 175.50)
-portfolio.add("Google", 50, 2800.00, 2950.00)
-portfolio.add("Tesla", 200, 900.00, 750.00)
-portfolio.add("Microsoft", 75, 300.00, 325.00)
+def geometric_sum_infinite(first_term, ratio)
+  raise ArgumentError, "Ratio must be |r| < 1 for convergence" if ratio.abs >= 1
+  first_term / (1.0 - ratio)
+end
 
-portfolio.report
+puts "Geometric Sequence (a=2, r=3, n=5):"
+seq = geometric_sequence(2, 3, 5)
+puts seq.inspect
+puts "Sum: #{geometric_sum(2, 3, 5)}"
+
+puts "\nInfinite Sum (a=1, r=0.5):"
+puts geometric_sum_infinite(1, 0.5)  # => 2.0
+
+# Compound interest ก็คือ geometric sequence!
+puts "\nCompound Interest (1000 baht, 5% per year, 5 years):"
+balances = geometric_sequence(1000, 1.05, 6)
+balances.each_with_index do |balance, year|
+  puts "Year #{year}: #{'%.2f' % balance} baht"
+end
+```
+
+**ข้อ 13**: เขียน numerical integration
+
+```ruby
+# เฉลย
+def trapezoidal_integration(a, b, n, &func)
+  h = (b - a).to_f / n
+  sum = func.call(a) / 2.0 + func.call(b) / 2.0
+  
+  (1...n).each do |i|
+    sum += func.call(a + i * h)
+  end
+  
+  h * sum
+end
+
+def simpson_integration(a, b, n, &func)
+  raise ArgumentError, "n must be even" if n.odd?
+  
+  h = (b - a).to_f / n
+  sum = func.call(a) + func.call(b)
+  
+  (1...n).each do |i|
+    x = a + i * h
+    sum += i.even? ? 2 * func.call(x) : 4 * func.call(x)
+  end
+  
+  h * sum / 3
+end
+
+# ∫₀¹ x² dx = 1/3
+puts "∫₀¹ x² dx:"
+puts "Trapezoidal: #{trapezoidal_integration(0, 1, 1000) { |x| x**2 }.round(6)}"
+puts "Simpson:     #{simpson_integration(0, 1, 1000) { |x| x**2 }.round(6)}"
+puts "Exact:       #{1.0/3}"
+
+# ∫₀^π sin(x) dx = 2
+puts "\n∫₀^π sin(x) dx:"
+puts "Trapezoidal: #{trapezoidal_integration(0, Math::PI, 1000) { |x| Math.sin(x) }.round(6)}"
+puts "Simpson:     #{simpson_integration(0, Math::PI, 1000) { |x| Math.sin(x) }.round(6)}"
+puts "Exact:       2.0"
+```
+
+**ข้อ 14**: เขียน binary search ใน sorted numbers
+
+```ruby
+# เฉลย
+def binary_search(array, target)
+  low, high = 0, array.length - 1
+  
+  while low <= high
+    mid = (low + high) / 2
+    
+    case array[mid] <=> target
+    when 0  then return mid  # found
+    when -1 then low = mid + 1   # target is larger
+    when 1  then high = mid - 1  # target is smaller
+    end
+  end
+  
+  nil  # not found
+end
+
+def binary_search_range(array, target)
+  # หา index แรกและสุดท้ายที่ target ปรากฎ
+  first = find_first(array, target)
+  return nil if first.nil?
+  
+  last = find_last(array, target)
+  first..last
+end
+
+def find_first(array, target)
+  low, high = 0, array.length - 1
+  result = nil
+  
+  while low <= high
+    mid = (low + high) / 2
+    if array[mid] == target
+      result = mid
+      high = mid - 1
+    elsif array[mid] < target
+      low = mid + 1
+    else
+      high = mid - 1
+    end
+  end
+  
+  result
+end
+
+def find_last(array, target)
+  low, high = 0, array.length - 1
+  result = nil
+  
+  while low <= high
+    mid = (low + high) / 2
+    if array[mid] == target
+      result = mid
+      low = mid + 1
+    elsif array[mid] < target
+      low = mid + 1
+    else
+      high = mid - 1
+    end
+  end
+  
+  result
+end
+
+sorted = [1, 3, 5, 7, 9, 11, 13, 15, 17, 19]
+puts binary_search(sorted, 7)    # => 3
+puts binary_search(sorted, 13)   # => 6
+puts binary_search(sorted, 6)    # => nil
+
+nums = [1, 2, 2, 3, 3, 3, 4, 4, 5]
+range = binary_search_range(nums, 3)
+puts "3 appears at positions: #{range}"  # => 3..5
+```
+
+**ข้อ 15**: Monte Carlo Simulation
+
+```ruby
+# เฉลย
+def estimate_pi(num_samples)
+  inside_circle = 0
+  
+  num_samples.times do
+    x = rand * 2 - 1  # -1 to 1
+    y = rand * 2 - 1  # -1 to 1
+    inside_circle += 1 if x**2 + y**2 <= 1
+  end
+  
+  4.0 * inside_circle / num_samples
+end
+
+def birthday_problem_simulation(num_people, num_trials = 10_000)
+  successes = 0
+  
+  num_trials.times do
+    birthdays = num_people.times.map { rand(365) }
+    successes += 1 if birthdays.length != birthdays.uniq.length
+  end
+  
+  successes.to_f / num_trials
+end
+
+# Estimate Pi
+puts "=== Monte Carlo Pi Estimation ==="
+[100, 1_000, 10_000, 100_000].each do |n|
+  estimate = estimate_pi(n)
+  error = ((estimate - Math::PI) / Math::PI * 100).abs
+  puts "n=#{n.to_s.ljust(8)}: π ≈ #{estimate.round(6)} (error: #{error.round(4)}%)"
+end
+puts "Actual π = #{Math::PI}"
+
+# Birthday Problem
+puts "\n=== Birthday Problem Simulation ==="
+[10, 23, 30, 50].each do |n|
+  prob = birthday_problem_simulation(n)
+  puts "#{n} คน: #{(prob * 100).round(1)}% โอกาสเกิดวันเดียวกัน"
+end
 ```
 
 ---
 
 ## สรุป
 
-ในตอนที่ 4 นี้ เราได้เรียนรู้:
+| เรื่อง | สิ่งที่เรียนรู้ |
+|--------|----------------|
+| Integer | Decimal, Binary (0b), Hex (0x), Octal (0o), ขนาดไม่จำกัด |
+| Float | ทศนิยม, Scientific notation, ค่าพิเศษ (NaN, Infinity) |
+| Arithmetic | +, -, *, /, %, ** และ Integer/Float division |
+| Integer methods | odd?, even?, abs, gcd, lcm, digits, pow, times, upto, downto |
+| Float methods | round, ceil, floor, truncate, nan?, infinite? |
+| Math module | sqrt, log, sin, cos, tan, atan2, hypot, PI, E |
+| BigDecimal | ความแม่นยำสูงสำหรับการเงิน |
+| Random | rand, Random.new, seed |
+| Conversions | to_i, to_f, to_r, to_c, Integer(), Float() |
+| Formatting | sprintf, format, % operator |
 
-1. **Integer** - Literals, Methods, Bitwise Operations, Large Numbers
-2. **Float** - Precision, Special Values (NaN, Infinity), Methods
-3. **Arithmetic** - Integer vs Float Division (ระวัง!)
-4. **Math Module** - sqrt, exp, log, Trigonometry
-5. **BigDecimal** - สำหรับการเงินที่ต้องการความแม่นยำสูง
-6. **Number Bases** - Binary, Octal, Hexadecimal
-7. **Random** - rand, Random.new, Seeding
-8. **Conversions** - to_i, to_f, to_r, to_c, Integer(), Float()
-9. **Formatting** - round, ceil, floor, sprintf
-
-ในตอนต่อไปเราจะเรียนรู้เรื่อง **Arrays** ซึ่งเป็นโครงสร้างข้อมูลที่ทรงพลังมากใน Ruby
-
----
-
-*ตอนที่ 4 จบแล้ว - ไปต่อตอนที่ 5: Arrays*
+ตอนต่อไปจะเป็นเรื่อง **Arrays** ที่เป็น Collection ที่ทรงพลังที่สุดใน Ruby

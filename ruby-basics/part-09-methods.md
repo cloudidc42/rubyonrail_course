@@ -1,81 +1,462 @@
-# ตอนที่ 9: Methods (ขั้นตอนที่ 146-170)
+# ตอนที่ 9: Methods / Functions (Steps 146-170)
 
-## บทนำ
-
-Methods เป็นองค์ประกอบพื้นฐานในการเขียน Ruby ทุก ๆ operation ใน Ruby เป็น method call Methods ช่วยให้โค้ด reusable, readable และ maintainable
-
-ในบทนี้เราจะเรียนรู้:
-- การ define และ call methods
-- Parameters และ arguments ทุกรูปแบบ
-- Default parameters
-- Keyword arguments
-- Splat operators
-- Return values
-- Method visibility
-- Bang methods และ Predicate methods
-- Method objects
-- Recursive methods
-- Method chaining
-- Memoization
+> **เป้าหมาย**: เรียนรู้การสร้างและใช้งาน methods ใน Ruby อย่างครบถ้วน ตั้งแต่พื้นฐานไปจนถึง advanced patterns
 
 ---
 
-## ขั้นตอนที่ 146: การ Define และ Call Methods พื้นฐาน
+## Step 146: การ Define Method — def / end
+
+Method คือกลุ่มของโค้ดที่มีชื่อ สามารถเรียกใช้ซ้ำได้ ใน Ruby ใช้ `def` และ `end`
 
 ```ruby
-# การ define method ด้วย def/end
+# รูปแบบพื้นฐาน
 def greet
   puts "สวัสดี!"
 end
 
-# การ call method
-greet       # => สวัสดี!
-greet()     # => สวัสดี! (เหมือนกัน, parentheses optional)
+greet  # Output: สวัสดี!
 
-# method ที่รับ arguments
+# Method ที่รับ argument
 def greet_person(name)
-  puts "สวัสดี #{name}!"
+  puts "สวัสดี, #{name}!"
 end
 
-greet_person("Alice")   # => สวัสดี Alice!
-greet_person "Bob"      # => สวัสดี Bob! (ไม่ต้อง parentheses)
+greet_person("Alice")  # Output: สวัสดี, Alice!
 
-# method ที่คืนค่า
+# Method ที่คืนค่า
 def add(a, b)
-  a + b   # implicit return
+  a + b  # ค่าสุดท้ายเป็น return value อัตโนมัติ
 end
 
 result = add(3, 4)
-puts result   # => 7
+puts result  # Output: 7
+```
 
-# method ที่มีหลาย parameters
-def create_user(name, age, email)
-  "User: #{name}, อายุ: #{age}, อีเมล: #{email}"
-end
+### ชื่อ Method ใน Ruby
 
-puts create_user("Alice", 25, "alice@example.com")
-
-# naming convention: snake_case
+```ruby
+# ชื่อ method ใช้ lowercase + underscore (snake_case)
 def calculate_total_price
-  # ...
+def get_user_by_id
+def is_valid_email?      # predicate method ลงท้าย ?
+def save!                # bang method ลงท้าย !
+def convert_to_string    # ชัดเจน
+```
+
+### Method ที่ไม่มี argument
+
+```ruby
+def current_time
+  Time.now.strftime("%H:%M:%S")
 end
 
-def get_user_by_id
+def ruby_version
+  RUBY_VERSION
+end
+
+puts current_time   # 14:30:25
+puts ruby_version   # 3.2.0
+```
+
+---
+
+## Step 147: Calling Methods — การเรียกใช้ Method
+
+```ruby
+# วิธีการเรียก method ต่างๆ
+def hello
+  "Hello, World!"
+end
+
+# วิธีที่ 1: เรียกตรงๆ
+hello
+
+# วิธีที่ 2: เก็บใน variable
+result = hello
+puts result
+
+# วิธีที่ 3: ใน string interpolation
+puts "ผลลัพธ์: #{hello}"
+
+# เรียก method บน object
+"hello".upcase
+[1, 2, 3].length
+42.to_s
+
+# เรียก method แบบ explicit receiver
+self.hello  # บน current object
+obj.hello   # บน obj
+```
+
+### Method Parentheses
+
+```ruby
+# ใน Ruby วงเล็บเป็น optional สำหรับ method calls
+puts "Hello"    # ✅ ไม่ใส่วงเล็บ
+puts("Hello")   # ✅ ใส่วงเล็บ
+
+# แต่ควรใส่วงเล็บเมื่อมี argument เพื่อความชัดเจน
+greet "Alice"      # ✅ ทำงานได้
+greet("Alice")     # ✅ ชัดเจนกว่า (recommended)
+
+# ต้องใส่วงเล็บเมื่อ chain method
+result = add(3, 4).to_s
+# result = add 3, 4 .to_s  # ❌ ambiguous
+```
+
+---
+
+## Step 148: Parameters และ Arguments
+
+```ruby
+# Parameters = ชื่อที่ใช้ใน method definition
+# Arguments = ค่าจริงที่ส่งเข้าไปตอนเรียก
+
+def add(a, b)  # a, b คือ parameters
+  a + b
+end
+
+add(3, 4)  # 3, 4 คือ arguments
+
+# Multiple parameters
+def create_user(name, age, email)
+  { name: name, age: age, email: email }
+end
+
+user = create_user("Alice", 30, "alice@example.com")
+puts user.inspect
+# {:name=>"Alice", :age=>30, :email=>"alice@example.com"}
+
+# Order matters!
+def introduce(name, job)
+  "ผมชื่อ #{name} ทำงานเป็น #{job}"
+end
+
+puts introduce("Alice", "Developer")  # ผมชื่อ Alice ทำงานเป็น Developer
+puts introduce("Developer", "Alice")  # ผมชื่อ Developer ทำงานเป็น Alice (ผิด!)
+```
+
+---
+
+## Step 149: Default Parameters — ค่าเริ่มต้น
+
+```ruby
+# Default parameter
+def greet(name, greeting = "สวัสดี")
+  "#{greeting}, #{name}!"
+end
+
+puts greet("Alice")             # สวัสดี, Alice!
+puts greet("Bob", "Hello")      # Hello, Bob!
+puts greet("Charlie", "ดีจ้า")  # ดีจ้า, Charlie!
+
+# Default ที่ซับซ้อนขึ้น
+def create_user(name, age = 18, role = :user, active = true)
+  { name: name, age: age, role: role, active: active }
+end
+
+puts create_user("Alice").inspect
+# {:name=>"Alice", :age=>18, :role=>:user, :active=>true}
+
+puts create_user("Bob", 25, :admin).inspect
+# {:name=>"Bob", :age=>25, :role=>:admin, :active=>true}
+```
+
+### Default กับ Expression
+
+```ruby
+# Default สามารถเป็น expression ได้
+def log_message(msg, timestamp = Time.now)
+  "[#{timestamp.strftime('%H:%M:%S')}] #{msg}"
+end
+
+# Default อ้างอิง parameter ก่อนหน้าได้
+def multiply(a, b = a * 2)  # b default คือ a * 2
+  a * b
+end
+
+puts multiply(3)     # 3 * 6 = 18
+puts multiply(3, 4)  # 3 * 4 = 12
+
+# Default กับ method call
+def connect(host, port = default_port, timeout = 30)
   # ...
 end
 ```
 
 ---
 
-## ขั้นตอนที่ 147: Return Values
+## Step 150: Keyword Arguments — Named Parameters
 
 ```ruby
-# Implicit return - Ruby คืนค่าบรรทัดสุดท้าย
-def multiply(a, b)
-  a * b   # คืนค่านี้โดยอัตโนมัติ
+# Keyword arguments ทำให้เรียก method ชัดเจนขึ้น
+def create_order(product:, quantity:, price:)
+  {
+    product: product,
+    quantity: quantity,
+    price: price,
+    total: quantity * price
+  }
 end
 
-puts multiply(4, 5)   # => 20
+# ต้องระบุชื่อตอนเรียก
+order = create_order(product: "กาแฟ", quantity: 3, price: 50)
+puts order[:total]  # 150
+
+# ลำดับไม่สำคัญ!
+order = create_order(price: 50, product: "กาแฟ", quantity: 3)
+puts order[:total]  # 150 (เหมือนกัน)
+```
+
+### Keyword กับ Default
+
+```ruby
+def send_email(to:, subject:, body:, cc: nil, bcc: nil, html: false)
+  puts "ถึง: #{to}"
+  puts "เรื่อง: #{subject}"
+  puts "สำเนา: #{cc}" if cc
+  puts "HTML: #{html}"
+end
+
+send_email(
+  to: "alice@example.com",
+  subject: "ทดสอบ",
+  body: "เนื้อหา"
+)
+# ถึง: alice@example.com
+# เรื่อง: ทดสอบ
+# HTML: false
+
+send_email(
+  to: "bob@example.com",
+  subject: "ประชุม",
+  body: "รายละเอียด",
+  html: true,
+  cc: "charlie@example.com"
+)
+```
+
+### Keyword Arguments ช่วยอ่านง่าย
+
+```ruby
+# ❌ อ่านยาก: positional arguments
+connect("localhost", 5432, "mydb", "admin", "secret", true, 30)
+
+# ✅ อ่านง่าย: keyword arguments
+connect(
+  host: "localhost",
+  port: 5432,
+  database: "mydb",
+  username: "admin",
+  password: "secret",
+  ssl: true,
+  timeout: 30
+)
+```
+
+---
+
+## Step 151: Required Keyword Arguments
+
+```ruby
+# Ruby 2.1+: keyword ที่ไม่มี default = required
+def create_user(name:, email:, age: nil)
+  { name: name, email: email, age: age }
+end
+
+# ✅ ถูกต้อง
+create_user(name: "Alice", email: "alice@example.com")
+
+# ❌ Error: missing keyword: name
+# create_user(email: "alice@example.com")
+
+# ❌ Error: missing keyword: email
+# create_user(name: "Alice")
+
+# ตัวอย่างจริง
+def transfer_money(from:, to:, amount:, note: "")
+  return "จำนวนเงินต้องเป็นบวก" unless amount > 0
+  
+  puts "โอน #{amount} บาท"
+  puts "จาก: #{from}"
+  puts "ไปยัง: #{to}"
+  puts "หมายเหตุ: #{note}" unless note.empty?
+end
+
+transfer_money(from: "Alice", to: "Bob", amount: 1000, note: "ค่าอาหาร")
+```
+
+---
+
+## Step 152: Splat Operator (*args) — Variable Arguments
+
+```ruby
+# * รับ arguments จำนวนไม่แน่นอน
+def sum(*numbers)
+  numbers.sum
+end
+
+puts sum(1, 2, 3)         # 6
+puts sum(1, 2, 3, 4, 5)   # 15
+puts sum                   # 0
+
+# *args เป็น Array ใน method
+def greet_all(*names)
+  puts "สวัสดี: #{names.join(', ')}!"
+end
+
+greet_all("Alice", "Bob", "Charlie")
+# สวัสดี: Alice, Bob, Charlie!
+
+# ผสมกับ required parameters
+def log(level, *messages)
+  messages.each do |msg|
+    puts "[#{level.upcase}] #{msg}"
+  end
+end
+
+log("info", "เริ่มต้นระบบ", "เชื่อมต่อ Database", "โหลด Config")
+# [INFO] เริ่มต้นระบบ
+# [INFO] เชื่อมต่อ Database
+# [INFO] โหลด Config
+```
+
+### Splat ใน Method Call
+
+```ruby
+# ใช้ * ขยาย array เป็น arguments
+def add(a, b, c)
+  a + b + c
+end
+
+numbers = [1, 2, 3]
+puts add(*numbers)  # 6
+
+# รวม arrays
+def combine(*arrays)
+  arrays.flatten
+end
+
+a = [1, 2, 3]
+b = [4, 5, 6]
+c = [7, 8, 9]
+puts combine(a, b, c).inspect  # [1, 2, 3, 4, 5, 6, 7, 8, 9]
+```
+
+---
+
+## Step 153: Double Splat (**kwargs) — Variable Keyword Arguments
+
+```ruby
+# ** รับ keyword arguments จำนวนไม่แน่นอน
+def create_tag(tag, **attributes)
+  attr_string = attributes.map { |k, v| "#{k}=\"#{v}\"" }.join(" ")
+  "<#{tag} #{attr_string}>"
+end
+
+puts create_tag("a", href: "https://example.com", class: "link")
+# <a href="https://example.com" class="link">
+
+puts create_tag("img", src: "photo.jpg", alt: "รูปภาพ", width: "100")
+# <img src="photo.jpg" alt="รูปภาพ" width="100">
+
+# ผสม positional, splat, double splat
+def complex_method(required, *optional, key: "default", **options)
+  puts "required: #{required}"
+  puts "optional: #{optional.inspect}"
+  puts "key: #{key}"
+  puts "options: #{options.inspect}"
+end
+
+complex_method("a", "b", "c", key: "custom", x: 1, y: 2)
+# required: a
+# optional: ["b", "c"]
+# key: custom
+# options: {:x=>1, :y=>2}
+```
+
+### Double Splat กับ Hash
+
+```ruby
+# ** ขยาย Hash เป็น keyword arguments
+def configure(debug: false, log_level: :info, timeout: 30)
+  puts "debug: #{debug}, log: #{log_level}, timeout: #{timeout}"
+end
+
+config = { debug: true, log_level: :debug }
+configure(**config)
+# debug: true, log: debug, timeout: 30
+
+# merge hashes ด้วย **
+defaults = { color: "blue", size: "medium" }
+overrides = { color: "red" }
+merged = { **defaults, **overrides }
+puts merged.inspect  # {:color=>"red", :size=>"medium"}
+```
+
+---
+
+## Step 154: Mixed Parameters — ผสมทุกประเภท
+
+```ruby
+# Ruby parameters ทุกประเภทผสมกัน
+def everything(
+  required,          # required positional
+  optional = "opt",  # optional positional
+  *rest,             # splat
+  keyword:,          # required keyword
+  key_opt: "def",    # optional keyword
+  **options,         # double splat
+  &block             # block
+)
+  puts "required: #{required}"
+  puts "optional: #{optional}"
+  puts "rest: #{rest.inspect}"
+  puts "keyword: #{keyword}"
+  puts "key_opt: #{key_opt}"
+  puts "options: #{options.inspect}"
+  block.call if block
+end
+
+everything("a", "b", "c", "d",
+           keyword: "req", x: 1) { puts "Block!" }
+# required: a
+# optional: b
+# rest: ["c", "d"]
+# keyword: req
+# key_opt: def
+# options: {:x=>1}
+# Block!
+```
+
+### ลำดับ Parameters ที่ถูกต้อง
+
+```ruby
+# ลำดับที่ Ruby กำหนด:
+# 1. required positional
+# 2. optional positional
+# 3. *splat
+# 4. required keyword
+# 5. optional keyword
+# 6. **double_splat
+# 7. &block
+
+def correct_order(req, opt = "opt", *splat, kwreq:, kwopt: "kd", **dbl, &blk)
+  # ...
+end
+```
+
+---
+
+## Step 155: Return Values — Implicit vs Explicit
+
+```ruby
+# Implicit return: ค่าสุดท้ายของ method
+def add(a, b)
+  a + b  # return โดยอัตโนมัติ
+end
+
+puts add(3, 4)  # 7
 
 # Explicit return
 def divide(a, b)
@@ -83,659 +464,586 @@ def divide(a, b)
   a.to_f / b
 end
 
-puts divide(10, 3)    # => 3.3333...
-puts divide(10, 0)    # => หารด้วยศูนย์ไม่ได้
+puts divide(10, 2)  # 5.0
+puts divide(10, 0)  # หารด้วยศูนย์ไม่ได้
 
-# Return หลาย values (tuple as Array)
-def min_max(array)
-  [array.min, array.max]
+# Implicit return ของ if/case
+def classify_age(age)
+  if age < 13
+    "เด็ก"
+  elsif age < 18
+    "วัยรุ่น"
+  elsif age < 60
+    "ผู้ใหญ่"
+  else
+    "ผู้สูงอายุ"
+  end  # ค่าสุดท้ายจาก if block
 end
 
-min, max = min_max([3, 1, 4, 1, 5, 9])
-puts "Min: #{min}, Max: #{max}"   # => Min: 1, Max: 9
+puts classify_age(8)   # เด็ก
+puts classify_age(25)  # ผู้ใหญ่
+```
 
-# คืนค่า Hash
-def statistics(numbers)
+### Return ใน Guard Clauses
+
+```ruby
+def process_user(user)
+  # guard clauses ใช้ explicit return
+  return nil unless user
+  return { error: "inactive" } unless user[:active]
+  return { error: "too_young" } if user[:age] < 18
+  
+  # happy path
   {
-    count: numbers.size,
-    sum: numbers.sum,
-    average: numbers.sum.to_f / numbers.size,
+    success: true,
+    user_id: user[:id],
+    message: "ดำเนินการสำเร็จ"
+  }
+end
+```
+
+---
+
+## Step 156: Multiple Return Values
+
+```ruby
+# Ruby methods คืนค่าได้ค่าเดียว แต่ใช้ Array ได้
+def min_max(numbers)
+  [numbers.min, numbers.max]
+end
+
+min, max = min_max([3, 1, 4, 1, 5, 9, 2, 6])
+puts "min: #{min}, max: #{max}"  # min: 1, max: 9
+
+# คืนเป็น Hash เพื่อความชัดเจน
+def statistics(numbers)
+  sum = numbers.sum
+  avg = sum.to_f / numbers.length
+  {
+    sum: sum,
+    average: avg.round(2),
     min: numbers.min,
-    max: numbers.max
+    max: numbers.max,
+    count: numbers.length
   }
 end
 
 stats = statistics([1, 2, 3, 4, 5])
-puts stats[:average]   # => 3.0
+puts "รวม: #{stats[:sum]}, เฉลี่ย: #{stats[:average]}"
+# รวม: 15, เฉลี่ย: 3.0
 
-# Method ที่ไม่มี return value ชัดเจน คืน nil
-def side_effect_only
-  puts "กำลังทำอะไรบางอย่าง"
-  # ไม่มี return statement
+# Destructuring assignment
+def parse_name(full_name)
+  parts = full_name.split
+  first = parts.first
+  last = parts.last
+  [first, last]
 end
 
-result = side_effect_only
-puts result.inspect   # => nil
+first, last = parse_name("John Doe")
+puts "ชื่อ: #{first}, นามสกุล: #{last}"
+# ชื่อ: John, นามสกุล: Doe
 ```
 
 ---
 
-## ขั้นตอนที่ 148: Default Parameters
-
-```ruby
-# Default parameters
-def greet(name = "Anonymous", greeting = "สวัสดี")
-  "#{greeting} #{name}!"
-end
-
-puts greet                      # => สวัสดี Anonymous!
-puts greet("Alice")             # => สวัสดี Alice!
-puts greet("Bob", "Hello")      # => Hello Bob!
-
-# Default values สามารถ reference parameter ก่อนหน้า
-def create_rectangle(width, height = width)
-  { width: width, height: height, area: width * height }
-end
-
-puts create_rectangle(5).inspect         # => {:width=>5, :height=>5, :area=>25}
-puts create_rectangle(4, 6).inspect     # => {:width=>4, :height=>6, :area=>24}
-
-# Default values สามารถเป็น expression
-def log(message, level = :info, timestamp = Time.now)
-  "[#{level.upcase}] #{timestamp}: #{message}"
-end
-
-# Default ที่ depend บน environment
-def connect(host = ENV["DB_HOST"] || "localhost", port = 5432)
-  "Connecting to #{host}:#{port}"
-end
-
-# ระวัง: Default ที่เป็น mutable object
-# ไม่ดี!
-def add_item(item, list = [])
-  list << item   # ปัญหา: list เดียวกันทุกครั้ง!
-  list
-end
-
-# ดีกว่า
-def add_item_safe(item, list = nil)
-  list = list ? list.dup : []
-  list << item
-  list
-end
-```
-
----
-
-## ขั้นตอนที่ 149: Keyword Arguments
-
-```ruby
-# Keyword arguments ทำให้ method call อ่านง่ายขึ้น
-def create_user(name:, age:, email:)
-  { name: name, age: age, email: email }
-end
-
-# ต้องระบุ keyword
-create_user(name: "Alice", age: 25, email: "alice@example.com")
-
-# ลำดับไม่สำคัญ
-create_user(email: "bob@example.com", name: "Bob", age: 30)
-
-# Keyword arguments กับ default values
-def setup_server(host: "localhost", port: 3000, ssl: false)
-  puts "Server: #{host}:#{port} (SSL: #{ssl})"
-end
-
-setup_server                          # => Server: localhost:3000 (SSL: false)
-setup_server(port: 8080)             # => Server: localhost:8080 (SSL: false)
-setup_server(host: "0.0.0.0", ssl: true)  # => Server: 0.0.0.0:3000 (SSL: true)
-
-# Mix ของ positional และ keyword arguments
-def process(data, verbose: false, timeout: 30)
-  puts "Processing #{data.class} (timeout: #{timeout}, verbose: #{verbose})"
-end
-
-process([1, 2, 3])
-process("text", verbose: true)
-process({key: "val"}, timeout: 60, verbose: true)
-
-# Required keyword arguments (Ruby 2.1+)
-def connect(host:, port:, database:)
-  "#{host}:#{port}/#{database}"
-end
-
-# connect(host: "localhost")  # ArgumentError: missing keyword: port, database
-
-# **kwargs - รับ keyword arguments ที่ไม่รู้ชื่อล่วงหน้า
-def flexible(**options)
-  puts options.inspect
-end
-
-flexible(color: "red", size: :large, weight: 50)
-# => {:color=>"red", :size=>:large, :weight=>50}
-```
-
----
-
-## ขั้นตอนที่ 150: Splat Operator (*args)
-
-```ruby
-# *args - รับ arguments จำนวนเท่าไรก็ได้
-def sum(*numbers)
-  numbers.reduce(0, :+)
-end
-
-puts sum(1, 2, 3)            # => 6
-puts sum(1, 2, 3, 4, 5)     # => 15
-puts sum                      # => 0
-
-# *args ใน middle
-def wrap(first, *middle, last)
-  "[#{first}] #{middle.join(', ')} [#{last}]"
-end
-
-puts wrap("start", "a", "b", "c", "end")
-# => [start] a, b, c [end]
-
-# Splat ใน method call
-def add(a, b, c)
-  a + b + c
-end
-
-nums = [1, 2, 3]
-puts add(*nums)   # => 6 (splat ใน call)
-
-# Splat กับ Array operations
-first, *rest = [1, 2, 3, 4, 5]
-puts first         # => 1
-puts rest.inspect  # => [2, 3, 4, 5]
-
-*head, last = [1, 2, 3, 4, 5]
-puts head.inspect  # => [1, 2, 3, 4]
-puts last          # => 5
-
-a, *b, c = [1, 2, 3, 4, 5]
-puts a             # => 1
-puts b.inspect     # => [2, 3, 4]
-puts c             # => 5
-
-# Double splat (**) สำหรับ Hash
-def merge_options(base, **overrides)
-  base.merge(overrides)
-end
-
-defaults = { color: "blue", size: :medium }
-result = merge_options(defaults, color: "red", weight: 100)
-puts result.inspect
-# => {:color=>"red", :size=>:medium, :weight=>100}
-```
-
----
-
-## ขั้นตอนที่ 151: ทุก Parameter ในคราวเดียว
-
-```ruby
-# Ruby 2.7+: รองรับทุก argument types
-def complex_method(required, optional = "default", *args, keyword:, kw_default: "kw_def", **kwargs, &block)
-  puts "required: #{required}"
-  puts "optional: #{optional}"
-  puts "args: #{args.inspect}"
-  puts "keyword: #{keyword}"
-  puts "kw_default: #{kw_default}"
-  puts "kwargs: #{kwargs.inspect}"
-  puts "block: #{block.call}" if block
-end
-
-complex_method(
-  "req",          # required
-  "opt",          # optional
-  1, 2, 3,       # *args
-  keyword: "kw", # keyword:
-  extra: true,   # **kwargs
-  &-> { "block result" }  # &block
-)
-
-# ลำดับ parameters:
-# 1. required positional
-# 2. optional positional (with defaults)
-# 3. splat (*args)
-# 4. required keyword
-# 5. optional keyword (with defaults)
-# 6. double splat (**kwargs)
-# 7. block (&block)
-
-# Ruby 3.0: Separated positional and keyword arguments
-# ใน Ruby 2 บางกรณี hash สุดท้ายถูก treat เป็น keyword args
-# ใน Ruby 3 ต้องแยกชัดเจน
-```
-
----
-
-## ขั้นตอนที่ 152: Method Aliases
-
-```ruby
-class Calculator
-  def add(a, b)
-    a + b
-  end
-
-  # สร้าง alias
-  alias_method :plus, :add
-  alias :sum, :add
-end
-
-calc = Calculator.new
-puts calc.add(3, 4)    # => 7
-puts calc.plus(3, 4)   # => 7
-puts calc.sum(3, 4)    # => 7
-
-# alias ที่ built-in Ruby methods
-class Array
-  alias_method :size_alias, :size
-end
-
-arr = [1, 2, 3]
-puts arr.size         # => 3
-puts arr.size_alias   # => 3
-
-# alias ใน Module
-module Greetable
-  def greet(name)
-    "สวัสดี #{name}"
-  end
-
-  alias_method :hello, :greet
-  alias_method :hi, :greet
-end
-
-class Person
-  include Greetable
-
-  def initialize(name)
-    @name = name
-  end
-
-  def introduce
-    greet(@name)
-  end
-end
-
-person = Person.new("Alice")
-puts person.greet("Bob")    # => สวัสดี Bob
-puts person.hello("Bob")    # => สวัสดี Bob
-puts person.hi("Bob")       # => สวัสดี Bob
-
-# Method aliasing pattern: save original, override, call original
-class Logger
-  def log(message)
-    puts "[LOG] #{message}"
-  end
-end
-
-class TimestampLogger < Logger
-  alias_method :original_log, :log
-
-  def log(message)
-    original_log("[#{Time.now}] #{message}")
-  end
-end
-```
-
----
-
-## ขั้นตอนที่ 153: Method Visibility - public, private, protected
+## Step 157: Method Visibility — public, private, protected
 
 ```ruby
 class BankAccount
   def initialize(balance)
     @balance = balance
-    @owner = "Default Owner"
   end
 
-  # Public methods - accessible จากทุกที่
+  # public methods — เรียกจากนอก class ได้
   def deposit(amount)
-    validate_amount(amount)
+    validate_amount!(amount)
     @balance += amount
-    "เพิ่ม #{amount} บาท"
+    log_transaction("deposit", amount)
+    @balance
   end
 
   def withdraw(amount)
-    validate_amount(amount)
-    check_sufficient_funds(amount)
+    validate_amount!(amount)
+    check_sufficient_funds!(amount)
     @balance -= amount
-    "ถอน #{amount} บาท"
+    log_transaction("withdraw", amount)
+    @balance
   end
 
   def balance
     @balance
   end
 
-  # Protected methods - accessible จาก instance ของ class เดียวกัน
-  protected
-
-  def transfer_to(other_account, amount)
-    @balance -= amount
-    other_account.receive(amount)
-  end
-
-  def receive(amount)
-    @balance += amount
-  end
-
-  # Private methods - accessible เฉพาะใน instance เดียวกัน
   private
 
-  def validate_amount(amount)
-    raise ArgumentError, "จำนวนต้องเป็นบวก" unless amount > 0
+  # private methods — เรียกได้แค่ใน class เดียวกัน
+  def validate_amount!(amount)
+    raise ArgumentError, "จำนวนเงินต้องเป็นบวก" unless amount > 0
   end
 
-  def check_sufficient_funds(amount)
-    raise "เงินไม่พอ" if amount > @balance
+  def check_sufficient_funds!(amount)
+    raise "ยอดเงินไม่เพียงพอ" if amount > @balance
+  end
+
+  def log_transaction(type, amount)
+    puts "[LOG] #{type}: #{amount} บาท | ยอดคงเหลือ: #{@balance} บาท"
+  end
+
+  protected
+
+  # protected methods — เรียกได้จาก subclass และ instance เดียวกัน
+  def transfer_to(other_account, amount)
+    withdraw(amount)
+    other_account.deposit(amount)
   end
 end
 
 account = BankAccount.new(1000)
-puts account.deposit(500)     # => เพิ่ม 500 บาท
-puts account.balance          # => 1500
-# account.validate_amount(100)  # NoMethodError: private method
+puts account.deposit(500)   # 1500
+puts account.withdraw(200)  # 1300
 
-# Protected vs Private
-# Private: ไม่สามารถ call ด้วย explicit receiver (แม้แต่ self)
-# Protected: สามารถ call ด้วย instance อื่นของ class เดียวกัน
+# account.validate_amount!(100)  # NoMethodError: private method
+```
+
+### Private Method Ruby 2.7+ Style
+
+```ruby
+class User
+  def initialize(name, email)
+    @name = name
+    @email = email
+  end
+
+  def display
+    "#{formatted_name} <#{masked_email}>"
+  end
+
+  private def formatted_name  # Ruby 2.7+ inline private
+    @name.split.map(&:capitalize).join(" ")
+  end
+
+  private def masked_email
+    local, domain = @email.split("@")
+    "#{local[0]}***@#{domain}"
+  end
+end
+
+user = User.new("john doe", "johndoe@example.com")
+puts user.display  # John Doe <j***@example.com>
 ```
 
 ---
 
-## ขั้นตอนที่ 154: Private Methods แบบละเอียด
+## Step 158: Bang Methods (!) — Mutating Methods
 
 ```ruby
-class User
-  def initialize(name, age)
+# Bang methods มักแก้ไข object ที่เรียก (in-place)
+name = "hello world"
+puts name.upcase    # "HELLO WORLD" — คืนค่าใหม่, name ไม่เปลี่ยน
+puts name           # "hello world" — ยังเหมือนเดิม
+
+name.upcase!        # แก้ไข name โดยตรง
+puts name           # "HELLO WORLD"
+
+# ตัวอย่างกับ Array
+arr = [3, 1, 4, 1, 5, 9, 2, 6]
+sorted = arr.sort    # คืน array ใหม่
+puts arr.inspect     # [3, 1, 4, 1, 5, 9, 2, 6] — ยังเหมือนเดิม
+
+arr.sort!            # แก้ไข array ใน place
+puts arr.inspect     # [1, 1, 2, 3, 4, 5, 6, 9]
+
+# map vs map!
+numbers = [1, 2, 3, 4, 5]
+doubled = numbers.map { |n| n * 2 }    # คืน array ใหม่
+puts numbers.inspect                    # [1, 2, 3, 4, 5] — ไม่เปลี่ยน
+
+numbers.map! { |n| n * 2 }             # แก้ไข in-place
+puts numbers.inspect                    # [2, 4, 6, 8, 10]
+```
+
+### สร้าง Bang Methods เอง
+
+```ruby
+class Product
+  attr_accessor :name, :price, :stock
+
+  def initialize(name, price, stock)
     @name = name
-    @age = age
+    @price = price
+    @stock = stock
   end
 
-  def greeting
-    "สวัสดี! ฉันชื่อ #{@name}, #{format_age}"
+  # Non-bang: คืน object ใหม่
+  def apply_discount(percent)
+    new_price = @price * (1 - percent / 100.0)
+    Product.new(@name, new_price, @stock)
+  end
+
+  # Bang: แก้ไข object นี้
+  def apply_discount!(percent)
+    @price = @price * (1 - percent / 100.0)
+    self  # คืน self เพื่อให้ chain ได้
+  end
+
+  # Non-bang: คืน boolean
+  def save
+    # บันทึกไปยัง database
+    @id = SecureRandom.uuid
+    true
+  rescue
+    false
+  end
+
+  # Bang: raise error ถ้าล้มเหลว
+  def save!
+    save or raise "บันทึกไม่สำเร็จ: #{name}"
+  end
+end
+
+coffee = Product.new("กาแฟ", 100, 50)
+cheap_coffee = coffee.apply_discount(20)
+puts cheap_coffee.price  # 80.0
+puts coffee.price        # 100 — ยังเหมือนเดิม
+
+coffee.apply_discount!(20)
+puts coffee.price        # 80.0 — เปลี่ยนแล้ว!
+```
+
+---
+
+## Step 159: Predicate Methods (?) — Boolean Methods
+
+```ruby
+# Method ลงท้าย ? คืน true/false
+class User
+  def initialize(age, active, admin)
+    @age = age
+    @active = active
+    @admin = admin
   end
 
   def adult?
     @age >= 18
   end
 
-  # Inline private (Ruby 2.7+)
-  private def format_age
-    "อายุ #{@age} ปี"
-  end
-
-  private
-
-  def internal_method
-    "ใช้ภายในเท่านั้น"
-  end
-end
-
-user = User.new("Alice", 25)
-puts user.greeting    # => สวัสดี! ฉันชื่อ Alice, อายุ 25 ปี
-puts user.adult?      # => true
-# user.format_age     # => NoMethodError
-
-# Private method ใน Ruby 2.7+
-# สามารถ call ด้วย self. ได้แล้ว (ใน instance เดิม)
-class Calculator
-  def compute(x)
-    double(x) + triple(x)  # เรียก private methods
-  end
-
-  private
-
-  def double(n)
-    n * 2
-  end
-
-  def triple(n)
-    n * 3
-  end
-end
-
-puts Calculator.new.compute(5)   # => 25
-
-# Method ที่ private โดย default ใน Ruby
-# initialize
-# initialize_copy
-
-class Document
-  def initialize(title, content)
-    @title = title
-    @content = content
-  end
-  
-  # initialize เป็น private โดยอัตโนมัติ
-  # ไม่สามารถ call ได้โดยตรง
-end
-```
-
----
-
-## ขั้นตอนที่ 155: Bang Methods (!) และ Predicate Methods (?)
-
-```ruby
-# Bang methods (!) - เป็น convention ไม่ใช่ rule
-# มักหมายถึง: "อันตราย" หรือ "แก้ไข in-place"
-
-# ตัวอย่าง pairs ของ ! methods
-arr = [3, 1, 4, 1, 5, 9]
-
-sorted = arr.sort      # คืนค่า Array ใหม่
-arr.sort!              # แก้ไข arr in-place
-puts arr.inspect       # => [1, 1, 3, 4, 5, 9]
-
-str = "hello"
-upcased = str.upcase   # คืน String ใหม่
-str.upcase!            # แก้ไข str in-place
-puts str               # => HELLO
-
-# ! methods ใน Ruby standard library
-[1, nil, 2, nil, 3].compact   # คืนค่าใหม่
-[1, nil, 2, nil, 3].compact!  # in-place
-
-# สร้าง bang method เอง
-class TextProcessor
-  def initialize(text)
-    @text = text
-  end
-
-  def normalize
-    # คืน instance ใหม่ หรือ string ใหม่
-    TextProcessor.new(@text.strip.downcase)
-  end
-
-  def normalize!
-    # แก้ไข in-place
-    @text = @text.strip.downcase
-    self  # คืน self สำหรับ chaining
-  end
-
-  def to_s
-    @text
-  end
-end
-
-t = TextProcessor.new("  HELLO WORLD  ")
-puts t.normalize.to_s    # => hello world (t ไม่เปลี่ยน)
-puts t.to_s              # => "  HELLO WORLD  "
-t.normalize!
-puts t.to_s              # => "hello world"
-
-# Predicate methods (?) - คืนค่า boolean
-puts [].empty?            # => true
-puts "hello".include?("ell")  # => true
-puts 5.between?(1, 10)   # => true
-puts nil.nil?            # => true
-puts 3.odd?              # => true
-puts 4.even?             # => true
-puts "abc".start_with?("ab")  # => true
-puts "abc".end_with?("bc")    # => true
-
-# สร้าง predicate method เอง
-class User
-  def initialize(role, active)
-    @role = role
-    @active = active
-  end
-
-  def admin?
-    @role == :admin
-  end
-
   def active?
     @active
   end
 
-  def can_access?(resource)
-    active? && (admin? || resource.public?)
+  def admin?
+    @admin
+  end
+
+  def teenager?
+    (13..17).cover?(@age)
+  end
+
+  def can_access?(feature)
+    case feature
+    when :admin_panel  then admin?
+    when :reports      then active? && adult?
+    when :dashboard    then active?
+    else false
+    end
   end
 end
+
+user = User.new(25, true, false)
+puts user.adult?          # true
+puts user.active?         # true
+puts user.admin?          # false
+puts user.can_access?(:reports)    # true
+puts user.can_access?(:admin_panel) # false
+```
+
+### Built-in Predicate Methods
+
+```ruby
+# String
+puts "hello".empty?         # false
+puts "".empty?              # true
+puts "hello".include?("ll") # true
+puts "hello".start_with?("he") # true
+puts "hello".end_with?("lo")   # true
+
+# Array
+puts [].empty?              # true
+puts [1, 2, 3].any? { |n| n > 2 } # true
+puts [2, 4, 6].all?(&:even?)      # true
+
+# Numeric
+puts 5.zero?       # false
+puts 0.zero?       # true
+puts 5.positive?   # true
+puts (-3).negative? # true
+puts 4.even?       # true
+puts 5.odd?        # true
+puts 5.between?(1, 10) # true
+
+# Object
+puts nil.nil?      # true
+puts 5.nil?        # false
+puts 5.is_a?(Integer) # true
+puts 5.respond_to?(:to_s) # true
 ```
 
 ---
 
-## ขั้นตอนที่ 156: Method Objects
+## Step 160: Method Aliases — alias และ alias_method
 
 ```ruby
-# Method เป็น object ใน Ruby
-def greet(name)
-  "สวัสดี #{name}!"
+class Array
+  # alias สร้างชื่อเรียกแทนได้
+  alias_method :contains?, :include?
+  alias_method :size, :length
 end
 
-m = method(:greet)
-puts m.class           # => Method
-puts m.call("Alice")   # => สวัสดี Alice!
-puts m.("Bob")         # => สวัสดี Bob! (syntactic sugar)
+arr = [1, 2, 3, 4, 5]
+puts arr.contains?(3)  # true
+puts arr.size          # 5
 
-# ส่ง method เป็น argument
-names = ["Alice", "Bob", "Carol"]
-puts names.map(&method(:greet)).inspect
-# => ["สวัสดี Alice!", "สวัสดี Bob!", "สวัสดี Carol!"]
-
-# Method object จาก instance
-class Calculator
-  def double(n)
-    n * 2
+# alias keyword (แบบเก่า)
+class String
+  alias old_reverse reverse
+  
+  def reverse
+    super.swapcase  # override แต่ยังใช้ original ได้ผ่าน old_reverse
   end
+end
+
+# สร้าง aliases ใน class เอง
+class Calculator
+  def add(a, b)
+    a + b
+  end
+  alias plus add  # plus เป็น alias ของ add
+  alias :sum :add # รูปแบบ symbol
 end
 
 calc = Calculator.new
-double_method = calc.method(:double)
-puts [1, 2, 3].map(&double_method).inspect   # => [2, 4, 6]
+puts calc.add(3, 4)   # 7
+puts calc.plus(3, 4)  # 7
+puts calc.sum(3, 4)   # 7
+```
 
-# UnboundMethod - method ที่ไม่ผูกกับ instance
-unbound = Calculator.instance_method(:double)
-puts unbound.class   # => UnboundMethod
+### เหตุที่ใช้ alias_method
 
-bound = unbound.bind(Calculator.new)
-puts bound.call(5)   # => 10
+```ruby
+class EmailNotifier
+  def send_notification(message)
+    # ส่ง email
+    puts "Email: #{message}"
+  end
+  
+  # สร้าง alias เพื่อ backward compatibility
+  alias_method :notify, :send_notification
+  alias_method :alert,  :send_notification
+end
 
-# Method#to_proc
-m = "hello".method(:upcase)
-puts m.to_proc.call   # => HELLO
-
-# Proc ของ built-in methods
-puts [1, -2, 3, -4].select(&method(:positive?))   # ไม่ทำงาน
-puts [1, -2, 3, -4].map(&:abs).inspect   # => [1, 2, 3, 4]
+notifier = EmailNotifier.new
+notifier.send_notification("ประชุม")  # Email: ประชุม
+notifier.notify("ประชุม")            # Email: ประชุม
+notifier.alert("ประชุม")             # Email: ประชุม
 ```
 
 ---
 
-## ขั้นตอนที่ 157: Recursive Methods
+## Step 161: Method Objects — method(:name)
 
 ```ruby
-# Recursion - method เรียกตัวเอง
+# Method ใน Ruby เป็น object ได้!
+def square(n)
+  n ** 2
+end
+
+m = method(:square)
+puts m.class      # Method
+puts m.call(5)    # 25
+puts m.(5)        # 25 (shorthand)
+puts m[5]         # 25 (shorthand)
+
+# Method object มี arity
+puts m.arity  # 1
+
+# ใช้กับ built-in methods
+upcase_method = "hello".method(:upcase)
+puts upcase_method.call  # HELLO
+
+# map ด้วย method object
+numbers = [1, 2, 3, 4, 5]
+squares = numbers.map(&method(:square))
+puts squares.inspect  # [1, 4, 9, 16, 25]
+```
+
+### UnboundMethod
+
+```ruby
+# UnboundMethod: method ที่ยังไม่ผูกกับ object
+class Greeter
+  def hello
+    "Hello, I'm #{@name}"
+  end
+end
+
+unbound = Greeter.instance_method(:hello)
+puts unbound.class  # UnboundMethod
+
+# ต้อง bind กับ object ก่อนเรียก
+alice = Greeter.new
+alice.instance_variable_set(:@name, "Alice")
+bound = unbound.bind(alice)
+puts bound.call  # Hello, I'm Alice
+```
+
+---
+
+## Step 162: Passing Methods as Blocks (&method(:name))
+
+```ruby
+# & แปลง method เป็น block
+numbers = [-3, -1, 0, 2, 4, 6]
+
+# แบบปกติ
+positives = numbers.select { |n| n.positive? }
+
+# ด้วย method object
+positives = numbers.select(&method(:positive?))  # ถ้า positive? เป็น method
+
+# ด้วย Symbol#to_proc
+positives = numbers.select(&:positive?)  # สั้นกว่า!
+puts positives.inspect  # [2, 4, 6]
+
+# ตัวอย่างการใช้
+words = ["hello", "WORLD", "ruby", "PROGRAMMING"]
+
+# แบบปกติ
+upcased = words.map { |w| w.upcase }
+
+# ด้วย Symbol#to_proc
+upcased = words.map(&:upcase)
+puts upcased.inspect  # ["HELLO", "WORLD", "RUBY", "PROGRAMMING"]
+
+# map กับ custom method
+def double(n)
+  n * 2
+end
+
+numbers = [1, 2, 3, 4, 5]
+puts numbers.map(&method(:double)).inspect  # [2, 4, 6, 8, 10]
+```
+
+### Symbol to Proc (&:method_name)
+
+```ruby
+# & บน symbol เรียก to_proc เพื่อสร้าง block
+# :upcase เหมือนกับ { |s| s.upcase }
+# :to_i เหมือนกับ { |s| s.to_i }
+
+["1", "2", "3"].map(&:to_i)     # [1, 2, 3]
+[1, 2, 3].map(&:to_s)           # ["1", "2", "3"]
+["a", "b", "c"].map(&:upcase)   # ["A", "B", "C"]
+[1, nil, 2, nil, 3].compact     # [1, 2, 3]
+[1, nil, 2, nil, 3].select(&:itself)  # [1, 2, 3]
+```
+
+---
+
+## Step 163: Recursive Methods — การเรียกตัวเอง
+
+```ruby
+# Factorial
 def factorial(n)
   return 1 if n <= 1
   n * factorial(n - 1)
 end
 
-puts factorial(5)   # => 120
-puts factorial(10)  # => 3628800
+puts factorial(5)  # 120
+puts factorial(10) # 3628800
 
-# Fibonacci recursive
-def fibonacci(n)
+# Fibonacci
+def fib(n)
   return n if n <= 1
-  fibonacci(n - 1) + fibonacci(n - 2)
+  fib(n - 1) + fib(n - 2)
 end
 
-puts fibonacci(10)  # => 55
-# หมายเหตุ: การ implement นี้ช้ามาก O(2^n)
-
-# Fibonacci ด้วย memoization
-def fibonacci_memo(n, memo = {})
-  return n if n <= 1
-  memo[n] ||= fibonacci_memo(n - 1, memo) + fibonacci_memo(n - 2, memo)
-end
-
-puts fibonacci_memo(50)  # => 12586269025
-
-# Binary Search recursive
-def binary_search(arr, target, low = 0, high = arr.length - 1)
-  return -1 if low > high
-  mid = (low + high) / 2
-
-  case arr[mid] <=> target
-  when 0 then mid
-  when -1 then binary_search(arr, target, mid + 1, high)
-  when 1 then binary_search(arr, target, low, mid - 1)
-  end
-end
-
-sorted = [1, 3, 5, 7, 9, 11, 13, 15]
-puts binary_search(sorted, 7)    # => 3
-puts binary_search(sorted, 6)    # => -1
+puts fib(10)  # 55
+# หมายเหตุ: naive recursion ช้า ใช้ memoization แทน
 
 # Tower of Hanoi
 def hanoi(n, from = "A", to = "C", via = "B")
-  if n == 1
-    puts "ย้ายจาก #{from} ไป #{to}"
-    return
-  end
+  return if n == 0
   hanoi(n - 1, from, via, to)
-  puts "ย้ายจาก #{from} ไป #{to}"
+  puts "เคลื่อน disk #{n} จาก #{from} ไป #{to}"
   hanoi(n - 1, via, to, from)
 end
 
 hanoi(3)
+# เคลื่อน disk 1 จาก A ไป C
+# เคลื่อน disk 2 จาก A ไป B
+# เคลื่อน disk 1 จาก C ไป B
+# เคลื่อน disk 3 จาก A ไป C
+# เคลื่อน disk 1 จาก B ไป A
+# เคลื่อน disk 2 จาก B ไป C
+# เคลื่อน disk 1 จาก A ไป C
+```
 
-# Flatten recursive
-def my_flatten(arr)
+### Recursion กับ Accumulator (Tail Recursion Pattern)
+
+```ruby
+# ปกติ Ruby ไม่ optimize tail recursion แต่เขียนให้ชัดเจนได้
+def factorial_tail(n, acc = 1)
+  return acc if n <= 1
+  factorial_tail(n - 1, n * acc)
+end
+
+puts factorial_tail(10)  # 3628800
+
+# Flatten ด้วย recursion
+def deep_flatten(arr)
   arr.each_with_object([]) do |item, result|
     if item.is_a?(Array)
-      result.concat(my_flatten(item))
+      result.concat(deep_flatten(item))
     else
       result << item
     end
   end
 end
 
-puts my_flatten([1, [2, [3, [4]]]]).inspect   # => [1, 2, 3, 4]
+puts deep_flatten([1, [2, [3, [4, 5]], 6]]).inspect  # [1, 2, 3, 4, 5, 6]
 ```
 
 ---
 
-## ขั้นตอนที่ 158: Method Chaining
+## Step 164: Method Chaining — เชื่อม Methods ต่อกัน
 
 ```ruby
-# Method chaining - เรียก methods ต่อ ๆ กัน
+# Method chaining ทำได้เมื่อ method คืน self หรือ object ที่มี method ต่อ
+
+# String chaining
+"  hello world  ".strip.split.map(&:capitalize).join(" ")
+# => "Hello World"
+
+# Array chaining
+[1, 2, 3, 4, 5]
+  .map { |n| n * 2 }
+  .select { |n| n > 4 }
+  .sum
+# => 24
+
+# สร้าง class ที่ chain ได้
 class QueryBuilder
   def initialize
+    @table = nil
     @conditions = []
     @order = nil
-    @limit_val = nil
-    @table = nil
+    @limit = nil
   end
 
   def from(table)
     @table = table
-    self  # คืน self เพื่อ chaining
+    self  # คืน self เพื่อให้ chain ได้
   end
 
   def where(condition)
@@ -743,994 +1051,851 @@ class QueryBuilder
     self
   end
 
-  def order(field, direction = :asc)
-    @order = "#{field} #{direction.to_s.upcase}"
+  def order_by(column, direction = :asc)
+    @order = "#{column} #{direction.upcase}"
     self
   end
 
   def limit(n)
-    @limit_val = n
+    @limit = n
     self
   end
 
-  def build
+  def to_sql
     sql = "SELECT * FROM #{@table}"
     sql += " WHERE #{@conditions.join(' AND ')}" unless @conditions.empty?
     sql += " ORDER BY #{@order}" if @order
-    sql += " LIMIT #{@limit_val}" if @limit_val
+    sql += " LIMIT #{@limit}" if @limit
     sql
   end
 end
 
 query = QueryBuilder.new
-  .from("users")
-  .where("age > 18")
-  .where("active = true")
-  .order(:name)
-  .limit(10)
-  .build
+          .from("users")
+          .where("age >= 18")
+          .where("active = true")
+          .order_by(:name)
+          .limit(10)
+          .to_sql
 
 puts query
-# => SELECT * FROM users WHERE age > 18 AND active = true ORDER BY name ASC LIMIT 10
-
-# String method chaining
-result = "  hello world  "
-  .strip
-  .split
-  .map(&:capitalize)
-  .join(" ")
-puts result   # => Hello World
-
-# Array method chaining
-top_earners = [
-  { name: "Alice", salary: 80000 },
-  { name: "Bob", salary: 60000 },
-  { name: "Carol", salary: 90000 },
-  { name: "Dave", salary: 55000 }
-]
-  .select { |e| e[:salary] > 60000 }
-  .sort_by { |e| -e[:salary] }
-  .map { |e| e[:name] }
-
-puts top_earners.inspect   # => ["Carol", "Alice"]
+# SELECT * FROM users WHERE age >= 18 AND active = true ORDER BY name ASC LIMIT 10
 ```
 
 ---
 
-## ขั้นตอนที่ 159: Memoization
+## Step 165: Memoization Pattern — Cache Results
 
 ```ruby
-# Memoization - cache ผลลัพธ์เพื่อไม่ต้องคำนวณซ้ำ
-
-# วิธีที่ 1: ||=
-class Calculator
-  def fibonacci(n)
-    @memo ||= {}
-    @memo[n] ||= if n <= 1
-      n
-    else
-      fibonacci(n - 1) + fibonacci(n - 2)
-    end
-  end
-end
-
-calc = Calculator.new
-puts calc.fibonacci(50)   # => คำนวณเร็วมาก!
-
-# วิธีที่ 2: Instance variable
-class DataFetcher
-  def user_count
-    @user_count ||= expensive_db_query
-  end
-
-  def product_list
-    @product_list ||= fetch_from_api
-  end
-
-  private
-
-  def expensive_db_query
-    sleep(1)  # simulate slow query
-    1000
-  end
-
-  def fetch_from_api
-    sleep(2)  # simulate API call
-    ["product1", "product2"]
-  end
-end
-
-# วิธีที่ 3: Hash-based memoization
-module Memoizable
-  def memoize(method_name)
-    original = instance_method(method_name)
-    cache_var = "@_memo_#{method_name}"
-
-    define_method(method_name) do |*args|
-      cache = instance_variable_get(cache_var) || instance_variable_set(cache_var, {})
-      cache[args] ||= original.bind(self).call(*args)
-    end
-  end
-end
-
-class ExpensiveCalculator
-  extend Memoizable
-
-  def complex_calculation(n)
-    puts "กำลังคำนวณ #{n}..."
-    n ** 3
-  end
-
-  memoize :complex_calculation
-end
-
-calc = ExpensiveCalculator.new
-puts calc.complex_calculation(5)   # => กำลังคำนวณ 5... => 125
-puts calc.complex_calculation(5)   # => 125 (ไม่คำนวณซ้ำ)
-puts calc.complex_calculation(3)   # => กำลังคำนวณ 3... => 27
-```
-
----
-
-## ขั้นตอนที่ 160: Method Missing และ respond_to_missing?
-
-```ruby
-# method_missing - จัดการ method ที่ไม่มี
-class DynamicProxy
-  def initialize(target)
-    @target = target
-  end
-
-  def method_missing(name, *args, &block)
-    if @target.respond_to?(name)
-      puts "Calling #{name} on target"
-      @target.send(name, *args, &block)
-    else
-      super  # ส่งต่อไปยัง default behavior
-    end
-  end
-
-  def respond_to_missing?(name, include_private = false)
-    @target.respond_to?(name, include_private) || super
-  end
-end
-
-proxy = DynamicProxy.new([1, 2, 3])
-puts proxy.length       # => Calling length on target => 3
-puts proxy.map { |x| x * 2 }.inspect   # => [2, 4, 6]
-
-# Dynamic Finder (Rails style)
-class Database
+# Memoization คือการ cache ผลลัพธ์ของการคำนวณ
+class Fibonacci
   def initialize
-    @data = {
-      users: [
-        { id: 1, name: "Alice", role: "admin" },
-        { id: 2, name: "Bob", role: "user" }
-      ]
-    }
+    @cache = {}
   end
 
+  def calculate(n)
+    return n if n <= 1
+    @cache[n] ||= calculate(n - 1) + calculate(n - 2)
+  end
+end
+
+fib = Fibonacci.new
+puts fib.calculate(50)  # 12586269025 (เร็วมาก!)
+
+# Memoization ด้วย ||=
+class ExpensiveCalculator
+  def initialize(data)
+    @data = data
+  end
+
+  def result
+    @result ||= compute_expensive_result
+  end
+
+  def summary
+    @summary ||= build_summary
+  end
+
+  private
+
+  def compute_expensive_result
+    puts "กำลังคำนวณ..." 
+    @data.map { |x| x ** 3 }.sum
+  end
+
+  def build_summary
+    puts "กำลังสร้าง summary..."
+    { total: result, count: @data.length, average: result.to_f / @data.length }
+  end
+end
+
+calc = ExpensiveCalculator.new([1, 2, 3, 4, 5])
+puts calc.result  # กำลังคำนวณ... 225
+puts calc.result  # 225 (ไม่คำนวณซ้ำ!)
+puts calc.summary.inspect  # กำลังสร้าง summary... {:total=>225, :count=>5, :average=>45.0}
+```
+
+### Thread-safe Memoization
+
+```ruby
+# ใน multi-threaded environment ต้องระวัง
+class SafeMemoizer
+  def initialize
+    @mutex = Mutex.new
+    @cache = {}
+  end
+
+  def fetch(key, &computation)
+    @cache[key] || @mutex.synchronize do
+      @cache[key] ||= computation.call
+    end
+  end
+end
+```
+
+---
+
+## Step 166–170: Advanced Method Patterns
+
+### Step 166: Method Missing
+
+```ruby
+class FlexibleHash
+  def initialize
+    @data = {}
+  end
+
+  # เรียก method ที่ไม่มี
   def method_missing(name, *args)
-    if name.to_s =~ /^find_(\w+)_by_(\w+)$/
-      table = $1.to_sym
-      field = $2.to_sym
-      value = args.first
-      @data[table]&.find { |r| r[field] == value }
+    key = name.to_s
+    
+    if key.end_with?("=")
+      # setter: obj.name = "Alice"
+      @data[key.chomp("=")] = args.first
+    elsif key.end_with?("?")
+      # predicate: obj.admin?
+      !@data[key.chomp("?")].nil?
     else
-      super
+      # getter: obj.name
+      @data[key]
     end
   end
 
   def respond_to_missing?(name, include_private = false)
-    name.to_s =~ /^find_\w+_by_\w+$/ || super
+    true
   end
 end
 
-db = Database.new
-puts db.find_users_by_name("Alice").inspect
-# => {:id=>1, :name=>"Alice", :role=>"admin"}
-puts db.find_users_by_role("user").inspect
-# => {:id=>2, :name=>"Bob", :role=>"user"}
+person = FlexibleHash.new
+person.name = "Alice"
+person.age = 30
+person.admin = true
+
+puts person.name    # Alice
+puts person.age     # 30
+puts person.admin?  # true
+puts person.email?  # false
 ```
 
----
-
-## ขั้นตอนที่ 161: define_method
+### Step 167: Callable Objects
 
 ```ruby
-# define_method - สร้าง method โดยใช้ string/symbol
-class MyClass
-  # สร้าง methods dynamically
-  %w[red green blue].each do |color|
-    define_method("#{color}_text") do |text|
-      "\e[#{case color when 'red' then 31 when 'green' then 32 else 34 end}m#{text}\e[0m"
-    end
-  end
-end
+# Ruby มีหลายวิธีในการสร้าง callable objects
 
-obj = MyClass.new
-# puts obj.red_text("Error!")   # แสดงเป็นสีแดง
-# puts obj.green_text("OK!")    # แสดงเป็นสีเขียว
+# 1. Method object
+def double(n) = n * 2
+m = method(:double)
+m.call(5)  # 10
 
-# สร้าง getters/setters dynamically
-class Config
-  SETTINGS = %i[host port database username]
+# 2. Proc
+p = Proc.new { |n| n * 2 }
+p.call(5)  # 10
 
-  SETTINGS.each do |setting|
-    define_method(setting) { instance_variable_get("@#{setting}") }
-    define_method("#{setting}=") { |val| instance_variable_set("@#{setting}", val) }
-  end
+# 3. Lambda
+l = lambda { |n| n * 2 }
+l.call(5)  # 10
 
-  def initialize(opts = {})
-    opts.each { |k, v| send("#{k}=", v) if SETTINGS.include?(k) }
-  end
-end
+# 4. Stabby lambda
+sl = ->(n) { n * 2 }
+sl.call(5)  # 10
 
-config = Config.new(host: "localhost", port: 5432, database: "myapp")
-puts config.host      # => localhost
-puts config.port      # => 5432
-config.database = "newdb"
-puts config.database  # => newdb
-
-# define_method กับ closure
-def create_multiplier(factor)
-  define_method("multiply_by_#{factor}") do |n|
-    n * factor
-  end
-end
-
-class Calculator
-end
-
-calc = Calculator.new
-# create_multiplier บน Calculator...
-# หรือใช้ lambda
-multiplier = ->(factor) { ->(n) { n * factor } }
-double = multiplier.(2)
-puts double.(5)   # => 10
-```
-
----
-
-## ขั้นตอนที่ 162: Methods with Blocks (yield และ block_given?)
-
-```ruby
-# Accepting blocks
-def repeat(n)
-  n.times { yield }
-end
-
-repeat(3) { puts "Hello!" }
-# => Hello! x 3
-
-# block_given? - ตรวจสอบว่ามี block ส่งมา
-def greet(name)
-  if block_given?
-    yield name
-  else
-    "สวัสดี #{name}"
-  end
-end
-
-puts greet("Alice")                     # => สวัสดี Alice
-puts greet("Bob") { |n| "Hi #{n}!" }   # => Hi Bob!
-
-# yield ด้วยข้อมูล
-def transform(data)
-  if block_given?
-    yield data
-  else
-    data
-  end
-end
-
-puts transform([1, 2, 3]) { |a| a.map { |n| n * 2 } }.inspect
-# => [2, 4, 6]
-
-# &block - explicit block parameter
-def log_time(&block)
-  start = Time.now
-  result = block.call
-  elapsed = Time.now - start
-  puts "ใช้เวลา: #{elapsed.round(4)} วินาที"
-  result
-end
-
-result = log_time { (1..1000).to_a.map { |n| n ** 2 }.sum }
-puts result
-
-# ส่ง block ต่อ
-def wrapper(&block)
-  puts "ก่อน"
-  inner(&block)
-  puts "หลัง"
-end
-
-def inner
-  puts "ใน inner"
-  yield
-end
-
-wrapper { puts "Block content" }
-```
-
----
-
-## ขั้นตอนที่ 163: Method Access Control Detail
-
-```ruby
-# attr_accessor, attr_reader, attr_writer
-class Person
-  attr_accessor :name    # getter + setter
-  attr_reader :age       # getter only
-  attr_writer :email     # setter only
-
-  def initialize(name, age, email)
-    @name = name
-    @age = age
-    @email = email
-  end
-
-  def info
-    "#{@name}, #{@age} years"
-  end
-
-  private :info  # ทำ method ที่มีอยู่ให้ private
-end
-
-p = Person.new("Alice", 25, "alice@example.com")
-puts p.name        # => Alice (getter)
-p.name = "Bob"     # (setter)
-puts p.age         # => 25 (getter)
-# p.age = 30      # NoMethodError
-p.email = "new@example.com"  # (setter)
-# p.email          # NoMethodError (no getter)
-
-# module_function
-module MathHelper
-  module_function  # เป็นทั้ง instance method และ module method
-
-  def square(n)
-    n ** 2
-  end
-
-  def cube(n)
-    n ** 3
-  end
-end
-
-puts MathHelper.square(4)   # => 16 (as module method)
-puts MathHelper.cube(3)     # => 27
-
-include MathHelper
-puts square(5)   # => 25 (as instance method)
-
-# protected - สำหรับ comparison
-class Temperature
-  include Comparable
-
-  def initialize(degrees)
-    @degrees = degrees
-  end
-
-  def <=>(other)
-    degrees <=> other.degrees
-  end
-
-  protected
-
-  def degrees
-    @degrees
-  end
+# ทุกตัว respond to call
+[m, p, l, sl].each do |callable|
+  puts callable.call(5)  # 10 ทั้งหมด
 end
 ```
 
----
-
-## ขั้นตอนที่ 164: Proc การส่ง methods เป็น Arguments
+### Step 168: Method Decoration Pattern
 
 ```ruby
-# Symbol#to_proc - แปลง symbol เป็น proc
-# :method_name.to_proc เทียบกับ { |x| x.method_name }
-
-names = ["alice", "bob", "carol"]
-
-# ยาว
-upcase_names = names.map { |n| n.upcase }
-
-# สั้นกว่า
-upcase_names = names.map(&:upcase)
-
-# works with any method
-puts [1, 2, 3].map(&:to_s).inspect     # => ["1", "2", "3"]
-puts [-1, 2, -3].map(&:abs).inspect    # => [1, 2, 3]
-puts [1, 2, 3].select(&:odd?).inspect  # => [1, 3]
-
-# method(:name) - สำหรับ methods ที่ต้อง argument
-def double(n)
-  n * 2
-end
-
-puts [1, 2, 3].map(&method(:double)).inspect   # => [2, 4, 6]
-
-# Chaining กับ &:method
-result = ["  hello  ", "  world  ", "  ruby  "]
-  .map(&:strip)
-  .map(&:capitalize)
-  .sort
-puts result.inspect   # => ["Hello", "Ruby", "World"]
-
-# Higher-order methods
-def apply_twice(func, value)
-  func.call(func.call(value))
-end
-
-double_func = method(:double)
-puts apply_twice(double_func, 3)   # => 12
-
-# Passing method references
-sorters = {
-  by_name: ->(a, b) { a[:name] <=> b[:name] },
-  by_age: ->(a, b) { a[:age] <=> b[:age] },
-  by_salary: ->(a, b) { b[:salary] <=> a[:salary] }  # descending
-}
-
-people = [
-  { name: "Charlie", age: 35, salary: 70000 },
-  { name: "Alice", age: 25, salary: 80000 },
-  { name: "Bob", age: 30, salary: 60000 }
-]
-
-people.sort(&sorters[:by_name]).each { |p| puts p[:name] }
-```
-
----
-
-## ขั้นตอนที่ 165: Callable Objects
-
-```ruby
-# Objects ที่ callable ได้ต้องมี #call method
-# Proc, Lambda, Method ล้วนเป็น callable
-
-# Proc
-double_proc = Proc.new { |n| n * 2 }
-puts double_proc.call(5)   # => 10
-puts double_proc.(5)        # => 10
-puts double_proc[5]         # => 10
-
-# Lambda
-double_lambda = lambda { |n| n * 2 }
-# หรือ
-double_lambda2 = ->(n) { n * 2 }
-puts double_lambda.call(5)   # => 10
-
-# Method
-def triple(n)
-  n * 3
-end
-
-triple_method = method(:triple)
-puts triple_method.call(5)   # => 15
-
-# Custom callable class
-class Formatter
-  def initialize(template)
-    @template = template
-  end
-
-  def call(data)
-    @template % data
-  end
-end
-
-currency_formatter = Formatter.new("฿%,d")
-puts currency_formatter.(50000)   # => ฿50,000
-
-# ใช้ callable objects ใน higher-order programming
-def process_numbers(numbers, *operations)
-  operations.reduce(numbers) do |nums, op|
-    nums.map { |n| op.call(n) }
-  end
-end
-
-result = process_numbers(
-  [1, 2, 3, 4, 5],
-  method(:double),   # ไม่มี method double ในตัวอย่างนี้
-  ->(n) { n + 1 },
-  ->(n) { n * 3 }
-)
-```
-
----
-
-## ขั้นตอนที่ 166-170: Advanced Method Concepts
-
-```ruby
-# ขั้นตอนที่ 166: Method Introspection
-class MyClass
-  def public_method; end
-  protected
-  def protected_method; end
-  private
-  def private_method; end
-end
-
-obj = MyClass.new
-puts obj.methods.sort.first(5).inspect
-puts obj.public_methods(false).inspect
-puts obj.protected_methods(false).inspect
-puts obj.private_methods(false).inspect
-
-puts obj.respond_to?(:public_method)    # => true
-puts obj.respond_to?(:private_method)  # => false
-puts obj.respond_to?(:private_method, true)  # => true (include private)
-
-# ขั้นตอนที่ 167: send
-class Greeter
-  private
-
-  def secret_greet(name)
-    "ลับมาก! สวัสดี #{name}"
-  end
-end
-
-g = Greeter.new
-puts g.send(:secret_greet, "Alice")   # send สามารถ call private methods
-# g.public_send(:secret_greet, "Alice")  # NoMethodError
-
-# ขั้นตอนที่ 168: Method Wrapping (Decorator pattern)
-module Timing
+# เพิ่มความสามารถให้ method โดยไม่แก้ต้นฉบับ
+module Logging
   def self.included(base)
-    base.instance_methods(false).each do |method|
-      original = instance_method(method)
-      define_method(method) do |*args, &block|
-        start = Time.now
+    base.instance_methods(false).each do |method_name|
+      original = base.instance_method(method_name)
+      base.define_method(method_name) do |*args, &block|
+        puts "[LOG] Calling #{method_name}(#{args.inspect})"
         result = original.bind(self).call(*args, &block)
-        puts "#{method} ใช้เวลา #{Time.now - start} วินาที"
+        puts "[LOG] #{method_name} returned #{result.inspect}"
         result
       end
     end
   end
 end
 
-# ขั้นตอนที่ 169: Functional Composition
-double = ->(n) { n * 2 }
-increment = ->(n) { n + 1 }
-
-# compose กับ >> และ << (Ruby 2.6+)
-double_then_increment = double >> increment
-increment_then_double = double << increment
-
-puts double_then_increment.(5)   # => 11 (5*2+1)
-puts increment_then_double.(5)   # => 12 (5+1)*2
-
-# ขั้นตอนที่ 170: Curry
-add = ->(a, b) { a + b }
-add5 = add.curry.(5)   # partial application
-
-puts add5.(3)    # => 8
-puts add5.(10)   # => 15
-
-multiply = ->(a, b) { a * b }
-triple = multiply.curry.(3)
-
-puts [1, 2, 3, 4, 5].map(&triple).inspect
-# => [3, 6, 9, 12, 15]
-```
-
----
-
-## แบบฝึกหัด (ขั้นตอนที่ 146-170)
-
-### ข้อที่ 1: Method ที่รองรับ Multiple Input Formats
-
-```ruby
-# เฉลย
-def parse_date(input)
-  case input
-  when String
-    parts = input.split(/[-\/]/).map(&:to_i)
-    Date.new(*parts) rescue "Invalid date format"
-  when Array
-    Date.new(*input) rescue "Invalid date array"
-  when Hash
-    Date.new(input[:year], input[:month], input[:day]) rescue "Invalid date hash"
-  else
-    raise ArgumentError, "Unsupported input type"
-  end
-end
-```
-
-### ข้อที่ 2: Pipeline สำหรับ Text Processing
-
-```ruby
-# เฉลย
-class TextPipeline
-  def initialize(text)
-    @text = text
-    @operations = []
-  end
-
-  def strip
-    @operations << :strip
-    self
-  end
-
-  def downcase
-    @operations << :downcase
-    self
-  end
-
-  def remove_punctuation
-    @operations << ->(t) { t.gsub(/[^\w\s]/, '') }
-    self
-  end
-
-  def split_words
-    @operations << :split
-    self
-  end
-
-  def process
-    @operations.reduce(@text) do |text, op|
-      case op
-      when Symbol then text.send(op)
-      when Proc then op.call(text)
-      end
-    end
-  end
-end
-
-result = TextPipeline.new("  Hello, World! This is Ruby.  ")
-  .strip
-  .downcase
-  .remove_punctuation
-  .split_words
-  .process
-
-puts result.inspect
-# => ["hello", "world", "this", "is", "ruby"]
-```
-
-### ข้อที่ 3: Retry Logic
-
-```ruby
-# เฉลย
-def with_retry(max_attempts: 3, wait: 1, exceptions: [StandardError])
-  attempts = 0
-  begin
-    attempts += 1
-    yield attempts
-  rescue *exceptions => e
-    puts "Attempt #{attempts} failed: #{e.message}"
-    if attempts < max_attempts
-      sleep(wait)
-      retry
-    else
-      raise "Failed after #{max_attempts} attempts: #{e.message}"
-    end
-  end
-end
-
-# ใช้งาน:
-result = with_retry(max_attempts: 3) do |attempt|
-  raise "Simulated error" if attempt < 3
-  "Success on attempt #{attempt}"
-end
-puts result
-```
-
-### ข้อที่ 4: Memoized Fibonacci
-
-```ruby
-# เฉลย
-class FibonacciCalculator
-  def initialize
-    @cache = { 0 => 0, 1 => 1 }
-  end
-
-  def compute(n)
-    @cache[n] ||= compute(n - 1) + compute(n - 2)
-  end
-
-  def sequence(n)
-    (0..n).map { |i| compute(i) }
-  end
-end
-
-calc = FibonacciCalculator.new
-puts calc.sequence(15).inspect
-```
-
-### ข้อที่ 5: Flexible Logger
-
-```ruby
-# เฉลย
-class Logger
-  LEVELS = { debug: 0, info: 1, warn: 2, error: 3, fatal: 4 }
-
-  def initialize(min_level: :info, prefix: nil)
-    @min_level = min_level
-    @prefix = prefix
-    @logs = []
-  end
-
-  LEVELS.each do |level, value|
-    define_method(level) do |message|
-      log(level, message)
-    end
-  end
-
-  private
-
-  def log(level, message)
-    return unless LEVELS[level] >= LEVELS[@min_level]
-    entry = {
-      level: level,
-      message: "#{@prefix ? "[#{@prefix}] " : ''}#{message}",
-      time: Time.now
-    }
-    @logs << entry
-    puts "[#{level.upcase}] #{entry[:message]}"
-  end
-end
-
-logger = Logger.new(min_level: :info, prefix: "APP")
-logger.debug("ไม่แสดง")
-logger.info("เริ่มระบบ")
-logger.warn("ระวัง!")
-logger.error("เกิดข้อผิดพลาด")
-```
-
-### ข้อที่ 6-25: แบบฝึกหัดเพิ่มเติม
-
-```ruby
-# ข้อ 6: Decorator Method
-def memoize(func)
-  cache = {}
-  ->(n) { cache[n] ||= func.call(n) }
-end
-
-slow_square = ->(n) { sleep(0.01); n ** 2 }
-fast_square = memoize(slow_square)
-puts fast_square.(5)   # => 25 (คำนวณ)
-puts fast_square.(5)   # => 25 (cache)
-
-# ข้อ 7: Compose Functions
-def compose(*funcs)
-  funcs.reduce { |f, g| ->(x) { f.(g.(x)) } }
-end
-
-pipeline = compose(
-  ->(x) { x * 2 },
-  ->(x) { x + 1 },
-  ->(x) { x ** 2 }
-)
-puts pipeline.(3)   # => (3^2 + 1) * 2 = 20
-
-# ข้อ 8: Safe Division
-def safe_divide(a, b, default: nil)
-  return default if b.zero?
-  a.to_f / b
-rescue => e
-  default
-end
-
-puts safe_divide(10, 2)          # => 5.0
-puts safe_divide(10, 0)          # => nil
-puts safe_divide(10, 0, default: 0)  # => 0
-
-# ข้อ 9: Named Parameters Validator
-def validated_method(name:, age: nil, email: nil)
-  errors = []
-  errors << "ชื่อต้องมีอย่างน้อย 2 ตัวอักษร" if name.length < 2
-  errors << "อายุต้อง 0-120" if age && !(0..120).include?(age)
-  errors << "Email ไม่ถูกต้อง" if email && !email.include?("@")
+class Calculator
+  def add(a, b) = a + b
+  def multiply(a, b) = a * b
   
-  return yield(name, age, email) if errors.empty? && block_given?
-  errors.empty? ? { success: true } : { success: false, errors: errors }
+  # include หลัง method definitions
+  include Logging
 end
 
-result = validated_method(name: "A")
-puts result.inspect   # => {:success=>false, :errors=>["ชื่อต้องมีอย่างน้อย 2 ตัวอักษร"]}
+calc = Calculator.new
+calc.add(3, 4)
+# [LOG] Calling add([3, 4])
+# [LOG] add returned 7
+```
 
-# ข้อ 10: Fluent Interface
-class EmailBuilder
-  def initialize
-    @to = []
-    @cc = []
-    @subject = ""
-    @body = ""
-  end
+### Step 169: Functional Methods
 
-  def to(*addresses)
-    @to.concat(addresses)
-    self
-  end
+```ruby
+# Ruby รองรับ functional programming style
+# compose methods
 
-  def cc(*addresses)
-    @cc.concat(addresses)
-    self
-  end
-
-  def subject(text)
-    @subject = text
-    self
-  end
-
-  def body(text)
-    @body = text
-    self
-  end
-
-  def send!
-    puts "To: #{@to.join(', ')}"
-    puts "CC: #{@cc.join(', ')}" unless @cc.empty?
-    puts "Subject: #{@subject}"
-    puts "---"
-    puts @body
-    puts "Email sent!"
-    self
-  end
+def compose(*fns)
+  fns.reduce { |f, g| ->(x) { f.call(g.call(x)) } }
 end
 
-EmailBuilder.new
-  .to("alice@example.com", "bob@example.com")
-  .cc("manager@example.com")
-  .subject("รายงานประจำเดือน")
-  .body("สวัสดีทุกคน นี่คือรายงานประจำเดือน...")
-  .send!
+double = ->(n) { n * 2 }
+square = ->(n) { n ** 2 }
+add_one = ->(n) { n + 1 }
 
-# ข้อ 11: Method Rate Limiter
-class RateLimiter
-  def initialize(calls_per_second)
-    @interval = 1.0 / calls_per_second
-    @last_call = Time.now - @interval
+double_then_square = compose(square, double)  # square(double(x))
+puts double_then_square.call(3)  # (3*2)^2 = 36
+
+pipeline = compose(add_one, square, double)  # add_one(square(double(x)))
+puts pipeline.call(3)  # add_one(square(6)) = add_one(36) = 37
+
+# Method pipeline ด้วย >> และ <<  (Ruby 2.6+)
+triple = ->(n) { n * 3 }
+square_f = ->(n) { n ** 2 }
+to_s_f = ->(n) { n.to_s }
+
+pipeline = triple >> square_f >> to_s_f
+puts pipeline.call(2)  # ((2*3)^2).to_s = "36"
+```
+
+### Step 170: Mixin Methods และ Module Functions
+
+```ruby
+# Module methods
+module MathHelper
+  def self.circle_area(radius)
+    Math::PI * radius ** 2
   end
 
-  def call
-    elapsed = Time.now - @last_call
-    sleep(@interval - elapsed) if elapsed < @interval
-    @last_call = Time.now
-    yield
+  def self.distance(x1, y1, x2, y2)
+    Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
   end
 end
 
-# ข้อ 12: Recursive Data Traversal
-def traverse(data, &block)
-  case data
-  when Hash
-    data.each_with_object({}) do |(k, v), result|
-      result[k] = traverse(v, &block)
-    end
-  when Array
-    data.map { |item| traverse(item, &block) }
-  else
-    block.call(data)
+puts MathHelper.circle_area(5).round(2)  # 78.54
+puts MathHelper.distance(0, 0, 3, 4).round(2)  # 5.0
+
+# Module ที่ include ได้
+module Greetable
+  def greet
+    "สวัสดี! ฉันชื่อ #{name}"
+  end
+
+  def farewell
+    "ลาก่อน! ขอบคุณ #{name}"
   end
 end
 
-nested = { a: 1, b: [2, 3, { c: 4 }], d: "hello" }
-doubled = traverse(nested) { |v| v.is_a?(Integer) ? v * 2 : v }
-puts doubled.inspect
-# => {:a=>2, :b=>[4, 6, {:c=>8}], :d=>"hello"}
+class Person
+  include Greetable
+  attr_reader :name
 
-# ข้อ 13-25: (สรุป patterns)
-
-# ข้อ 13: Template Method Pattern
-class Report
-  def generate
-    setup
-    header = generate_header
-    body = generate_body
-    footer = generate_footer
-    teardown
-    [header, body, footer].join("\n")
-  end
-
-  private
-
-  def setup; end
-  def teardown; end
-
-  def generate_header
-    raise NotImplementedError, "Subclass must implement generate_header"
-  end
-
-  def generate_body
-    raise NotImplementedError
-  end
-
-  def generate_footer
-    "--- End of Report ---"
+  def initialize(name)
+    @name = name
   end
 end
 
-class SalesReport < Report
-  def generate_header
-    "=== Sales Report ==="
-  end
-
-  def generate_body
-    "Total Sales: ฿100,000"
-  end
-end
-
-puts SalesReport.new.generate
-
-# ข้อ 14: Optional Chaining
-class Config
-  def initialize(data)
-    @data = data
-  end
-
-  def dig_safe(*keys)
-    keys.reduce(@data) do |current, key|
-      return nil unless current.is_a?(Hash)
-      current[key]
-    end
-  end
-end
-
-config = Config.new({ db: { host: "localhost", port: 5432 } })
-puts config.dig_safe(:db, :host)       # => localhost
-puts config.dig_safe(:db, :name).inspect      # => nil (ไม่ error)
-puts config.dig_safe(:cache, :host).inspect   # => nil (ไม่ error)
-
-# ข้อ 15: Dynamic Validators
-class Validator
-  RULES = {
-    required: ->(val, _) { !val.nil? && val.to_s != '' },
-    min_length: ->(val, n) { val.to_s.length >= n },
-    max_length: ->(val, n) { val.to_s.length <= n },
-    min: ->(val, n) { val.to_i >= n },
-    max: ->(val, n) { val.to_i <= n },
-    format: ->(val, regex) { val.to_s.match?(regex) }
-  }
-
-  def validate(value, **rules)
-    errors = rules.each_with_object([]) do |(rule, param), errs|
-      unless RULES[rule]&.call(value, param)
-        errs << "ไม่ผ่าน rule: #{rule}(#{param})"
-      end
-    end
-    errors.empty? ? { valid: true } : { valid: false, errors: errors }
-  end
-end
-
-v = Validator.new
-puts v.validate("hello", required: true, min_length: 3, max_length: 10).inspect
-puts v.validate("", required: true).inspect
-puts v.validate("user@test.com", format: /\A\S+@\S+\z/).inspect
+alice = Person.new("Alice")
+puts alice.greet    # สวัสดี! ฉันชื่อ Alice
+puts alice.farewell # ลาก่อน! ขอบคุณ Alice
 ```
 
 ---
 
-## สรุปบทที่ 9
+## แบบฝึกหัดตอนที่ 9 (25 ข้อ)
 
-| หัวข้อ | สิ่งที่เรียนรู้ |
-|--------|----------------|
-| การ define | `def name`, implicit return |
-| Parameters | required, optional (`= default`), splat (`*args`), keyword (`key:`) |
-| Return | implicit, explicit `return` |
-| Visibility | `public`, `private`, `protected` |
-| Bang (!) | แก้ไข in-place หรือ "อันตราย" |
-| Predicate (?) | คืนค่า boolean |
-| Method objects | `method(:name)`, `&:symbol` |
-| Recursion | self-call พร้อม base case |
-| Chaining | return `self` |
-| Memoization | `@var ||= expensive_call` |
-| method_missing | จัดการ undefined methods |
-| define_method | สร้าง methods dynamically |
+### ข้อ 1-5: พื้นฐาน Methods
 
-**Key Takeaways:**
-1. Ruby method คืนค่าบรรทัดสุดท้ายเสมอ (implicit return)
-2. ใช้ keyword arguments เพื่อทำให้ method calls อ่านง่าย
-3. Bang methods (!) เป็น convention ไม่ใช่ rule
-4. Predicate methods (?) ควรคืนค่า boolean เสมอ
-5. Return `self` จาก methods สำหรับ method chaining
-6. `||=` เป็นวิธีที่ง่ายที่สุดสำหรับ memoization
+```ruby
+# ข้อ 1: String Calculator
+def string_calculator(expression)
+  # รับ string เช่น "3 + 4" แล้วคืนผลลัพธ์
+  parts = expression.split
+  a = parts[0].to_f
+  op = parts[1]
+  b = parts[2].to_f
+  
+  case op
+  when "+" then a + b
+  when "-" then a - b
+  when "*" then a * b
+  when "/" then b != 0 ? a / b : "Error: Division by zero"
+  when "%" then a % b
+  when "**" then a ** b
+  else "Error: Unknown operator"
+  end
+end
+
+puts string_calculator("10 + 5")    # 15.0
+puts string_calculator("20 / 4")    # 5.0
+puts string_calculator("3 ** 4")    # 81.0
+puts string_calculator("10 / 0")    # Error: Division by zero
+
+# ข้อ 2: Titlecase
+def titlecase(str)
+  # แปลง "hello world" -> "Hello World"
+  # แต่ words เช่น "a", "an", "the", "in", "of" ไม่ capitalize (ยกเว้นตัวแรก)
+  small_words = %w[a an the in of on at to for and but or nor]
+  words = str.downcase.split
+  words.each_with_index.map do |word, i|
+    (i == 0 || !small_words.include?(word)) ? word.capitalize : word
+  end.join(" ")
+end
+
+puts titlecase("the quick brown fox")    # The Quick Brown Fox
+puts titlecase("lord of the rings")      # Lord of the Rings
+puts titlecase("a tale of two cities")   # A Tale of Two Cities
+
+# ข้อ 3: Caesar Cipher
+def caesar_cipher(text, shift)
+  text.chars.map do |char|
+    if char.match?(/[A-Za-z]/)
+      base = char.match?(/[A-Z]/) ? "A".ord : "a".ord
+      ((char.ord - base + shift) % 26 + base).chr
+    else
+      char
+    end
+  end.join
+end
+
+puts caesar_cipher("Hello, World!", 3)   # Khoor, Zruog!
+puts caesar_cipher("Khoor, Zruog!", -3)  # Hello, World!
+
+# ข้อ 4: Pangram checker
+def pangram?(sentence)
+  ("a".."z").all? { |c| sentence.downcase.include?(c) }
+end
+
+puts pangram?("The quick brown fox jumps over the lazy dog")  # true
+puts pangram?("Hello World")  # false
+
+# ข้อ 5: สร้าง Matrix
+def create_matrix(rows, cols, &filler)
+  filler ||= ->(r, c) { 0 }
+  Array.new(rows) { |r| Array.new(cols) { |c| filler.call(r, c) } }
+end
+
+identity = create_matrix(3, 3) { |r, c| r == c ? 1 : 0 }
+identity.each { |row| puts row.inspect }
+# [1, 0, 0]
+# [0, 1, 0]
+# [0, 0, 1]
+
+multiplication = create_matrix(5, 5) { |r, c| (r + 1) * (c + 1) }
+multiplication.each { |row| puts row.map { |n| n.to_s.rjust(4) }.join }
+```
+
+### ข้อ 6-10: Keyword Arguments และ Splat
+
+```ruby
+# ข้อ 6: URL Builder
+def build_url(base_url, path = "", **params)
+  url = "#{base_url.chomp('/')}/#{path.gsub(/^\//, '')}"
+  unless params.empty?
+    query = params.map { |k, v| "#{k}=#{URI.encode_www_form_component(v.to_s)}" }.join("&")
+    url += "?#{query}"
+  end
+  url
+end
+
+require "uri"
+puts build_url("https://api.example.com", "users", page: 1, limit: 10, sort: "name")
+# https://api.example.com/users?page=1&limit=10&sort=name
+
+# ข้อ 7: Flexible Logger
+def log(*messages, level: :info, timestamp: true, prefix: nil)
+  ts = timestamp ? "[#{Time.now.strftime('%Y-%m-%d %H:%M:%S')}] " : ""
+  pre = prefix ? "[#{prefix}] " : ""
+  icon = { info: "ℹ", warn: "⚠", error: "✗", debug: "⚙" }[level] || "?"
+  
+  messages.each do |msg|
+    puts "#{ts}#{icon} #{pre}#{msg}"
+  end
+end
+
+log("เริ่มต้นระบบ", level: :info)
+log("CPU สูง", "Memory เต็ม", level: :warn, prefix: "SYSTEM")
+log("Database connection failed", level: :error, timestamp: false)
+
+# ข้อ 8: Table Formatter
+def format_table(headers, rows, **options)
+  col_widths = headers.length.times.map do |i|
+    [headers[i].length, *rows.map { |r| r[i].to_s.length }].max
+  end
+  
+  separator = "+#{col_widths.map { |w| "-" * (w + 2) }.join("+")}+"
+  
+  format_row = ->(row) {
+    "|#{row.each_with_index.map { |cell, i| " #{cell.to_s.ljust(col_widths[i])} " }.join("|")}|"
+  }
+  
+  lines = [separator, format_row.call(headers), separator]
+  rows.each { |row| lines << format_row.call(row) }
+  lines << separator
+  lines.join("\n")
+end
+
+headers = ["ชื่อ", "อายุ", "เมือง"]
+rows = [
+  ["Alice", 30, "กรุงเทพ"],
+  ["Bob", 25, "เชียงใหม่"],
+  ["Charlie", 35, "ภูเก็ต"]
+]
+puts format_table(headers, rows)
+# +-------+-----+-----------+
+# | ชื่อ  | อายุ | เมือง     |
+# +-------+-----+-----------+
+# | Alice | 30  | กรุงเทพ   |
+# | Bob   | 25  | เชียงใหม่ |
+# | Charlie | 35 | ภูเก็ต  |
+# +-------+-----+-----------+
+
+# ข้อ 9: Method Profiler
+def profile(method_name, *args, runs: 100, **kwargs)
+  times = runs.times.map do
+    start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    method(method_name).call(*args, **kwargs)
+    Process.clock_gettime(Process::CLOCK_MONOTONIC) - start
+  end
+  
+  {
+    method: method_name,
+    runs: runs,
+    total_ms: (times.sum * 1000).round(3),
+    avg_ms: (times.sum / runs * 1000).round(3),
+    min_ms: (times.min * 1000).round(3),
+    max_ms: (times.max * 1000).round(3)
+  }
+end
+
+def slow_sum(n)
+  (1..n).sum
+end
+
+result = profile(:slow_sum, 10000, runs: 50)
+puts result.inspect
+
+# ข้อ 10: Deep Merge
+def deep_merge(hash1, hash2)
+  hash1.merge(hash2) do |_, old_val, new_val|
+    if old_val.is_a?(Hash) && new_val.is_a?(Hash)
+      deep_merge(old_val, new_val)
+    elsif old_val.is_a?(Array) && new_val.is_a?(Array)
+      old_val + new_val
+    else
+      new_val
+    end
+  end
+end
+
+config1 = { db: { host: "localhost", port: 5432 }, debug: false, tags: ["v1"] }
+config2 = { db: { port: 5433, name: "mydb" }, debug: true, tags: ["v2"] }
+merged = deep_merge(config1, config2)
+puts merged.inspect
+# {:db=>{:host=>"localhost", :port=>5433, :name=>"mydb"}, :debug=>true, :tags=>["v1", "v2"]}
+```
+
+### ข้อ 11-15: Return Values และ Visibility
+
+```ruby
+# ข้อ 11: Result Pattern
+class Result
+  attr_reader :value, :error
+
+  def self.ok(value)
+    new(value: value)
+  end
+
+  def self.err(error)
+    new(error: error)
+  end
+
+  def initialize(value: nil, error: nil)
+    @value = value
+    @error = error
+    @success = error.nil?
+  end
+
+  def success?
+    @success
+  end
+
+  def failure?
+    !@success
+  end
+
+  def on_success(&block)
+    block.call(@value) if success?
+    self
+  end
+
+  def on_failure(&block)
+    block.call(@error) if failure?
+    self
+  end
+
+  def map(&block)
+    success? ? Result.ok(block.call(@value)) : self
+  end
+end
+
+def divide_safe(a, b)
+  return Result.err("หารด้วยศูนย์ไม่ได้") if b == 0
+  Result.ok(a.to_f / b)
+end
+
+divide_safe(10, 2)
+  .on_success { |v| puts "ผลลัพธ์: #{v}" }
+  .on_failure { |e| puts "Error: #{e}" }
+# ผลลัพธ์: 5.0
+
+divide_safe(10, 0)
+  .on_success { |v| puts "ผลลัพธ์: #{v}" }
+  .on_failure { |e| puts "Error: #{e}" }
+# Error: หารด้วยศูนย์ไม่ได้
+
+# ข้อ 12: Memoized Properties
+class User
+  def initialize(id)
+    @id = id
+  end
+
+  def name
+    @name ||= fetch_from_db(:name)
+  end
+
+  def email
+    @email ||= fetch_from_db(:email)
+  end
+
+  def full_profile
+    @full_profile ||= {
+      id: @id,
+      name: name,
+      email: email,
+      created_at: Time.now
+    }
+  end
+
+  private
+
+  def fetch_from_db(field)
+    # simulate DB query
+    sleep(0.001)
+    { name: "User #{@id}", email: "user#{@id}@example.com" }[field]
+  end
+end
+
+user = User.new(42)
+3.times { puts user.name }  # DB query แค่ครั้งเดียว!
+
+# ข้อ 13: Decorator Pattern
+module Cacheable
+  def self.included(base)
+    base.extend(ClassMethods)
+  end
+
+  module ClassMethods
+    def cache_method(*method_names, ttl: 60)
+      method_names.each do |name|
+        original = instance_method(name)
+        cache = {}
+        
+        define_method(name) do |*args|
+          key = [name, args].hash
+          cached = cache[key]
+          
+          if cached && Time.now - cached[:time] < ttl
+            cached[:value]
+          else
+            result = original.bind(self).call(*args)
+            cache[key] = { value: result, time: Time.now }
+            result
+          end
+        end
+      end
+    end
+  end
+end
+
+class WeatherService
+  include Cacheable
+  
+  def temperature(city)
+    puts "Fetching weather for #{city}..."
+    rand(20..35)
+  end
+  
+  cache_method :temperature, ttl: 300  # cache 5 นาที
+end
+
+weather = WeatherService.new
+puts weather.temperature("Bangkok")  # Fetching weather... 28
+puts weather.temperature("Bangkok")  # ใช้ cache (ไม่ fetch ซ้ำ!)
+
+# ข้อ 14: Chain of Responsibility
+class Validator
+  def initialize(name, &rule)
+    @name = name
+    @rule = rule
+    @next_validator = nil
+  end
+
+  def then(validator)
+    @next_validator = validator
+    validator
+  end
+
+  def validate(value)
+    unless @rule.call(value)
+      return { valid: false, failed_at: @name }
+    end
+    @next_validator ? @next_validator.validate(value) : { valid: true }
+  end
+end
+
+not_nil    = Validator.new("not_nil") { |v| !v.nil? }
+not_empty  = Validator.new("not_empty") { |v| !v.to_s.empty? }
+min_length = Validator.new("min_length_6") { |v| v.to_s.length >= 6 }
+has_upper  = Validator.new("has_uppercase") { |v| v.to_s.match?(/[A-Z]/) }
+has_digit  = Validator.new("has_digit") { |v| v.to_s.match?(/\d/) }
+
+not_nil.then(not_empty).then(min_length).then(has_upper).then(has_digit)
+
+puts not_nil.validate(nil).inspect          # {:valid=>false, :failed_at=>"not_nil"}
+puts not_nil.validate("hello").inspect      # {:valid=>false, :failed_at=>"min_length_6"}
+puts not_nil.validate("Hello1").inspect     # {:valid=>true}
+
+# ข้อ 15: Builder Pattern
+class HtmlBuilder
+  def initialize(tag, **attrs)
+    @tag = tag
+    @attrs = attrs
+    @children = []
+    @text = nil
+  end
+
+  def text(content)
+    @text = content
+    self
+  end
+
+  def add(tag, **attrs, &block)
+    child = HtmlBuilder.new(tag, **attrs)
+    block.call(child) if block
+    @children << child
+    self
+  end
+
+  def build
+    attr_str = @attrs.map { |k, v| " #{k}=\"#{v}\"" }.join
+    inner = @text || @children.map(&:build).join
+    "<#{@tag}#{attr_str}>#{inner}</#{@tag}>"
+  end
+end
+
+html = HtmlBuilder.new("div", class: "card") do |div|
+  # ไม่ใช้ block ที่นี่ (ตัวอย่างอื่น)
+end
+
+card = HtmlBuilder.new("div", class: "card")
+card.add("h2") { |h| h.text("Ruby Methods") }
+card.add("p", class: "description") { |p| p.text("เรียนรู้ methods ใน Ruby") }
+card.add("a", href: "/learn") { |a| a.text("อ่านต่อ") }
+
+puts card.build
+# <div class="card"><h2>Ruby Methods</h2><p class="description">เรียนรู้ methods ใน Ruby</p><a href="/learn">อ่านต่อ</a></div>
+```
+
+### ข้อ 16-25: Advanced Methods
+
+```ruby
+# ข้อ 16: Method Overloading Simulation
+class Shape
+  def area(*args)
+    case args
+    in [Float | Integer => r] if args.length == 1
+      # circle: area(radius)
+      Math::PI * r ** 2
+    in [Float | Integer => w, Float | Integer => h] if args.length == 2
+      # rectangle: area(width, height)
+      w * h
+    in [Float | Integer => a, Float | Integer => b, Float | Integer => c] if args.length == 3
+      # triangle: area(a, b, c) using Heron's formula
+      s = (a + b + c) / 2.0
+      Math.sqrt(s * (s-a) * (s-b) * (s-c))
+    else
+      raise ArgumentError, "ไม่รู้จักรูปแบบ"
+    end
+  end
+end
+
+shape = Shape.new
+puts shape.area(5).round(2)          # 78.54 (วงกลม radius 5)
+puts shape.area(4, 6).round(2)       # 24.0 (สี่เหลี่ยม 4x6)
+puts shape.area(3, 4, 5).round(2)    # 6.0 (สามเหลี่ยม 3-4-5)
+
+# ข้อ 17: Lazy Evaluator
+class LazyValue
+  def initialize(&computation)
+    @computation = computation
+    @evaluated = false
+  end
+
+  def value
+    unless @evaluated
+      @value = @computation.call
+      @evaluated = true
+    end
+    @value
+  end
+
+  def to_s
+    value.to_s
+  end
+end
+
+expensive = LazyValue.new do
+  puts "กำลังคำนวณ..."
+  sleep(0.1)
+  42
+end
+
+puts "ยังไม่คำนวณ"
+puts expensive.value  # กำลังคำนวณ... 42
+puts expensive.value  # 42 (cache)
+
+# ข้อ 18: Method Pipeline
+class Pipeline
+  def initialize(*steps)
+    @steps = steps
+  end
+
+  def call(input)
+    @steps.reduce(input) { |value, step|
+      case step
+      when Symbol then value.send(step)
+      when Proc, Method then step.call(value)
+      else raise "ไม่รู้จัก step type: #{step.class}"
+      end
+    }
+  end
+
+  def >>(other_step)
+    Pipeline.new(*@steps, other_step)
+  end
+end
+
+pipeline = Pipeline.new(
+  :strip,
+  :downcase,
+  ->(s) { s.gsub(/\s+/, "_") },
+  :to_sym
+)
+
+puts pipeline.call("  Hello World  ").inspect  # :hello_world
+
+# ข้อ 19: Aspect-Oriented Method Wrapping
+module Around
+  def self.wrap(object, method_name, before: nil, after: nil, rescue_with: nil)
+    original = object.method(method_name)
+    
+    object.define_singleton_method(method_name) do |*args, **kwargs, &block|
+      before&.call(method_name, args)
+      begin
+        result = original.call(*args, **kwargs, &block)
+        after&.call(method_name, result)
+        result
+      rescue => e
+        rescue_with ? rescue_with.call(e) : raise
+      end
+    end
+  end
+end
+
+class Service
+  def process(data)
+    puts "Processing: #{data}"
+    data.upcase
+  end
+end
+
+svc = Service.new
+Around.wrap(
+  svc,
+  :process,
+  before: ->(name, args) { puts "[BEFORE] #{name}(#{args.inspect})" },
+  after:  ->(name, result) { puts "[AFTER] #{name} -> #{result}" }
+)
+
+svc.process("hello")
+# [BEFORE] process(["hello"])
+# Processing: hello
+# [AFTER] process -> HELLO
+
+# ข้อ 20-25: โจทย์เพิ่มเติม
+# ข้อ 20: สร้าง DSL สำหรับ validation rules
+# ข้อ 21: Implement curry ด้วย closures
+# ข้อ 22: สร้าง retry mechanism ด้วย exponential backoff
+# ข้อ 23: สร้าง Observable pattern ด้วย method hooks
+# ข้อ 24: Implement pipe operator (|>) ด้วย method chaining
+# ข้อ 25: สร้าง Method introspection tool
+```
 
 ---
 
-*ถัดไป: ตอนที่ 10 - Blocks, Procs, Lambdas (ขั้นตอนที่ 171-200)*
+## สรุป Methods ใน Ruby
+
+| Pattern | การใช้งาน |
+|---------|----------|
+| `def method(req)` | required parameter |
+| `def method(opt = val)` | optional parameter |
+| `def method(*args)` | variable positional |
+| `def method(key:)` | required keyword |
+| `def method(key: val)` | optional keyword |
+| `def method(**opts)` | variable keyword |
+| `def method(&blk)` | explicit block |
+| `method!` | bang (mutating) |
+| `method?` | predicate (boolean) |
+| `alias_method :new, :old` | method alias |
+| `method(:name)` | method as object |
+| `@var \|\|= value` | memoization |
+
+**Best Practices:**
+1. ชื่อ method ใช้ snake_case
+2. ใช้ keyword arguments เพื่อความชัดเจน
+3. Guard clauses แทน deep nesting
+4. Bang method ควรมี non-bang version ด้วย
+5. Memoize ผลการคำนวณที่ expensive
+6. Private method สำหรับ implementation details
+7. Method ควรทำสิ่งเดียว (Single Responsibility)
+
+> ⬅️ [ตอนที่ 8: Loops](part-08-loops.md) | ➡️ [ตอนที่ 10: Blocks, Procs, Lambdas](part-10-blocks-procs-lambdas.md)
