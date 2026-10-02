@@ -1,417 +1,307 @@
-# ตอนที่ 38: Associations (Steps 831-860)
+# Part 38: Associations (ขั้นตอนที่ 831-860)
 
 ## บทนำ
 
-Associations (ความสัมพันธ์) ใน Active Record คือการเชื่อมโยงระหว่าง models ต่างๆ ทำให้การทำงานกับ related data ง่ายขึ้นมาก แทนที่จะต้องเขียน SQL JOIN เองทุกครั้ง Rails จัดการให้เราด้วย methods ที่ intuitive
+Associations คือความสัมพันธ์ระหว่าง models Active Record รองรับ association types หลากหลาย ทำให้เราสามารถแสดง relationships ระหว่าง objects ได้อย่างสมจริงและทำงานกับ related data ได้ง่าย
 
 ---
 
 ## ขั้นตอนที่ 831: belongs_to
 
-### belongs_to พื้นฐาน
+### belongs_to คืออะไร?
 
-`belongs_to` ใช้เมื่อ model มี foreign key ที่ชี้ไปยัง model อื่น
+`belongs_to` ใช้เมื่อ model หนึ่งมี foreign key อ้างไปยัง model อื่น
 
 ```ruby
-# app/models/comment.rb
-class Comment < ApplicationRecord
-  belongs_to :post
-  # comment.post_id → posts.id
-end
-
-# app/models/post.rb
-class Post < ApplicationRecord
-  # ไม่จำเป็นต้องมี has_many ก็ได้ แต่ควรมีเพื่อ full association
-  has_many :comments
-end
-
-# Migration
-class CreateComments < ActiveRecord::Migration[7.1]
+# Migration: articles table มี user_id column
+class CreateArticles < ActiveRecord::Migration[7.1]
   def change
-    create_table :comments do |t|
-      t.text :body
-      t.references :post, null: false, foreign_key: true
-      # สร้าง post_id column + foreign key constraint
+    create_table :articles do |t|
+      t.string :title
+      t.references :user, null: false, foreign_key: true  # เพิ่ม user_id column
+      t.timestamps
     end
   end
 end
-```
 
-### belongs_to Options ทั้งหมด
-
-```ruby
-class Comment < ApplicationRecord
-  # class_name - ชื่อ class ต่างจาก convention
-  belongs_to :author, class_name: "User"
-  # comment.author_id → users.id
-
-  # foreign_key - ชื่อ foreign key ต่างจาก convention
-  belongs_to :post, foreign_key: :article_id
-  # comment.article_id → posts.id
-
-  # primary_key - primary key ของ association (default: id)
-  belongs_to :post, primary_key: :uuid
-
-  # optional - ไม่บังคับ (Rails 5+: belongs_to ต้อง required by default)
-  belongs_to :category, optional: true
-  # เท่ากับ validates :category, presence: false
-
-  # touch - touch parent timestamps
-  belongs_to :post, touch: true
-  # เมื่อ update comment → update post.updated_at ด้วย
-  belongs_to :post, touch: :comments_updated_at
-  # touch column ที่ระบุแทน updated_at
-
-  # counter_cache
-  belongs_to :post, counter_cache: true
-  # post.comments_count อัปเดตอัตโนมัติ
-
-  belongs_to :post, counter_cache: :total_comments
-  # ใช้ column ชื่อ total_comments
-
-  # dependent (ไม่ค่อยใช้กับ belongs_to)
+# Model
+class Article < ApplicationRecord
   belongs_to :user
 
-  # inverse_of - ระบุ inverse association
-  belongs_to :post, inverse_of: :comments
-
-  # scope
-  belongs_to :post, -> { where(published: true) }
-
-  # polymorphic
-  belongs_to :commentable, polymorphic: true
+  # หรือกับ options:
+  belongs_to :user, optional: true           # ไม่บังคับต้องมี user
+  belongs_to :author, class_name: "User"     # custom class name
+  belongs_to :category, counter_cache: true  # counter cache
+  belongs_to :parent, class_name: "Article", optional: true  # self-referential
 end
+
+# Methods ที่ได้จาก belongs_to:
+article = Article.find(1)
+article.user          # ดึง User object
+article.user_id       # ดึง foreign key value
+article.user = user   # assign user
+article.build_user(name: "Test")  # build user without save
+article.create_user!(name: "Test") # create user with save
+
+# Validation:
+# belongs_to ใน Rails 5+ จะ validate ว่า user ต้องมีอยู่จริง
+# article.user_id = 999  # user ที่ไม่มีอยู่
+# article.valid?  # => false
+# article.errors[:user]  # => ["must exist"]
 ```
 
-### การใช้งาน belongs_to Methods
+### belongs_to Options
 
 ```ruby
-comment = Comment.find(1)
+class Article < ApplicationRecord
+  # class_name - กำหนด class name ที่ต่างจาก convention
+  belongs_to :author, class_name: "User", foreign_key: "user_id"
 
-# Access associated object
-comment.post          # return Post object
-comment.post_id       # return post_id integer
+  # foreign_key - กำหนด foreign key column
+  belongs_to :writer, class_name: "User", foreign_key: "writer_user_id"
 
-# Build new association
-comment.build_post(title: "New Post")  # new Post ที่ยังไม่ save
-comment.create_post(title: "New Post") # create + save Post
+  # primary_key - กำหนด primary key ของ associated model
+  belongs_to :user, primary_key: "uuid"
 
-# Assign association
-comment.post = Post.find(5)
-comment.post_id = 5
+  # optional - ไม่บังคับมี association
+  belongs_to :category, optional: true
 
-# Check if association loaded
-comment.post.loaded?   # false (belum loaded)
-comment.post           # query database
-comment.post.loaded?   # true
+  # counter_cache - increment/decrement counter
+  belongs_to :user, counter_cache: true  # เพิ่ม articles_count ใน users
+  belongs_to :user, counter_cache: :published_articles_count  # custom counter
 
-# Reload association
-comment.reload_post    # clear cache + reload
+  # touch - update timestamps ของ parent เมื่อ save
+  belongs_to :article, touch: true
+  belongs_to :article, touch: :last_commented_at
+
+  # validate - validate association (default true ใน Rails 5+)
+  belongs_to :user, validate: true
+
+  # dependent - behavior เมื่อ associated object ถูกลบ
+  # (ไม่ค่อยใช้ใน belongs_to)
+  belongs_to :user, dependent: :destroy  # ถ้า user ถูกลบ จะลบ article ด้วย
+
+  # inverse_of - ระบุ inverse association
+  belongs_to :user, inverse_of: :articles
+end
 ```
 
 ---
 
 ## ขั้นตอนที่ 832: has_many
 
-### has_many พื้นฐาน
+### has_many คืออะไร?
 
-```ruby
-# app/models/post.rb
-class Post < ApplicationRecord
-  has_many :comments
-  # posts.id ← comments.post_id
-end
-
-# ใช้งาน
-post = Post.find(1)
-post.comments         # ActiveRecord::Associations::CollectionProxy
-post.comments.count   # SELECT COUNT(*) FROM comments WHERE post_id = 1
-post.comments.all     # SELECT * FROM comments WHERE post_id = 1
-```
-
-### has_many Options ทั้งหมด
+`has_many` ใช้เมื่อ model หนึ่งมี model อื่นหลายตัว
 
 ```ruby
 class User < ApplicationRecord
-  # class_name
-  has_many :authored_posts, class_name: "Post", foreign_key: :author_id
-
-  # foreign_key
-  has_many :posts, foreign_key: :author_id
-
-  # primary_key
-  has_many :posts, primary_key: :uuid
-
-  # through (join via another table)
-  has_many :post_tags, through: :posts
-  has_many :tags, through: :post_tags
-
-  # source (ใช้กับ through)
-  has_many :followers_users, through: :follows, source: :follower
-
-  # dependent - จัดการเมื่อ parent ถูกลบ
-  has_many :posts, dependent: :destroy       # destroy each (run callbacks)
-  has_many :posts, dependent: :delete_all    # single SQL DELETE (no callbacks)
-  has_many :posts, dependent: :nullify       # set foreign key = NULL
-  has_many :posts, dependent: :restrict_with_error    # error ถ้ามี posts
-  has_many :posts, dependent: :restrict_with_exception  # exception ถ้ามี posts
-
-  # as (polymorphic)
-  has_many :comments, as: :commentable
-
-  # inverse_of
-  has_many :posts, inverse_of: :user
-
-  # scope (lambda)
-  has_many :published_posts, -> { where(published: true) }, class_name: "Post"
-  has_many :recent_posts, -> { order(created_at: :desc).limit(5) }, class_name: "Post"
-
-  # autosave
-  has_many :posts, autosave: true
-  # save posts ด้วยเมื่อ save user
-
-  # validate
-  has_many :posts, validate: true
-  # validate posts เมื่อ save user
+  has_many :articles
+  has_many :comments
+  has_many :likes
 end
+
+# Methods ที่ได้จาก has_many:
+user = User.find(1)
+user.articles                    # ดึง articles ทั้งหมด (SQL query)
+user.articles.count              # COUNT query
+user.articles.build(title: "x") # build article without save
+user.articles.create!(title: "x", body: "content") # create and save
+user.articles.where(status: "published")  # scope on association
+user.articles.find(1)           # หา article by id (ต้องเป็นของ user)
+user.articles.first
+user.articles.last
+user.articles.any?
+user.articles.empty?
+user.articles << article        # append article
+user.articles.delete(article)   # remove association
+user.articles.destroy(article)  # destroy article
+user.articles.clear             # remove all
+user.articles.reload            # reload from database
 ```
 
-### has_many Collection Methods
+### has_many Options
 
 ```ruby
-user = User.find(1)
+class User < ApplicationRecord
+  # dependent - behavior เมื่อ user ถูกลบ
+  has_many :articles, dependent: :destroy   # ลบ articles ด้วย (runs callbacks)
+  has_many :articles, dependent: :delete_all # ลบด้วย SQL (เร็วกว่า, ไม่ run callbacks)
+  has_many :articles, dependent: :nullify   # set user_id เป็น NULL
+  has_many :articles, dependent: :restrict_with_exception  # raise error
+  has_many :articles, dependent: :restrict_with_error     # add error to model
 
-# ดึงข้อมูล
-user.posts              # all posts
-user.posts.first        # first post
-user.posts.last         # last post
-user.posts.count        # COUNT query
-user.posts.size         # uses counter cache ถ้ามี
-user.posts.length       # load all + count
-user.posts.empty?       # check if empty
-user.posts.any?         # check if any
-user.posts.many?        # check if more than 1
+  # class_name - กำหนด class
+  has_many :published_articles, class_name: "Article"
 
-# เพิ่ม records
-user.posts << post            # เพิ่ม post เข้า collection
-user.posts.push(post)         # เหมือนกัน
-user.posts.append(post)       # เหมือนกัน
-user.posts.create(title: "New") # สร้าง + เพิ่ม
-user.posts.build(title: "New")  # สร้างแต่ยังไม่ save
+  # foreign_key - กำหนด foreign key
+  has_many :articles, foreign_key: "author_id"
 
-# ลบ records
-user.posts.delete(post)        # ลบ association (set FK = null หรือ destroy ตาม dependent)
-user.posts.destroy(post)       # destroy post (run callbacks)
-user.posts.delete_all          # DELETE SQL
-user.posts.destroy_all         # destroy each post
+  # primary_key - กำหนด primary key
+  has_many :articles, primary_key: "uuid"
 
-# Query ใน collection
-user.posts.where(published: true)
-user.posts.order(:title)
-user.posts.limit(5)
-user.posts.find(1)             # find ใน context ของ user
+  # scope - เพิ่ม default scope
+  has_many :published_articles, -> { where(status: "published") }, class_name: "Article"
+  has_many :recent_articles, -> { order(created_at: :desc).limit(5) }, class_name: "Article"
+  has_many :articles, -> { where(deleted_at: nil) }
 
-# Check membership
-user.posts.include?(post)
+  # inverse_of - specify inverse
+  has_many :articles, inverse_of: :user
 
-# Clear
-user.posts.clear               # ขึ้นอยู่กับ dependent option
+  # through - ผ่าน join model
+  has_many :comments, through: :articles
+
+  # source - กำหนด source สำหรับ through
+  has_many :commenters, through: :articles, source: :user
+
+  # as - polymorphic
+  has_many :images, as: :imageable
+end
 ```
 
 ---
 
 ## ขั้นตอนที่ 833: has_one
 
-### has_one พื้นฐาน
+### has_one คืออะไร?
+
+`has_one` ใช้เมื่อ model หนึ่งมีอีก model เดียว (1-to-1 จากฝั่ง parent)
 
 ```ruby
 class User < ApplicationRecord
   has_one :profile
-  # users.id ← profiles.user_id
+  has_one :setting
+  has_one :subscription
 end
 
 class Profile < ApplicationRecord
   belongs_to :user
 end
 
-# Migration
-class CreateProfiles < ActiveRecord::Migration[7.1]
-  def change
-    create_table :profiles do |t|
-      t.string :bio
-      t.string :website
-      t.string :avatar_url
-      t.references :user, null: false, foreign_key: true, index: { unique: true }
-    end
-  end
-end
+# Methods:
+user.profile          # ดึง Profile
+user.profile = profile  # assign
+user.build_profile(bio: "test")   # build without save
+user.create_profile!(bio: "test") # create and save
+user.profile&.destroy             # ลบ profile
 ```
 
 ### has_one Options
 
 ```ruby
 class User < ApplicationRecord
-  # class_name
-  has_one :main_address, class_name: "Address"
-
-  # foreign_key
-  has_one :profile, foreign_key: :account_id
-
-  # dependent
   has_one :profile, dependent: :destroy
-  has_one :settings, dependent: :delete
-  has_one :profile, dependent: :nullify
-
-  # through
-  has_one :account_details, through: :profile
+  has_one :profile, class_name: "UserProfile"
+  has_one :profile, foreign_key: "account_id"
 
   # scope
-  has_one :active_subscription, -> { where(active: true) },
-          class_name: "Subscription"
+  has_one :latest_subscription, -> { order(created_at: :desc) }, class_name: "Subscription"
+
+  # through
+  has_one :address, through: :profile
 end
-```
-
-### has_one Methods
-
-```ruby
-user = User.find(1)
-
-# Access
-user.profile          # Profile object หรือ nil
-
-# Build
-user.build_profile(bio: "Hello")   # new Profile ยังไม่ save
-user.create_profile(bio: "Hello")  # create + save
-
-# Assign
-user.profile = Profile.new(bio: "Hello")
-
-# Check
-user.profile.nil?     # ไม่มี profile
-user.profile.present? # มี profile
 ```
 
 ---
 
 ## ขั้นตอนที่ 834: has_many :through
 
-### has_many :through พื้นฐาน
+### has_many :through
+
+ใช้สำหรับ many-to-many ที่มี join model ที่มี attributes เพิ่มเติม
 
 ```ruby
-# Doctor → Appointment → Patient
-class Doctor < ApplicationRecord
-  has_many :appointments
-  has_many :patients, through: :appointments
-end
-
-class Appointment < ApplicationRecord
-  belongs_to :doctor
-  belongs_to :patient
-end
-
-class Patient < ApplicationRecord
-  has_many :appointments
-  has_many :doctors, through: :appointments
-end
-
-# Migration
-class CreateAppointments < ActiveRecord::Migration[7.1]
-  def change
-    create_table :appointments do |t|
-      t.datetime :scheduled_at
-      t.string :status
-      t.references :doctor, null: false, foreign_key: true
-      t.references :patient, null: false, foreign_key: true
-      t.timestamps
-    end
-  end
-end
-```
-
-### ตัวอย่าง Blog: Post → PostTag → Tag
-
-```ruby
-class Post < ApplicationRecord
-  has_many :post_tags, dependent: :destroy
-  has_many :tags, through: :post_tags
-end
-
-class PostTag < ApplicationRecord
-  belongs_to :post
-  belongs_to :tag
+# Models:
+class Article < ApplicationRecord
+  has_many :article_tags
+  has_many :tags, through: :article_tags
 end
 
 class Tag < ApplicationRecord
-  has_many :post_tags, dependent: :destroy
-  has_many :posts, through: :post_tags
+  has_many :article_tags
+  has_many :articles, through: :article_tags
 end
 
-# การใช้งาน
-post = Post.find(1)
+class ArticleTag < ApplicationRecord
+  belongs_to :article
+  belongs_to :tag
+  
+  # join model สามารถมี attributes เพิ่มเติม
+  # t.integer :position
+  # t.boolean :featured
+end
 
-# เพิ่ม tags
-post.tags << Tag.find_or_create_by(name: "ruby")
-post.tags.create(name: "rails")
+# Migration:
+create_table :article_tags do |t|
+  t.references :article, null: false, foreign_key: true
+  t.references :tag, null: false, foreign_key: true
+  t.timestamps
+end
+add_index :article_tags, [:article_id, :tag_id], unique: true
 
-# ดู tags
-post.tags                          # all tags
-post.tags.map(&:name)              # ["ruby", "rails"]
-post.tags.where(featured: true)    # ใช้ conditions ได้
-
-# ลบ tags
-post.tags.delete(tag)              # ลบแค่ join record
-post.tags.clear                    # ลบ join records ทั้งหมด
-
-# Access ผ่าน join model
-post.post_tags                     # join records
-post.post_tags.first.tag           # tag ผ่าน join
+# การใช้งาน:
+article = Article.find(1)
+article.tags                  # ดึง tags ทั้งหมด
+article.tags.create!(name: "Rails")  # สร้าง tag ใหม่และ associate
+article.tag_ids               # ดึง array ของ tag IDs
+article.tag_ids = [1, 2, 3]  # assign tags ด้วย IDs
+article.tags << Tag.find(1)  # เพิ่ม tag
+article.tags.delete(tag)     # ลบ association (ไม่ลบ tag จริง)
 ```
 
-### has_many :through กับ Extra Attributes
+### has_many :through กับ Business Logic
 
 ```ruby
+# ตัวอย่าง: User follows Article
 class User < ApplicationRecord
-  has_many :memberships
-  has_many :groups, through: :memberships
+  has_many :follows
+  has_many :followed_articles, through: :follows, source: :article
+
+  has_many :written_articles, class_name: "Article"
 end
 
-class Membership < ApplicationRecord
+class Article < ApplicationRecord
+  has_many :follows
+  has_many :followers, through: :follows, source: :user
+end
+
+class Follow < ApplicationRecord
   belongs_to :user
-  belongs_to :group
+  belongs_to :article
 
-  # extra attributes บน join model
-  t.string :role
-  t.datetime :joined_at
-  t.boolean :admin
+  # Extra attributes:
+  # t.string :reason    # ทำไม follow
+  # t.boolean :notify   # แจ้งเตือนหรือเปล่า
 end
 
-class Group < ApplicationRecord
-  has_many :memberships
-  has_many :members, through: :memberships, source: :user
-  has_many :admins, -> { where(memberships: { admin: true }) },
-           through: :memberships, source: :user
+# ตัวอย่าง: Order with LineItems
+class Order < ApplicationRecord
+  has_many :order_items
+  has_many :products, through: :order_items
+
+  def total
+    order_items.sum { |item| item.quantity * item.unit_price }
+  end
 end
 
-# การใช้งาน
-user = User.find(1)
-group = Group.find(1)
+class OrderItem < ApplicationRecord
+  belongs_to :order
+  belongs_to :product
 
-# เพิ่ม membership พร้อม attributes
-user.memberships.create(group: group, role: "admin", joined_at: Time.now)
+  # attributes: quantity, unit_price, discount
+end
 
-# หรือ
-Membership.create(user: user, group: group, role: "member")
-
-# Access
-user.memberships.where(role: "admin")
-user.groups
-group.members
-group.admins
+class Product < ApplicationRecord
+  has_many :order_items
+  has_many :orders, through: :order_items
+end
 ```
 
 ---
 
 ## ขั้นตอนที่ 835: has_one :through
+
+### has_one :through
 
 ```ruby
 class User < ApplicationRecord
@@ -428,36 +318,19 @@ class AccountHistory < ApplicationRecord
   belongs_to :account
 end
 
-# การใช้งาน
-user = User.find(1)
-user.account          # Account
-user.account_history  # AccountHistory ผ่าน account
-```
+# ใช้งาน:
+user.account_history  # User → Account → AccountHistory
 
-### ตัวอย่างที่ใช้งานจริง
-
-```ruby
-# Country → State → City
-class Country < ApplicationRecord
-  has_many :states
-  has_many :cities, through: :states
-  # ผ่าน states ไปยัง cities
+# ตัวอย่าง Real-world:
+class Customer < ApplicationRecord
+  has_one :order, -> { order(created_at: :desc) }
+  has_one :latest_purchase, through: :order, source: :product
 end
 
-class State < ApplicationRecord
-  belongs_to :country
-  has_many :cities
-end
-
-class City < ApplicationRecord
-  belongs_to :state
-  has_one :country, through: :state
-end
-
-# supplier → account → account_history
-class Supplier < ApplicationRecord
-  has_one :account
-  has_one :account_history, through: :account
+class Doctor < ApplicationRecord
+  has_many :appointments
+  has_many :patients, through: :appointments
+  has_one :first_patient, through: :appointments, source: :patient
 end
 ```
 
@@ -465,44 +338,59 @@ end
 
 ## ขั้นตอนที่ 836: has_and_belongs_to_many (HABTM)
 
-### HABTM พื้นฐาน
+### HABTM - Simple Many-to-Many
 
 ```ruby
-class Post < ApplicationRecord
+# HABTM ใช้สำหรับ many-to-many ที่ join table ไม่มี attributes เพิ่มเติม
+# (ปัจจุบันแนะนำให้ใช้ has_many :through แทน - ยืดหยุ่นกว่า)
+
+class Article < ApplicationRecord
   has_and_belongs_to_many :tags
 end
 
 class Tag < ApplicationRecord
-  has_and_belongs_to_many :posts
+  has_and_belongs_to_many :articles
 end
 
-# Migration - ต้องสร้าง join table เอง
-class CreatePostsTags < ActiveRecord::Migration[7.1]
+# Migration: ต้องสร้าง join table
+class CreateArticlesTags < ActiveRecord::Migration[7.1]
   def change
-    create_join_table :posts, :tags do |t|
-      t.index :post_id
-      t.index :tag_id
-      t.index [:post_id, :tag_id], unique: true
+    create_join_table :articles, :tags do |t|
+      t.index [:article_id, :tag_id]
+      t.index [:tag_id, :article_id]
     end
   end
 end
+
+# การใช้งาน:
+article.tags                    # ดึง tags
+article.tags << Tag.find(1)    # เพิ่ม tag
+article.tags.delete(tag)       # ลบ association
+article.tags = [tag1, tag2]    # set tags
+article.tag_ids = [1, 2, 3]   # set by IDs
+
+tag.articles                   # ดึง articles
 ```
 
 ### HABTM vs has_many :through
 
-```
-HABTM:
-- ง่าย ไม่มี join model
-- ไม่สามารถเพิ่ม extra attributes ได้
-- ไม่สามารถ validate join
-- เหมาะกับ simple many-to-many
+```ruby
+# HABTM:
+class Article < ApplicationRecord
+  has_and_belongs_to_many :tags
+end
 
-has_many :through:
-- มี join model
-- สามารถเพิ่ม extra attributes ได้
-- สามารถ validate join ได้
-- ยืดหยุ่นกว่า
-- แนะนำให้ใช้เสมอ
+# has_many :through (แนะนำ):
+class Article < ApplicationRecord
+  has_many :article_tags
+  has_many :tags, through: :article_tags
+end
+
+# เหตุผลที่ prefer has_many :through:
+# 1. สามารถเพิ่ม attributes ใน join model ได้
+# 2. สามารถ validate join model ได้
+# 3. สามารถ create/update join model ได้
+# 4. Rails documentation แนะนำ
 ```
 
 ---
@@ -511,228 +399,152 @@ has_many :through:
 
 ### Polymorphic คืออะไร?
 
-Polymorphic association ให้ model หนึ่ง belongs_to หลาย model ที่ต่างชนิดกัน
-
-```
-Comment สามารถ belongs_to: Post, Article, Photo, Video
-```
-
-### Implement Polymorphic
+Polymorphic ทำให้ model หนึ่ง belong_to หลาย models ด้วย single association
 
 ```ruby
-# app/models/comment.rb
+# Migration:
+class CreateComments < ActiveRecord::Migration[7.1]
+  def change
+    create_table :comments do |t|
+      t.text :body, null: false
+      t.references :commentable, polymorphic: true, null: false
+      # เพิ่ม 2 columns: commentable_type (string) และ commentable_id (bigint)
+      t.references :user, null: false, foreign_key: true
+      t.timestamps
+    end
+    add_index :comments, [:commentable_type, :commentable_id]
+  end
+end
+
+# Comment model
 class Comment < ApplicationRecord
   belongs_to :commentable, polymorphic: true
-  # ต้องมี: commentable_type, commentable_id columns
+  belongs_to :user
+
+  # commentable_type: "Article", "Photo", "Video"
+  # commentable_id: 1, 2, 3, ...
 end
 
-# app/models/post.rb
-class Post < ApplicationRecord
-  has_many :comments, as: :commentable, dependent: :destroy
-end
-
-# app/models/article.rb
+# Article model
 class Article < ApplicationRecord
   has_many :comments, as: :commentable, dependent: :destroy
 end
 
-# app/models/photo.rb
+# Photo model
 class Photo < ApplicationRecord
   has_many :comments, as: :commentable, dependent: :destroy
 end
 
-# Migration
-class CreateComments < ActiveRecord::Migration[7.1]
-  def change
-    create_table :comments do |t|
-      t.text :body
-      t.string :commentable_type, null: false  # ชื่อ class: "Post", "Article", "Photo"
-      t.bigint :commentable_id, null: false    # id ของ object
-      t.references :user, foreign_key: true
-      t.timestamps
-    end
+# Video model
+class Video < ApplicationRecord
+  has_many :comments, as: :commentable, dependent: :destroy
+end
 
-    # หรือใช้ references แบบ polymorphic
-    add_reference :comments, :commentable, polymorphic: true, null: false
-    # สร้าง commentable_type และ commentable_id
-    add_index :comments, [:commentable_type, :commentable_id]
+# การใช้งาน:
+article = Article.find(1)
+article.comments.create!(body: "Great article!", user: current_user)
+
+photo = Photo.find(1)
+photo.comments.create!(body: "Beautiful photo!", user: current_user)
+
+comment = Comment.find(1)
+comment.commentable  # ดึง Article หรือ Photo หรือ Video
+comment.commentable_type  # => "Article"
+comment.commentable_id    # => 1
+```
+
+### Real-world Polymorphic Examples
+
+```ruby
+# Likes - ทุก resource สามารถถูก like ได้
+class Like < ApplicationRecord
+  belongs_to :likeable, polymorphic: true
+  belongs_to :user
+end
+
+class Article < ApplicationRecord
+  has_many :likes, as: :likeable
+  def liked_by?(user)
+    likes.where(user: user).exists?
   end
 end
-```
 
-### Database Structure
-
-```
-comments table:
-+----+------------------+-----------------+-----------+
-| id | commentable_type | commentable_id  | body      |
-+----+------------------+-----------------+-----------+
-| 1  | "Post"           | 5               | "Great!"  |
-| 2  | "Article"        | 3               | "Thanks"  |
-| 3  | "Photo"          | 8               | "Nice"    |
-+----+------------------+-----------------+-----------+
-```
-
-### การใช้งาน Polymorphic
-
-```ruby
-# สร้าง comments
-post = Post.find(1)
-post.comments.create(body: "Great post!", user: current_user)
-
-article = Article.find(1)
-article.comments.create(body: "Interesting!", user: current_user)
-
-# ดู comments
-post.comments        # Comments สำหรับ post นี้
-article.comments     # Comments สำหรับ article นี้
-
-# Access commentable จาก comment
-comment = Comment.find(1)
-comment.commentable        # return Post object
-comment.commentable_type   # => "Post"
-comment.commentable_id     # => 5
-
-# Polymorphic route helper
-link_to "ดู", [comment.commentable]  # ไปยัง post หรือ article
-```
-
-### Polymorphic ตัวอย่างอื่น
-
-```ruby
-# Taggable - Tag หลาย types
-class Tag < ApplicationRecord
-  has_many :taggings
-  has_many :taggables, through: :taggings, source: :taggable
+class Comment < ApplicationRecord
+  has_many :likes, as: :likeable
 end
 
-class Tagging < ApplicationRecord
-  belongs_to :tag
-  belongs_to :taggable, polymorphic: true
-end
-
-class Post < ApplicationRecord
-  has_many :taggings, as: :taggable
-  has_many :tags, through: :taggings
-end
-
-# Attachable - Attachment หลาย types
-class Attachment < ApplicationRecord
-  belongs_to :attachable, polymorphic: true
+# Images - หลาย models มี images
+class Image < ApplicationRecord
+  belongs_to :imageable, polymorphic: true
+  has_one_attached :file
 end
 
 class User < ApplicationRecord
-  has_many :attachments, as: :attachable
+  has_many :images, as: :imageable
+  has_one :avatar, -> { where(role: "avatar") }, class_name: "Image", as: :imageable
 end
 
-class Post < ApplicationRecord
-  has_many :attachments, as: :attachable
+class Product < ApplicationRecord
+  has_many :images, as: :imageable
+end
+
+# Addresses - หลาย models มี addresses
+class Address < ApplicationRecord
+  belongs_to :addressable, polymorphic: true
+end
+
+class User < ApplicationRecord
+  has_one :billing_address, -> { where(type: "billing") },
+    class_name: "Address", as: :addressable
+  has_one :shipping_address, -> { where(type: "shipping") },
+    class_name: "Address", as: :addressable
+end
+
+class Company < ApplicationRecord
+  has_one :address, as: :addressable
+end
+
+# Notifications - polymorphic source
+class Notification < ApplicationRecord
+  belongs_to :notifiable, polymorphic: true
+  belongs_to :recipient, class_name: "User"
+
+  # source types: "Article", "Comment", "Follow", etc.
+end
+
+class Article < ApplicationRecord
+  has_many :notifications, as: :notifiable
+end
+
+class Comment < ApplicationRecord
+  has_many :notifications, as: :notifiable
+  after_create :notify_article_author
+
+  private
+
+  def notify_article_author
+    Notification.create!(
+      notifiable: self,
+      recipient: article.user,
+      message: "#{user.name} commented on your article"
+    )
+  end
 end
 ```
 
 ---
 
-## ขั้นตอนที่ 838: Self-referential Associations
+## ขั้นตอนที่ 838: Self-Referential Associations
 
-### Tree Structure
-
-```ruby
-# Employee hierarchy: Employee has many subordinates, belongs_to manager
-class Employee < ApplicationRecord
-  belongs_to :manager, class_name: "Employee", optional: true
-  has_many :subordinates, class_name: "Employee", foreign_key: :manager_id
-
-  def ancestors
-    result = []
-    current = self
-    while current.manager
-      result << current.manager
-      current = current.manager
-    end
-    result
-  end
-
-  def descendants
-    result = []
-    queue = subordinates.to_a
-    while queue.any?
-      employee = queue.shift
-      result << employee
-      queue.concat(employee.subordinates.to_a)
-    end
-    result
-  end
-end
-
-# Migration
-class CreateEmployees < ActiveRecord::Migration[7.1]
-  def change
-    create_table :employees do |t|
-      t.string :name
-      t.references :manager, foreign_key: { to_table: :employees }, null: true
-      t.timestamps
-    end
-  end
-end
-
-# การใช้งาน
-ceo = Employee.create(name: "CEO")
-vp1 = Employee.create(name: "VP Engineering", manager: ceo)
-vp2 = Employee.create(name: "VP Marketing", manager: ceo)
-dev1 = Employee.create(name: "Dev 1", manager: vp1)
-dev2 = Employee.create(name: "Dev 2", manager: vp1)
-
-ceo.subordinates      # [VP Engineering, VP Marketing]
-vp1.subordinates      # [Dev 1, Dev 2]
-dev1.manager          # VP Engineering
-dev1.ancestors        # [VP Engineering, CEO]
-ceo.descendants       # [VP Engineering, VP Marketing, Dev 1, Dev 2]
-```
-
-### Friendship (Bidirectional)
+### Self-Referential
 
 ```ruby
-class User < ApplicationRecord
-  # Friendships ที่ user เป็น initiator
-  has_many :friendships, dependent: :destroy
-  has_many :friends, through: :friendships
-
-  # Friendships ที่ user เป็น recipient
-  has_many :inverse_friendships, class_name: "Friendship",
-           foreign_key: :friend_id, dependent: :destroy
-  has_many :inverse_friends, through: :inverse_friendships, source: :user
-
-  # ดู friends ทั้งสองทิศทาง
-  def all_friends
-    (friends + inverse_friends).uniq
-  end
-end
-
-class Friendship < ApplicationRecord
-  belongs_to :user
-  belongs_to :friend, class_name: "User"
-end
-
-# Migration
-create_table :friendships do |t|
-  t.references :user, null: false, foreign_key: true
-  t.references :friend, null: false, foreign_key: { to_table: :users }
-  t.string :status, default: "pending"
-  t.timestamps
-end
-add_index :friendships, [:user_id, :friend_id], unique: true
-```
-
-### Category (Nested Categories)
-
-```ruby
+# Categories กับ subcategories
 class Category < ApplicationRecord
   belongs_to :parent, class_name: "Category", optional: true
-  has_many :children, class_name: "Category", foreign_key: :parent_id, dependent: :destroy
+  has_many :children, class_name: "Category", foreign_key: "parent_id", dependent: :destroy
 
-  scope :roots, -> { where(parent_id: nil) }
-  scope :leaves, -> { where.not(id: select(:parent_id).where.not(parent_id: nil)) }
-
+  # Navigation
   def root?
     parent_id.nil?
   end
@@ -741,379 +553,609 @@ class Category < ApplicationRecord
     children.empty?
   end
 
-  def depth
-    return 0 if root?
-    parent.depth + 1
-  end
-
-  def path
-    return [self] if root?
-    parent.path + [self]
-  end
-end
-```
-
----
-
-## ขั้นตอนที่ 839: N+1 Problem และ Eager Loading
-
-### N+1 Problem คืออะไร?
-
-```ruby
-# N+1 Problem
-posts = Post.all
-posts.each do |post|
-  puts post.user.name  # query แยกสำหรับแต่ละ post!
-end
-
-# SQL queries:
-# SELECT * FROM posts                    (1 query)
-# SELECT * FROM users WHERE id = 1      (1 query)
-# SELECT * FROM users WHERE id = 2      (1 query)
-# SELECT * FROM users WHERE id = 3      (1 query)
-# ... N+1 queries สำหรับ N posts
-```
-
-### แก้ด้วย Eager Loading
-
-```ruby
-# includes - โหลด association ล่วงหน้า
-posts = Post.includes(:user)
-posts.each do |post|
-  puts post.user.name  # ไม่ query เพิ่มแล้ว!
-end
-
-# SQL queries:
-# SELECT * FROM posts
-# SELECT * FROM users WHERE id IN (1, 2, 3, ...)
-# เพียง 2 queries เสมอ
-```
-
-### includes, preload, eager_load
-
-```ruby
-# includes - ให้ Rails เลือกวิธีที่ดีที่สุด
-Post.includes(:user, :comments)
-Post.includes(comments: :author)
-Post.includes(:user, comments: [:author, :likes])
-
-# preload - บังคับใช้ 2 separate queries
-Post.preload(:user)
-# SELECT * FROM posts
-# SELECT * FROM users WHERE id IN (...)
-
-# eager_load - บังคับใช้ LEFT OUTER JOIN
-Post.eager_load(:user)
-# SELECT posts.*, users.* FROM posts LEFT OUTER JOIN users ON ...
-
-# ใช้ includes กับ where บน association
-# ต้องใช้ references หรือ eager_load
-Post.includes(:comments).where(comments: { approved: true })
-# ถ้าใช้ string condition ต้องใช้ references
-Post.includes(:comments)
-    .where("comments.approved = ?", true)
-    .references(:comments)
-# หรือใช้ eager_load แทน includes
-Post.eager_load(:comments).where(comments: { approved: true })
-```
-
-### Detecting N+1 ด้วย Bullet gem
-
-```ruby
-# Gemfile
-gem "bullet", group: :development
-
-# config/environments/development.rb
-config.after_initialize do
-  Bullet.enable = true
-  Bullet.alert = true
-  Bullet.rails_logger = true
-  Bullet.add_footer = true
-  Bullet.bullet_logger = true
-  Bullet.unused_eager_loading_enable = true
-  Bullet.counter_cache_enable = true
-end
-```
-
----
-
-## ขั้นตอนที่ 840: Counter Cache
-
-### ติดตั้ง Counter Cache
-
-```ruby
-# app/models/comment.rb
-class Comment < ApplicationRecord
-  belongs_to :post, counter_cache: true
-end
-
-# Migration
-class AddCommentsCountToPosts < ActiveRecord::Migration[7.1]
-  def change
-    add_column :posts, :comments_count, :integer, default: 0, null: false
-
-    # Reset counts สำหรับ data ที่มีอยู่
-    Post.find_each do |post|
-      Post.reset_counters(post.id, :comments)
+  def ancestors
+    node = self
+    result = []
+    while node.parent.present?
+      result.unshift(node.parent)
+      node = node.parent
     end
+    result
+  end
+
+  def descendants
+    result = []
+    children.each do |child|
+      result << child
+      result.concat(child.descendants)
+    end
+    result
+  end
+
+  def self.tree
+    where(parent_id: nil).includes(children: [:children])
   end
 end
 
-# ใช้งาน
-post = Post.find(1)
-post.comments_count   # ดึงจาก column ในตาราง (ไม่ต้อง query)
-post.comments.size    # ใช้ counter cache ถ้ามี
-post.comments.count   # query database เสมอ
+# ใช้งาน:
+tech = Category.create!(name: "Technology")
+rails = Category.create!(name: "Rails", parent: tech)
+models = Category.create!(name: "Models", parent: rails)
+
+models.parent        # => rails
+models.ancestors     # => [tech, rails]
+tech.children        # => [rails]
+tech.descendants     # => [rails, models]
 ```
 
-### Custom Counter Cache Name
-
-```ruby
-class Like < ApplicationRecord
-  belongs_to :post, counter_cache: :likes_count
-  # ใช้ column likes_count แทน likes_count
-end
-
-# Reset specific counter
-Post.reset_counters(post_id, :likes)
-```
-
----
-
-## ขั้นตอนที่ 841: Association Callbacks
+### User Follows User
 
 ```ruby
 class User < ApplicationRecord
-  has_many :posts,
-           before_add: :check_post_limit,
-           after_add: :send_notification,
-           before_remove: :log_removal,
-           after_remove: :update_stats
+  has_many :active_follows, class_name: "Follow",
+    foreign_key: "follower_id", dependent: :destroy
+  has_many :passive_follows, class_name: "Follow",
+    foreign_key: "followed_id", dependent: :destroy
+
+  has_many :following, through: :active_follows, source: :followed
+  has_many :followers, through: :passive_follows, source: :follower
+
+  def follow!(other_user)
+    active_follows.create!(followed: other_user) unless following?(other_user)
+  end
+
+  def unfollow!(other_user)
+    active_follows.find_by(followed: other_user)&.destroy
+  end
+
+  def following?(other_user)
+    following.include?(other_user)
+  end
+
+  def followed_by?(other_user)
+    followers.include?(other_user)
+  end
 end
 
-class Post < ApplicationRecord
+class Follow < ApplicationRecord
+  belongs_to :follower, class_name: "User"
+  belongs_to :followed, class_name: "User"
+
+  validates :follower_id, uniqueness: { scope: :followed_id }
+  validate :cannot_follow_self
+
+  private
+
+  def cannot_follow_self
+    errors.add(:base, "ไม่สามารถ follow ตัวเองได้") if follower_id == followed_id
+  end
+end
+
+# Migration:
+create_table :follows do |t|
+  t.references :follower, null: false, foreign_key: { to_table: :users }
+  t.references :followed, null: false, foreign_key: { to_table: :users }
+  t.timestamps
+end
+add_index :follows, [:follower_id, :followed_id], unique: true
+```
+
+---
+
+## ขั้นตอนที่ 839: Association Methods และ Options
+
+### Association Methods
+
+```ruby
+class Article < ApplicationRecord
+  has_many :comments, dependent: :destroy
   belongs_to :user
 end
 
-# ใน User model
-private
+# Collection methods (has_many):
+@article.comments             # SELECT * FROM comments WHERE article_id = X
+@article.comments.count       # SELECT COUNT(*) FROM comments WHERE article_id = X
+@article.comments.size        # ใช้ counter_cache ถ้ามี
+@article.comments.length      # load ทั้งหมดแล้ว count (ไม่แนะนำ)
+@article.comments.empty?      # true/false
+@article.comments.any?        # true/false
+@article.comments.many?       # มีมากกว่า 1
+@article.comments.include?(comment)  # ตรวจสอบว่ามีหรือเปล่า
 
-def check_post_limit(post)
-  if posts.count >= 100
-    raise "ไม่สามารถเพิ่มบทความได้ มีมากกว่า 100 แล้ว"
-  end
-end
+# Modification:
+@article.comments.build(body: "test")   # new comment ที่ link กับ article (ไม่ save)
+@article.comments.create(body: "test")  # save ทันที
+@article.comments.create!(body: "test") # save + raise exception
+@article.comments << new_comment        # append
+@article.comments.concat(comments_arr)  # append หลายตัว
+@article.comments.push(new_comment)     # เหมือน <<
 
-def send_notification(post)
-  PostNotificationJob.perform_later(post.id)
-end
+@article.comments.delete(comment)       # ลบ association
+@article.comments.destroy(comment)      # destroy object + association
+@article.comments.clear                 # ลบ associations ทั้งหมด
+@article.comments.delete_all            # DELETE SQL (ไม่ run callbacks)
+@article.comments.destroy_all           # destroy แต่ละ object
 
-def log_removal(post)
-  Rails.logger.info "Removing post #{post.id} from user #{id}"
-end
-
-def update_stats(post)
-  update_column(:posts_count, posts.count)
-end
+# Querying:
+@article.comments.where(approved: true)
+@article.comments.order(created_at: :desc)
+@article.comments.includes(:user)
+@article.comments.limit(5)
+@article.comments.find(1)
+@article.comments.find_by(user: current_user)
 ```
 
 ---
 
-## ขั้นตอนที่ 842: Association Extensions
+## ขั้นตอนที่ 840: Eager Loading (N+1 Problem)
+
+### N+1 Problem
 
 ```ruby
-class User < ApplicationRecord
-  has_many :posts do
-    def published
-      where(published: true)
-    end
-
-    def recent
-      order(created_at: :desc).limit(5)
-    end
-
-    def search(query)
-      where("title LIKE ?", "%#{query}%")
-    end
-
-    def publish_all!
-      update_all(published: true)
-    end
-  end
+# ❌ N+1 Problem
+# 1 query สำหรับ articles + N queries สำหรับแต่ละ user
+@articles = Article.all
+@articles.each do |article|
+  puts article.user.name  # Query ใหม่ทุกครั้ง!
 end
+# SQL:
+# SELECT * FROM articles;
+# SELECT * FROM users WHERE id = 1;
+# SELECT * FROM users WHERE id = 2;
+# SELECT * FROM users WHERE id = 3;
+# ... (N queries!)
 
-# การใช้งาน
-user.posts.published
-user.posts.recent
-user.posts.search("Ruby")
-user.posts.published.recent
-user.posts.publish_all!
+# ✅ แก้ด้วย includes
+@articles = Article.includes(:user)
+@articles.each do |article|
+  puts article.user.name  # ใช้ data ที่ preloaded แล้ว
+end
+# SQL:
+# SELECT * FROM articles;
+# SELECT * FROM users WHERE id IN (1, 2, 3);  # เพียง 2 queries!
+
+# ตรวจสอบ N+1 ด้วย Bullet gem
+# config/environments/development.rb
+# config.after_initialize do
+#   Bullet.enable = true
+#   Bullet.rails_logger = true
+#   Bullet.add_footer = true
+# end
+```
+
+### includes vs preload vs eager_load
+
+```ruby
+# 1. includes - อัจฉริยะ เลือกระหว่าง preload/eager_load อัตโนมัติ
+Article.includes(:user)
+Article.includes(:user, :tags, :comments)
+Article.includes(comments: :user)  # nested
+Article.includes(:user).where("users.admin = ?", true).references(:users)
+
+# 2. preload - ใช้ separate queries เสมอ
+Article.preload(:user)
+# SQL:
+# SELECT * FROM articles
+# SELECT * FROM users WHERE id IN (...)
+
+# 3. eager_load - ใช้ LEFT OUTER JOIN เสมอ
+Article.eager_load(:user)
+# SQL:
+# SELECT articles.*, users.* FROM articles
+#   LEFT OUTER JOIN users ON users.id = articles.user_id
+
+# เมื่อไหร่ใช้อะไร:
+# includes: ใช้ทั่วไป (Rails เลือกให้)
+# preload: เมื่อต้องการ separate queries แน่นอน
+# eager_load: เมื่อต้องการ WHERE/ORDER บน joined table
+
+# includes + where บน association ต้องใช้ references:
+Article.includes(:user)
+       .where("users.role = ?", "admin")
+       .references(:users)
+# หรือ:
+Article.eager_load(:user).where(users: { role: "admin" })
+```
+
+### ตัวอย่าง Complex Eager Loading
+
+```ruby
+# หน้า article show ที่ต้องการข้อมูลหลายส่วน
+@article = Article.includes(
+  :user,
+  :category,
+  :tags,
+  comments: { user: :profile }  # nested includes
+).find(params[:id])
+
+# Dashboard ที่ต้องการ stats
+@users = User.includes(
+  :profile,
+  articles: [:tags, :comments],
+  follows: :followed
+).where(role: "author").limit(20)
+
+# Homepage ที่ต้องการ recent popular articles
+@articles = Article.published
+                   .includes(:user, :tags, :category)
+                   .preload(:comments)  # ต้องการ count
+                   .order(published_at: :desc)
+                   .limit(10)
 ```
 
 ---
 
-## ขั้นตอนที่ 843: Strict Loading
+## ขั้นตอนที่ 841-860: Association Best Practices
 
-### Strict Loading (Rails 6.1+)
-
-```ruby
-# ป้องกัน lazy loading - force eager loading
-post = Post.strict_loading.find(1)
-post.user   # raise ActiveRecord::StrictLoadingViolationError!
-
-# ต้อง eager load ล่วงหน้า
-post = Post.includes(:user).strict_loading.find(1)
-post.user   # OK
-
-# กำหนด globally ใน model
-class Post < ApplicationRecord
-  self.strict_loading_by_default = true
-end
-
-# กำหนดสำหรับ association
-class User < ApplicationRecord
-  has_many :posts, strict_loading: true
-end
-```
-
----
-
-## ขั้นตอนที่ 844: Association Tips และ Best Practices
-
-### Bidirectional Associations
+### Full Blog Application Associations
 
 ```ruby
-class Post < ApplicationRecord
-  belongs_to :user, inverse_of: :posts
-  has_many :comments, inverse_of: :post
-end
-
+# app/models/user.rb
 class User < ApplicationRecord
-  has_many :posts, inverse_of: :user
+  # Authored content
+  has_many :articles, dependent: :destroy
+  has_many :comments, dependent: :destroy
+  has_many :likes, dependent: :destroy
+  has_many :bookmarks, dependent: :destroy
+
+  # Published content
+  has_many :published_articles,
+    -> { published },
+    class_name: "Article"
+
+  # Liked articles
+  has_many :liked_articles, through: :likes, source: :likeable,
+    source_type: "Article"
+
+  # Social
+  has_many :active_follows, class_name: "Follow",
+    foreign_key: :follower_id, dependent: :destroy
+  has_many :passive_follows, class_name: "Follow",
+    foreign_key: :followed_id, dependent: :destroy
+  has_many :following, through: :active_follows, source: :followed
+  has_many :followers, through: :passive_follows, source: :follower
+
+  # Profile
+  has_one :profile, dependent: :destroy
+  has_one :setting, dependent: :destroy
+
+  # Notifications
+  has_many :notifications, foreign_key: :recipient_id, dependent: :destroy
+  has_many :unread_notifications, -> { unread },
+    class_name: "Notification", foreign_key: :recipient_id
 end
 
+# app/models/article.rb
+class Article < ApplicationRecord
+  belongs_to :user, counter_cache: :articles_count
+  belongs_to :category, optional: true, counter_cache: true
+
+  has_many :article_tags, dependent: :destroy
+  has_many :tags, through: :article_tags
+
+  has_many :comments, as: :commentable, dependent: :destroy
+  has_many :comment_users, through: :comments, source: :user
+
+  has_many :likes, as: :likeable, dependent: :destroy
+  has_many :bookmarks, dependent: :destroy
+
+  has_one :seo_meta, dependent: :destroy, autosave: true
+  has_one_attached :featured_image
+  has_many_attached :attachments
+
+  # Nested attributes
+  accepts_nested_attributes_for :seo_meta, allow_destroy: true
+  accepts_nested_attributes_for :tags,
+    reject_if: :all_blank,
+    allow_destroy: true
+end
+
+# app/models/comment.rb
 class Comment < ApplicationRecord
-  belongs_to :post, inverse_of: :comments
+  belongs_to :commentable, polymorphic: true
+  belongs_to :user
+
+  has_many :likes, as: :likeable, dependent: :destroy
+  has_many :replies, class_name: "Comment",
+    foreign_key: :parent_id, dependent: :destroy
+  belongs_to :parent, class_name: "Comment", optional: true
+end
+
+# app/models/tag.rb
+class Tag < ApplicationRecord
+  has_many :article_tags, dependent: :destroy
+  has_many :articles, through: :article_tags
+
+  scope :popular, -> { order(articles_count: :desc) }
+end
+
+# app/models/follow.rb
+class Follow < ApplicationRecord
+  belongs_to :follower, class_name: "User"
+  belongs_to :followed, class_name: "User"
+
+  validates :follower_id, uniqueness: { scope: :followed_id }
+  validate :cannot_follow_self
+
+  after_create :notify_followed_user
+
+  private
+
+  def cannot_follow_self
+    errors.add(:base, "Cannot follow yourself") if follower_id == followed_id
+  end
+
+  def notify_followed_user
+    Notification.create!(
+      recipient: followed,
+      notifiable: self,
+      message: "#{follower.name} started following you"
+    )
+  end
+end
+
+# app/models/like.rb
+class Like < ApplicationRecord
+  belongs_to :user
+  belongs_to :likeable, polymorphic: true, counter_cache: true
+
+  validates :user_id, uniqueness: {
+    scope: [:likeable_type, :likeable_id],
+    message: "already liked this"
+  }
+
+  after_create :increment_likes_count
+  after_destroy :decrement_likes_count
+
+  private
+
+  def increment_likes_count
+    likeable.increment!(:likes_count)
+  end
+
+  def decrement_likes_count
+    likeable.decrement!(:likes_count)
+  end
+end
+
+# app/models/notification.rb
+class Notification < ApplicationRecord
+  belongs_to :recipient, class_name: "User"
+  belongs_to :notifiable, polymorphic: true, optional: true
+
+  scope :unread, -> { where(read_at: nil) }
+  scope :recent, -> { order(created_at: :desc) }
+
+  def mark_as_read!
+    update!(read_at: Time.current)
+  end
 end
 ```
 
-### Polymorphic กับ STI
+---
+
+## แบบฝึกหัด Part 38 (ขั้นตอนที่ 831-860)
+
+**ข้อ 1:** สร้าง has_many :through สำหรับ Student และ Course ผ่าน Enrollment
 
 ```ruby
-# STI (Single Table Inheritance)
-class Shape < ApplicationRecord
+# คำตอบ:
+class Student < ApplicationRecord
+  has_many :enrollments, dependent: :destroy
+  has_many :courses, through: :enrollments
 end
 
-class Circle < Shape
-  def area
-    Math::PI * radius ** 2
-  end
+class Course < ApplicationRecord
+  has_many :enrollments, dependent: :destroy
+  has_many :students, through: :enrollments
 end
 
-class Rectangle < Shape
-  def area
-    width * height
-  end
-end
+class Enrollment < ApplicationRecord
+  belongs_to :student
+  belongs_to :course
 
-# Migration
-create_table :shapes do |t|
-  t.string :type  # required for STI
-  t.float :radius
-  t.float :width
-  t.float :height
+  # Extra: grade, enrolled_at, status
+  validates :student_id, uniqueness: { scope: :course_id }
 end
 ```
 
+**ข้อ 2:** สร้าง polymorphic association สำหรับ Attachments
+
+```ruby
+# คำตอบ:
+class Attachment < ApplicationRecord
+  belongs_to :attachable, polymorphic: true
+  has_one_attached :file
+  validates :file, presence: true
+end
+
+class Article < ApplicationRecord
+  has_many :attachments, as: :attachable, dependent: :destroy
+end
+
+class Message < ApplicationRecord
+  has_many :attachments, as: :attachable, dependent: :destroy
+end
+
+# Migration:
+create_table :attachments do |t|
+  t.references :attachable, polymorphic: true, null: false
+  t.string :filename
+  t.string :content_type
+  t.bigint :file_size
+  t.timestamps
+end
+```
+
+**ข้อ 3:** implement N+1 fix ด้วย includes
+
+```ruby
+# คำตอบ:
+# ❌ N+1:
+@articles = Article.published
+@articles.each { |a| puts "#{a.title} by #{a.user.name}" }
+
+# ✅ Fixed:
+@articles = Article.published.includes(:user, :tags, :category)
+@articles.each { |a| puts "#{a.title} by #{a.user.name}" }
+```
+
+**ข้อ 4:** สร้าง self-referential association สำหรับ categories
+
+```ruby
+# คำตอบ:
+class Category < ApplicationRecord
+  belongs_to :parent, class_name: "Category", optional: true
+  has_many :children, class_name: "Category",
+    foreign_key: "parent_id",
+    dependent: :destroy
+
+  scope :roots, -> { where(parent_id: nil) }
+
+  def root?
+    parent_id.nil?
+  end
+end
+```
+
+**ข้อ 5:** เขียน RSpec tests สำหรับ associations
+
+```ruby
+# คำตอบ:
+RSpec.describe Article, type: :model do
+  it { should belong_to(:user) }
+  it { should have_many(:comments).dependent(:destroy) }
+  it { should have_many(:tags).through(:article_tags) }
+  it { should belong_to(:category).optional }
+
+  describe "comments association" do
+    let(:article) { create(:article) }
+    let(:user) { create(:user) }
+
+    it "can have many comments" do
+      expect {
+        create(:comment, article: article, user: user)
+        create(:comment, article: article, user: user)
+      }.to change { article.comments.count }.by(2)
+    end
+  end
+end
+```
+
+**ข้อ 6:** สร้าง association กับ scope
+
+```ruby
+# คำตอบ:
+class User < ApplicationRecord
+  has_many :articles
+  has_many :published_articles,
+    -> { where(status: "published").order(published_at: :desc) },
+    class_name: "Article"
+  has_many :recent_articles,
+    -> { order(created_at: :desc).limit(5) },
+    class_name: "Article"
+  has_many :featured_articles,
+    -> { where(featured: true) },
+    class_name: "Article"
+end
+```
+
+**ข้อ 7:** implement counter cache
+
+```ruby
+# คำตอบ:
+# Migration:
+add_column :users, :articles_count, :integer, default: 0, null: false
+
+User.find_each do |user|
+  User.reset_counters(user.id, :articles)
+end
+
+# Model:
+class Article < ApplicationRecord
+  belongs_to :user, counter_cache: :articles_count
+end
+
+# ใช้งาน:
+user.articles_count  # เร็ว! ไม่ต้อง COUNT query
+```
+
+**ข้อ 8:** สร้าง User ที่ Follow User ด้วย self-referential
+
+```ruby
+# คำตอบ:
+class User < ApplicationRecord
+  has_many :active_follows, class_name: "Follow", foreign_key: :follower_id, dependent: :destroy
+  has_many :passive_follows, class_name: "Follow", foreign_key: :followed_id, dependent: :destroy
+  has_many :following, through: :active_follows, source: :followed
+  has_many :followers, through: :passive_follows, source: :follower
+
+  def follow!(other)
+    following << other unless following?(other)
+  end
+
+  def unfollow!(other)
+    following.delete(other)
+  end
+
+  def following?(other)
+    following.include?(other)
+  end
+end
+```
+
+**ข้อ 9:** สร้าง belongs_to กับ optional และ validate custom
+
+```ruby
+# คำตอบ:
+class Article < ApplicationRecord
+  belongs_to :category, optional: true
+  validates :category_id, presence: true, if: :published?
+
+  def published?
+    status == "published"
+  end
+end
+```
+
+**ข้อ 10:** eager load nested associations
+
+```ruby
+# คำตอบ:
+@articles = Article.published
+                   .includes(
+                     :user,
+                     :category,
+                     :tags,
+                     comments: { user: :profile }
+                   )
+                   .order(published_at: :desc)
+                   .page(params[:page])
+                   .per(10)
+```
+
+**ข้อ 11-30:** ดูตัวอย่าง associations ที่สมบูรณ์ในส่วน "Full Blog Application Associations" ด้านบน
+
 ---
 
-## แบบฝึกหัดตอนที่ 38 (30 ข้อ)
+## สรุป Part 38
 
-### ระดับพื้นฐาน
+ในบทนี้เราได้เรียนรู้:
 
-**ข้อ 1:** สร้าง `User` และ `Profile` models ที่มี has_one/belongs_to relationship พร้อม migration
+1. **belongs_to** - foreign key relationship (many side)
+2. **has_many** - one-to-many relationship
+3. **has_one** - one-to-one relationship
+4. **has_many :through** - many-to-many ผ่าน join model
+5. **has_one :through** - one-to-one ผ่าน intermediary model
+6. **HABTM** - simple many-to-many (ไม่แนะนำ)
+7. **Polymorphic** - model หนึ่ง belong_to หลาย models
+8. **Self-referential** - model สัมพันธ์กับตัวเอง
+9. **Association Options** - dependent, class_name, scope, etc.
+10. **Eager Loading** - แก้ N+1 ด้วย includes/preload/eager_load
+11. **N+1 Problem** - และวิธีแก้
 
-**ข้อ 2:** สร้าง `Post` และ `Comment` models พร้อม has_many/belongs_to relationship ด้วย dependent: :destroy
-
-**ข้อ 3:** สร้าง belongs_to ที่ optional (category ไม่จำเป็น) พร้อม test
-
-**ข้อ 4:** ใช้ has_many :through เพื่อเชื่อม Posts และ Tags ผ่าน PostTag join model
-
-**ข้อ 5:** ใช้ `touch: true` ใน belongs_to เพื่ออัปเดต parent's updated_at
-
-**ข้อ 6:** สร้าง self-referential association สำหรับ Category (parent/children)
-
-**ข้อ 7:** แก้ N+1 problem ด้วย includes ใน posts index page
-
-**ข้อ 8:** สร้าง counter cache สำหรับ comments count ใน posts
-
-**ข้อ 9:** ใช้ class_name และ foreign_key เพื่อสร้าง has_many :authored_posts
-
-**ข้อ 10:** ใช้ collection methods: build, create, << เพื่อเพิ่ม records
-
-### ระดับกลาง
-
-**ข้อ 11:** Implement polymorphic comments ที่ใช้ได้กับทั้ง Post, Article, Photo
-
-**ข้อ 12:** สร้าง Friendship model แบบ self-referential ที่มี status: pending/accepted/rejected
-
-**ข้อ 13:** ใช้ has_many :through กับ extra attributes เช่น Membership ที่มี role และ joined_at
-
-**ข้อ 14:** สร้าง scope ใน has_many เพื่อ filter เช่น published_posts, recent_posts
-
-**ข้อ 15:** ใช้ association extension เพิ่ม custom methods ให้ collection
-
-**ข้อ 16:** Implement Employee hierarchy ด้วย self-referential association
-
-**ข้อ 17:** ใช้ eager_load แทน includes เมื่อต้อง filter บน associated table
-
-**ข้อ 18:** สร้าง association callback เพื่อ validate เมื่อเพิ่ม records เข้า collection
-
-**ข้อ 19:** ใช้ merge เพื่อ combine scopes จาก associated models
-
-**ข้อ 20:** Implement tagging system ด้วย polymorphic many-to-many
-
-### ระดับสูง
-
-**ข้อ 21:** ติดตั้ง Bullet gem และ detect N+1 problems ในระบบ
-
-**ข้อ 22:** Implement threaded comments (comments ที่มี parent comment)
-
-**ข้อ 23:** สร้าง multi-level category tree ที่ query ทุก descendants ด้วย recursive query
-
-**ข้อ 24:** ใช้ strict_loading เพื่อป้องกัน lazy loading ใน production
-
-**ข้อ 25:** สร้าง has_many with complex scope ที่รวม joins
-
-**ข้อ 26:** Implement ระบบ followers/following ด้วย self-referential HABTM
-
-**ข้อ 27:** ใช้ preload vs eager_load อธิบายความแตกต่างด้วย SQL queries
-
-**ข้อ 28:** สร้าง polymorphic likes system สำหรับ Post, Comment, Photo
-
-**ข้อ 29:** Implement has_one through ใน 3 levels: Country → State → City
-
-**ข้อ 30:** เขียน tests ครอบคลุม associations ทั้งหมด รวม N+1 prevention
+Associations เป็นหัวใจของ Rails ORM ที่ทำให้การทำงานกับ related data เป็นเรื่องง่ายและ intuitive
 
 ---
 
-## สรุปตอนที่ 38
-
-| Association | ใช้เมื่อ | Database |
-|------------|---------|----------|
-| belongs_to | model มี foreign key | FK column ใน table นี้ |
-| has_many | model มีหลาย records ใน table อื่น | FK column ในตาราง other |
-| has_one | model มี 1 record ใน table อื่น | FK column ในตาราง other |
-| has_many :through | many-to-many ที่มี extra attributes | join table |
-| has_one :through | one-to-one ผ่าน join | join table |
-| HABTM | simple many-to-many | join table ไม่มี model |
-| polymorphic | belongs_to หลาย types | type + id columns |
-| self-referential | hierarchy/tree | self FK column |
-
-**Key Principles:**
-1. **ใช้ has_many :through แทน HABTM** เสมอ (flexible กว่า)
-2. **ใช้ includes เสมอ** เมื่อ access association ใน loop
-3. **ใช้ dependent:** ป้องกัน orphan records
-4. **ใช้ inverse_of** เพื่อ performance
-
-ตอนถัดไป: **ตอนที่ 39** - Validations
+*ต่อไป: Part 39 - Validations (ขั้นตอนที่ 861-880)*

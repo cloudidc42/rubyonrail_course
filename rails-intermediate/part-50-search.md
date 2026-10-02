@@ -1,611 +1,417 @@
-# ตอนที่ 50: Search (Steps 1101-1120)
+# Part 50: Search ใน Rails
 
-## บทนำ
-
-การค้นหาข้อมูลเป็นฟีเจอร์สำคัญของ web application แทบทุกตัว Rails รองรับการค้นหาได้หลายระดับตั้งแต่ LIKE query ง่ายๆ จนถึง full-text search ด้วย Elasticsearch
+## ขั้นตอนที่ 1101-1120: การค้นหาข้อมูลด้วยวิธีต่างๆ
 
 ---
 
-## Step 1101: Simple LIKE Search
-
-### Basic LIKE Query
+## ขั้นตอนที่ 1101: Basic Search ด้วย LIKE
 
 ```ruby
-# app/controllers/articles_controller.rb
-def index
-  @articles = Article.all
-  
-  if params[:search].present?
-    search_term = "%#{params[:search].strip}%"
-    @articles = @articles.where(
-      "title LIKE ? OR body LIKE ?",
-      search_term, search_term
-    )
-  end
-  
-  @articles = @articles.order(created_at: :desc).page(params[:page])
-end
-```
-
-### Case-Insensitive Search (PostgreSQL)
-
-```ruby
-# PostgreSQL ใช้ ILIKE แทน LIKE (case-insensitive)
-@articles = Article.where("title ILIKE ? OR body ILIKE ?", "%#{query}%", "%#{query}%")
-
-# หรือใช้ lower()
-@articles = Article.where(
-  "lower(title) LIKE ? OR lower(body) LIKE ?",
-  query.downcase.prepend("%").concat("%"),
-  query.downcase.prepend("%").concat("%")
-)
-```
-
-### Search Scope ใน Model
-
-```ruby
-# app/models/article.rb
-class Article < ApplicationRecord
-  scope :search, ->(query) {
-    return all if query.blank?
+# Simple LIKE search
+class PostsController < ApplicationController
+  def index
+    @posts = Post.all
     
-    safe_query = query.strip.gsub(/[%_]/, '\\\\\0')  # Escape wildcards
-    where("title ILIKE :q OR body ILIKE :q", q: "%#{safe_query}%")
-  }
-  
-  scope :by_author_name, ->(name) {
-    return all if name.blank?
-    joins(:user).where("users.name ILIKE ?", "%#{name}%")
-  }
-  
-  scope :with_tags, ->(tags) {
-    return all if tags.blank?
-    joins(:tags).where(tags: { name: tags.split(',').map(&:strip) })
-  }
+    if params[:query].present?
+      query = "%#{params[:query]}%"
+      @posts = @posts.where("title LIKE ? OR content LIKE ?", query, query)
+    end
+    
+    @posts = @posts.order(created_at: :desc).page(params[:page])
+  end
 end
 ```
-
----
-
-## Step 1102: Ransack Gem
-
-### Setup
-
-```ruby
-# Gemfile
-gem 'ransack'
-```
-
-```bash
-bundle install
-```
-
-### Basic Ransack Search
-
-```ruby
-# app/controllers/articles_controller.rb
-def index
-  @q = Article.ransack(params[:q])
-  @articles = @q.result(distinct: true).includes(:user).order(created_at: :desc)
-  @pagy, @articles = pagy(@articles)
-end
-```
-
-### Search Form
 
 ```erb
-<%# app/views/articles/index.html.erb %>
-<%= search_form_for @q do |f| %>
-  <%# Simple search %>
-  <div class="search-field">
-    <%= f.label :title_cont, "Title contains:" %>
-    <%= f.search_field :title_cont, class: "form-control", placeholder: "Search articles..." %>
+<%# app/views/posts/index.html.erb %>
+<%= form_with url: posts_path, method: :get do |f| %>
+  <div class="search-box">
+    <%= f.text_field :query, value: params[:query], placeholder: "ค้นหา..." %>
+    <%= f.submit "ค้นหา" %>
   </div>
-  
-  <%# Author name search %>
-  <div class="search-field">
-    <%= f.label :user_name_cont, "Author:" %>
-    <%= f.search_field :user_name_cont, class: "form-control" %>
-  </div>
-  
-  <%# Date range %>
-  <div class="search-field">
-    <%= f.label :created_at_gteq, "Published after:" %>
-    <%= f.date_field :created_at_gteq, class: "form-control" %>
-  </div>
-  
-  <div class="search-field">
-    <%= f.label :created_at_lteq, "Published before:" %>
-    <%= f.date_field :created_at_lteq, class: "form-control" %>
-  </div>
-  
-  <%# Published status %>
-  <div class="search-field">
-    <%= f.label :published_eq, "Status:" %>
-    <%= f.select :published_eq, [["All", ""], ["Published", true], ["Draft", false]], 
-                 { include_blank: false }, class: "form-control" %>
-  </div>
-  
-  <%# Sort %>
-  <div class="search-field">
-    <%= sort_link(@q, :created_at, "Date") %>
-    <%= sort_link(@q, :title, "Title") %>
-    <%= sort_link(@q, :views_count, "Views") %>
-  </div>
-  
-  <%= f.submit "Search", class: "btn btn-primary" %>
-  <%= link_to "Clear", articles_path, class: "btn btn-secondary" %>
+<% end %>
+
+<% @posts.each do |post| %>
+  <%= render post %>
 <% end %>
 ```
 
-### Ransack Predicates
-
-```
-_eq        → =  (equal)
-_not_eq    → !=
-_lt        → < (less than)
-_lteq      → <=
-_gt        → > (greater than)
-_gteq      → >=
-_cont      → LIKE %value%
-_not_cont  → NOT LIKE
-_start     → LIKE value%
-_end       → LIKE %value
-_in        → IN (array)
-_not_in    → NOT IN
-_null      → IS NULL
-_not_null  → IS NOT NULL
-_present   → not null, not blank
-_blank     → null or blank
-_true      → IS TRUE
-_false     → IS FALSE
-_matches   → LIKE (SQL wildcards)
-```
-
-### Ransack กับ Custom Ransackable
+## ขั้นตอนที่ 1102: ILIKE สำหรับ PostgreSQL
 
 ```ruby
-# app/models/article.rb
-class Article < ApplicationRecord
-  def self.ransackable_attributes(auth_object = nil)
-    # อนุญาต fields ที่ค้นหาได้
-    %w[title body created_at updated_at published views_count]
-  end
+# PostgreSQL ILIKE - case insensitive
+class Post < ApplicationRecord
+  scope :search_by_title, ->(query) {
+    where("title ILIKE ?", "%#{query}%") if query.present?
+  }
   
-  def self.ransackable_associations(auth_object = nil)
-    %w[user comments tags]
-  end
+  scope :search_by_content, ->(query) {
+    where("content ILIKE ?", "%#{query}%") if query.present?
+  }
   
-  # Custom ransack scope
-  ransack_scope :popular, ->(value) {
-    where("views_count > ?", value.to_i) if value.present?
+  scope :full_text_search, ->(query) {
+    return all if query.blank?
+    
+    where(
+      "title ILIKE :q OR content ILIKE :q OR tags_string ILIKE :q",
+      q: "%#{query}%"
+    )
   }
 end
 ```
 
----
+```ruby
+# PostgreSQL Full-Text Search (built-in)
+class Post < ApplicationRecord
+  scope :pg_search, ->(query) {
+    where(
+      "to_tsvector('english', title || ' ' || content) @@ plainto_tsquery(?)",
+      query
+    )
+  }
+  
+  # สร้าง index
+  # add_index :posts, "to_tsvector('english', title || ' ' || content)", 
+  #           using: :gin, name: 'index_posts_on_fts'
+end
+```
 
-## Step 1103: pg_search (PostgreSQL Full-Text Search)
-
-### Setup
+## ขั้นตอนที่ 1103: pg_search Gem
 
 ```ruby
 # Gemfile
 gem 'pg_search'
-```
 
-```bash
-bundle install
-rails generate pg_search:migration:multisearch
-rails db:migrate
+# bundle install
 ```
-
-### Single Model Search
 
 ```ruby
-# app/models/article.rb
-class Article < ApplicationRecord
+# app/models/post.rb
+class Post < ApplicationRecord
   include PgSearch::Model
   
-  # Full-text search
-  pg_search_scope :search_by_full_text,
-    against: {
-      title: 'A',     # Weight A (most important)
-      body: 'B',      # Weight B
-      excerpt: 'C'    # Weight C (least important)
-    },
+  # Multisearch (ค้นหาข้ามหลาย model)
+  multisearchable against: [:title, :content, :tags_string]
+  
+  # Single model search
+  pg_search_scope :search_by_title,
+    against: :title,
     using: {
       tsearch: {
-        language: "english",
-        tsvector_column: 'searchable',  # pre-built tsvector column
-        prefix: true                     # match partial words
-      },
-      trigram: {  # fuzzy matching
-        only: [:title],
-        threshold: 0.1
+        prefix: true,
+        highlight: {
+          StartSel: '<mark>',
+          StopSel: '</mark>'
+        }
       }
     }
   
-  # Simple search
-  pg_search_scope :search_title,
-    against: :title,
-    using: { tsearch: { prefix: true } }
-  
-  # Multi-table search
-  pg_search_scope :search_with_author,
-    against: :title,
-    associated_against: { user: [:name, :email] },
-    using: :tsearch
+  pg_search_scope :full_search,
+    against: {
+      title: 'A',      # น้ำหนักสูงสุด
+      content: 'B',
+      summary: 'C',
+      tags_string: 'D' # น้ำหนักต่ำสุด
+    },
+    using: {
+      tsearch: {
+        prefix: true,
+        dictionary: "english"
+      },
+      trigram: {
+        threshold: 0.3
+      }
+    }
 end
 ```
 
-### Multi-Search (ค้นหาข้ามหลาย models)
-
 ```ruby
-# app/models/user.rb
-class User < ApplicationRecord
-  include PgSearch::Model
-  
-  multisearchable against: [:name, :email],
-                  using: { tsearch: { prefix: true } }
-end
-
-# app/models/article.rb
-class Article < ApplicationRecord
-  include PgSearch::Model
-  
-  multisearchable against: [:title, :body],
-                  if: :published?,
-                  additional_attributes: -> (article) {
-                    { 
-                      status: article.published? ? 'published' : 'draft',
-                      author: article.user.name
-                    }
-                  }
-end
-
-# ค้นหาทุก models พร้อมกัน
-results = PgSearch.multisearch("ruby on rails")
-results.each do |result|
-  case result.searchable_type
-  when 'Article'
-    puts "Article: #{result.searchable.title}"
-  when 'User'
-    puts "User: #{result.searchable.name}"
+# ใน controller
+def index
+  if params[:query].present?
+    @posts = Post.full_search(params[:query])
+  else
+    @posts = Post.published.order(created_at: :desc)
   end
+  
+  @posts = @posts.page(params[:page]).per(20)
 end
 ```
 
-### Tsvector Column (Pre-built index)
-
 ```ruby
-# migration
-class AddSearchableToArticles < ActiveRecord::Migration[7.0]
-  def change
-    add_column :articles, :searchable, :tsvector
-    
-    execute <<-SQL
-      CREATE INDEX articles_searchable_idx ON articles USING GIN (searchable);
-    SQL
-    
-    execute <<-SQL
-      CREATE TRIGGER articles_searchable_update
-      BEFORE INSERT OR UPDATE ON articles
-      FOR EACH ROW EXECUTE FUNCTION
-      tsvector_update_trigger(searchable, 'pg_catalog.english', title, body);
-    SQL
-  end
-end
-```
-
----
-
-## Step 1104: Search Form ที่สมบูรณ์
-
-### Search Form Helper
-
-```ruby
-# app/helpers/search_helper.rb
-module SearchHelper
-  def search_highlighted(text, query)
-    return text if query.blank?
-    
-    highlighted = text.gsub(
-      /(#{Regexp.escape(query)})/i,
-      '<mark>\1</mark>'
-    )
-    highlighted.html_safe
-  end
-  
-  def active_search_filter?(key, value = nil)
-    if value
-      params.dig(:q, key) == value.to_s
-    else
-      params.dig(:q, key).present?
-    end
-  end
-end
-```
-
-### Advanced Search Controller
-
-```ruby
-# app/controllers/search_controller.rb
+# Global search ข้ามหลาย model
 class SearchController < ApplicationController
   def index
-    @query = params[:q].to_s.strip
-    @type = params[:type] || 'all'
-    @results = []
-    @total = 0
-    
-    return if @query.blank?
-    
-    case @type
-    when 'articles'
-      search_articles
-    when 'users'
-      search_users
-    else
-      search_all
-    end
-    
-    @pagy, @results = pagy_array(@results, items: 20)
+    @query = params[:query]
+    @results = PgSearch.multisearch(@query) if @query.present?
   end
-  
-  private
-  
-  def search_articles
-    @results = Article.search_by_full_text(@query)
-                      .published
-                      .includes(:user, :tags)
-                      .with_pg_search_rank
-                      .order("pg_search_rank DESC")
-    @total = @results.count
-  end
-  
-  def search_users
-    @results = User.where(
-      "name ILIKE ? OR email ILIKE ?",
-      "%#{@query}%", "%#{@query}%"
-    )
-    @total = @results.count
-  end
-  
-  def search_all
-    article_results = Article.search_by_full_text(@query).published.includes(:user).limit(5).to_a
-    user_results = User.where("name ILIKE ?", "%#{@query}%").limit(5).to_a
-    
-    @results = (article_results + user_results).sort_by { |r| r.respond_to?(:views_count) ? -r.views_count : 0 }
-    @total = article_results.length + user_results.length
-  end
+end
+
+# ต้อง run: rails pg_search:create_multisearch_tables
+# app/models/post.rb - multisearchable against: [:title, :content]
+# app/models/user.rb - multisearchable against: [:name, :bio]
+# app/models/tag.rb  - multisearchable against: :name
+```
+
+## ขั้นตอนที่ 1104: Ransack Gem
+
+```ruby
+# Gemfile
+gem 'ransack'
+
+# bundle install
+```
+
+```ruby
+# app/controllers/posts_controller.rb
+def index
+  @q = Post.ransack(params[:q])
+  @posts = @q.result(distinct: true)
+             .includes(:user, :tags)
+             .page(params[:page])
+             .per(20)
 end
 ```
 
----
+```erb
+<%# app/views/posts/index.html.erb %>
+<%= search_form_for @q do |f| %>
+  <div class="search-form">
+    <%# Text search %>
+    <div>
+      <%= f.label :title_cont, "หัวข้อประกอบด้วย" %>
+      <%= f.search_field :title_cont %>
+    </div>
+    
+    <%# Select dropdown %>
+    <div>
+      <%= f.label :category_id_eq, "หมวดหมู่" %>
+      <%= f.collection_select :category_id_eq, Category.all, :id, :name, include_blank: "ทั้งหมด" %>
+    </div>
+    
+    <%# Date range %>
+    <div>
+      <%= f.label :created_at_gteq, "ตั้งแต่วันที่" %>
+      <%= f.date_field :created_at_gteq %>
+    </div>
+    <div>
+      <%= f.label :created_at_lteq, "ถึงวันที่" %>
+      <%= f.date_field :created_at_lteq %>
+    </div>
+    
+    <%# Checkbox %>
+    <div>
+      <%= f.label :published_eq, "เผยแพร่แล้ว" %>
+      <%= f.check_box :published_eq %>
+    </div>
+    
+    <%# Sort %>
+    <%= f.sort_link :created_at, "วันที่สร้าง" %>
+    <%= f.sort_link :title, "หัวข้อ" %>
+    
+    <%= f.submit "ค้นหา" %>
+  </div>
+<% end %>
+```
 
-## Step 1105: Elasticsearch กับ Searchkick
+```ruby
+# Ransack predicates
+# _eq           - equal
+# _not_eq       - not equal
+# _lt           - less than
+# _lteq         - less than or equal
+# _gt           - greater than
+# _gteq         - greater than or equal
+# _cont         - contains (LIKE %value%)
+# _not_cont     - not contains
+# _start        - starts with
+# _end          - ends with
+# _in           - in array
+# _not_in       - not in array
+# _null         - is null
+# _not_null     - is not null
+# _true         - is true
+# _false        - is false
 
-### Setup
+# Combine multiple predicates
+# _and          - AND condition (default)
+# _or           - OR condition
+# title_or_content_cont - OR across fields
+```
+
+```ruby
+# Advanced Ransack
+# app/models/post.rb
+class Post < ApplicationRecord
+  # Allow searching associations
+  ransacker :author_name do
+    Arel.sql("users.name")
+  end
+  
+  # Custom ransack scope
+  ransacker :created_year do
+    Arel.sql("EXTRACT(YEAR FROM created_at)")
+  end
+end
+
+# ค้นหาด้วย custom ransacker
+@q = Post.joins(:user).ransack(params[:q])
+# params[:q] = { author_name_cont: "สมชาย", created_year_eq: 2024 }
+```
+
+## ขั้นตอนที่ 1105: Elasticsearch กับ Searchkick
 
 ```ruby
 # Gemfile
 gem 'searchkick'
-gem 'elasticsearch'  # หรือ 'opensearch-ruby' สำหรับ OpenSearch
+gem 'elasticsearch-model'  # optional
+
+# bundle install
 ```
-
-```bash
-# ติดตั้ง Elasticsearch
-# macOS
-brew install elastic/tap/elasticsearch-full
-brew services start elasticsearch-full
-
-# Docker
-docker run -d \
-  --name elasticsearch \
-  -p 9200:9200 \
-  -e "discovery.type=single-node" \
-  -e "xpack.security.enabled=false" \
-  elasticsearch:8.0.0
-```
-
-### Setup Model
 
 ```ruby
-# app/models/article.rb
-class Article < ApplicationRecord
-  belongs_to :user
-  has_many :comments
-  has_many :taggings
-  has_many :tags, through: :taggings
+# app/models/post.rb
+class Post < ApplicationRecord
+  searchkick text_start: [:title],  # prefix matching
+             word_start: [:content],
+             suggest: [:title],
+             index_prefix: "myapp"
   
-  searchkick(
-    # Fields ที่ต้อง index
-    text_fields: [:title, :body, :excerpt],
-    word_start: [:title],  # prefix search
-    
-    # Highlight
-    highlight: [:title, :body],
-    
-    # Callbacks
-    callbacks: :async,  # reindex ใน background
-    
-    # Language
-    language: "thai"  # หรือ "english"
-  )
-  
-  # Custom search data
+  # Define what gets indexed
   def search_data
     {
       title: title,
-      body: body,
-      excerpt: body&.truncate(500),
-      author: user.name,
+      content: content,
+      category: category&.name,
       tags: tags.map(&:name),
-      published: published,
+      author: user.name,
       published_at: published_at,
-      views_count: views_count,
-      category: category&.name
+      views_count: views_count
     }
   end
   
-  # Reindex conditions
-  def should_index?
-    published?
-  end
+  # Index conditions
+  scope :search_import, -> { includes(:user, :category, :tags).published }
 end
 ```
 
-### Index Management
+```ruby
+# Index data
+Post.reindex  # index ทั้งหมด
 
-```bash
-# สร้าง index
-Article.reindex
+# ค้นหา
+results = Post.search("rails tutorial",
+  fields: [:title, :content],
+  highlight: { fields: [:title, :content] },
+  suggest: true,
+  limit: 20,
+  page: 1
+)
 
-# Reindex เฉพาะบาง records
-Article.where(published: true).reindex
+results.each do |post|
+  puts post.title
+  puts post.search_highlights[:title]  # highlighted text
+end
 
-# Async reindex (ด้วย background job)
-Article.reindex_async
+results.suggestions  # spell suggestions
+results.total_count  # total results
 ```
 
-### ค้นหาด้วย Searchkick
+```ruby
+# Advanced search
+results = Post.search("rails",
+  # Filtering
+  where: {
+    category: "เทคโนโลยี",
+    published_at: { gte: 1.month.ago },
+    views_count: { gte: 100 }
+  },
+  
+  # Aggregations
+  aggs: [:category, :tags],
+  
+  # Sorting
+  order: { published_at: :desc },
+  
+  # Boost
+  boost_by: [:views_count],
+  boost_where: { featured: true }
+)
+
+# Facets/Aggregations
+results.aggs[:category]["buckets"].each do |bucket|
+  puts "#{bucket['key']}: #{bucket['doc_count']}"
+end
+```
 
 ```ruby
-# app/controllers/articles_controller.rb
-def index
-  @query = params[:q].to_s.strip
-  
-  if @query.present?
-    @articles = Article.search(
-      @query,
-      
-      # Fields ที่ค้นหา
-      fields: ["title^3", "body", "author"],  # title มี weight 3x
-      
-      # Misspelling tolerance
-      misspellings: { below: 5 },  # อนุญาต typo ถ้า result < 5
-      
-      # Filters
-      where: {
-        published: true,
-        created_at: { gte: 1.year.ago }
-      },
-      
-      # Aggregations (facets)
-      aggs: [:tags, :category],
-      
-      # Highlighting
-      highlight: { fields: [:title, :body], tag: "<mark>" },
-      
-      # Sorting
-      order: { views_count: :desc },
-      
-      # Pagination
+# Controller
+class SearchController < ApplicationController
+  def index
+    @query = params[:q]
+    @results = Post.search(
+      @query.presence || "*",
+      where: search_filters,
+      aggs: [:category, :tags],
       page: params[:page],
       per_page: 20,
-      
-      # Includes (avoid N+1)
-      includes: [:user, :tags]
+      highlight: { tag: "<mark>" }
     )
     
-    @highlights = @articles.with_details[:hits].map { |h| h[:_highlight] }
-    @aggregations = @articles.aggs
-  else
-    @articles = Article.published.recent.includes(:user)
-    @pagy, @articles = pagy(@articles)
+    @categories = @results.aggs[:category]["buckets"]
+    @tag_list = @results.aggs[:tags]["buckets"]
+  end
+  
+  def autocomplete
+    render json: Post.search(
+      params[:q],
+      fields: ["title^5", "content"],
+      match: :text_start,
+      limit: 5,
+      load: false  # ไม่โหลด ActiveRecord objects
+    ).map(&:title)
+  end
+  
+  private
+  
+  def search_filters
+    filters = {}
+    filters[:category] = params[:category] if params[:category].present?
+    filters[:tags] = { all: params[:tags].split(",") } if params[:tags].present?
+    filters
   end
 end
 ```
 
-### Faceted Search
-
-```ruby
-def index
-  @search = Article.search(
-    params[:q] || "*",
-    where: build_filters,
-    aggs: {
-      tags: { limit: 20 },
-      category: { limit: 10 },
-      published_year: {
-        date_histogram: {
-          field: :published_at,
-          calendar_interval: :year
-        }
-      }
-    },
-    page: params[:page],
-    per_page: 20
-  )
-  
-  @articles = @search.results
-  @facets = @search.aggs
-end
-
-private
-
-def build_filters
-  filters = { published: true }
-  filters[:tags] = params[:tags].split(',') if params[:tags].present?
-  filters[:category] = params[:category] if params[:category].present?
-  filters
-end
-```
-
----
-
-## Step 1106: Meilisearch
-
-### Setup
+## ขั้นตอนที่ 1106: Meilisearch
 
 ```ruby
 # Gemfile
 gem 'meilisearch-rails'
-```
 
-```bash
-# ติดตั้ง Meilisearch
-# macOS
-brew install meilisearch
-meilisearch
-
-# Docker
-docker run -it --rm \
-  -p 7700:7700 \
-  getmeili/meilisearch:v1.0
+# bundle install
 ```
 
 ```ruby
 # config/initializers/meilisearch.rb
 MeiliSearch::Rails.configuration = {
-  meilisearch_url: ENV.fetch("MEILISEARCH_URL", "http://localhost:7700"),
-  meilisearch_api_key: ENV.fetch("MEILISEARCH_API_KEY", ""),
-  timeout: 5,
-  max_retries: 2
+  meilisearch_url: ENV['MEILISEARCH_URL'] || 'http://localhost:7700',
+  meilisearch_api_key: ENV['MEILISEARCH_API_KEY']
 }
 ```
 
-### Model Setup
-
 ```ruby
-# app/models/article.rb
-class Article < ApplicationRecord
+# app/models/post.rb
+class Post < ApplicationRecord
   include MeiliSearch::Rails
   
   meilisearch do
-    attribute :title, :body, :excerpt
-    attribute :author do
-      user.name
-    end
-    attribute :tags do
-      tags.map(&:name)
-    end
+    attribute :title, :content, :category_name, :tag_names, :published_at
     
-    searchable_attributes [:title, :body, :author, :tags]
-    
-    filterable_attributes [:published, :created_at, :tags]
-    
-    sortable_attributes [:created_at, :views_count, :title]
+    searchable_attributes [:title, :content]
+    displayed_attributes [:id, :title, :content, :category_name]
+    sortable_attributes [:published_at, :views_count]
+    filterable_attributes [:category_name, :tag_names]
     
     ranking_rules [
       'words',
@@ -613,436 +419,304 @@ class Article < ApplicationRecord
       'proximity',
       'attribute',
       'sort',
-      'exactness',
-      'views_count:desc'
+      'exactness'
     ]
-    
-    pagination max_total_hits: 1000
-    
-    # Reindex condition
-    add_index 'articles' do
-      attribute :id
-      attribute :title
-      attribute :body
-      
-      searchable_attributes [:title, :body]
-    end
+  end
+  
+  def category_name
+    category&.name
+  end
+  
+  def tag_names
+    tags.map(&:name)
   end
 end
 ```
 
-### ค้นหาด้วย Meilisearch
-
 ```ruby
-# Basic search
-results = Article.search("ruby on rails")
-
-# Search with filters
-results = Article.search("rails", filter: ["published = true"])
-
-# Search with sort
-results = Article.search("rails", sort: ["created_at:desc"])
-
-# Pagination
-results = Article.search("rails", page: 1, hits_per_page: 20)
-results.hits      # Array of results
-results.total_hits
-results.processing_time_ms
-
-# Faceted search
-results = Article.search("rails",
-  facets: ["tags", "category"],
-  filter: ["published = true"]
+# Search
+results = Post.search(
+  "ruby on rails",
+  filter: "category_name = 'เทคโนโลยี'",
+  sort: ["published_at:desc"],
+  limit: 20,
+  offset: 0,
+  attributes_to_highlight: ["title", "content"],
+  highlight_pre_tag: "<mark>",
+  highlight_post_tag: "</mark>"
 )
-results.facet_distribution  # { "tags" => {"ruby" => 5, "rails" => 3} }
 ```
 
----
+## ขั้นตอนที่ 1107: Autocomplete / Typeahead
 
-## Step 1107: Autocomplete
-
-### Turbo Autocomplete
-
-```erb
-<%# app/views/shared/_search.html.erb %>
-<div class="search-autocomplete" data-controller="autocomplete">
-  <%= form_tag search_path, method: :get, data: { turbo: false } do %>
-    <input type="text" 
-           name="q" 
-           class="search-input"
-           data-action="input->autocomplete#search"
-           data-autocomplete-target="input"
-           autocomplete="off"
-           placeholder="ค้นหา...">
-           
-    <div class="autocomplete-dropdown" data-autocomplete-target="dropdown" hidden>
-      <%# Suggestions จะถูก inject ที่นี่ %>
-    </div>
-    
-    <%= submit_tag "ค้นหา", class: "search-btn" %>
-  <% end %>
-</div>
+```ruby
+# app/controllers/search_controller.rb
+def autocomplete
+  @suggestions = if params[:q].length >= 2
+    Post.search(params[:q],
+      fields: ["title^3", "tags.name"],
+      match: :word_start,
+      limit: 8,
+      load: false,
+      misspellings: false
+    ).map { |r| { id: r.id, title: r.title } }
+  else
+    []
+  end
+  
+  render json: @suggestions
+end
 ```
 
 ```javascript
-// app/javascript/controllers/autocomplete_controller.js
+// app/javascript/controllers/search_controller.js
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
-  static targets = ["input", "dropdown"]
+  static targets = ["input", "results"]
+  static values = { url: String }
   
   connect() {
     this.debounceTimer = null
   }
   
-  search(event) {
+  search() {
     clearTimeout(this.debounceTimer)
-    
     this.debounceTimer = setTimeout(() => {
-      const query = event.target.value.trim()
-      
-      if (query.length < 2) {
-        this.hideDropdown()
-        return
-      }
-      
-      this.fetchSuggestions(query)
-    }, 300)  // Debounce 300ms
+      this.fetchSuggestions()
+    }, 300)
   }
   
-  async fetchSuggestions(query) {
-    try {
-      const response = await fetch(`/search/suggestions?q=${encodeURIComponent(query)}`, {
-        headers: { 'Accept': 'application/json' }
-      })
-      
-      const data = await response.json()
-      this.renderSuggestions(data.suggestions)
-    } catch (error) {
-      console.error('Autocomplete error:', error)
-    }
-  }
-  
-  renderSuggestions(suggestions) {
-    if (suggestions.length === 0) {
-      this.hideDropdown()
+  async fetchSuggestions() {
+    const query = this.inputTarget.value
+    if (query.length < 2) {
+      this.resultsTarget.innerHTML = ""
       return
     }
     
-    this.dropdownTarget.innerHTML = suggestions.map(s => `
-      <div class="suggestion-item" data-action="click->autocomplete#select" data-value="${s.text}">
-        <span class="suggestion-icon">${s.type === 'article' ? '📄' : '👤'}</span>
-        <span class="suggestion-text">${s.text}</span>
-        <span class="suggestion-type">${s.type}</span>
-      </div>
-    `).join('')
+    const response = await fetch(
+      `${this.urlValue}?q=${encodeURIComponent(query)}`,
+      { headers: { "Accept": "application/json" } }
+    )
+    const suggestions = await response.json()
     
-    this.showDropdown()
-  }
-  
-  select(event) {
-    const value = event.currentTarget.dataset.value
-    this.inputTarget.value = value
-    this.hideDropdown()
-    this.element.querySelector('form').submit()
-  }
-  
-  showDropdown() {
-    this.dropdownTarget.hidden = false
-  }
-  
-  hideDropdown() {
-    this.dropdownTarget.hidden = true
+    this.resultsTarget.innerHTML = suggestions
+      .map(s => `<li><a href="/posts/${s.id}">${s.title}</a></li>`)
+      .join("")
   }
 }
 ```
 
-```ruby
-# app/controllers/search_controller.rb
-def suggestions
-  query = params[:q].to_s.strip
-  suggestions = []
-  
-  if query.length >= 2
-    # Article suggestions
-    articles = Article.published
-                      .where("title ILIKE ?", "#{query}%")
-                      .order(:views_count)
-                      .limit(5)
-    
-    suggestions += articles.map { |a| { text: a.title, type: 'article', id: a.id } }
-    
-    # User suggestions
-    users = User.where("name ILIKE ?", "#{query}%").limit(3)
-    suggestions += users.map { |u| { text: u.name, type: 'user', id: u.id } }
-  end
-  
-  render json: { suggestions: suggestions.first(8) }
-end
-```
-
----
-
-## Step 1108: Indexing Strategies
-
-### Database Indexes สำหรับ Search
-
-```ruby
-# Migration
-class AddSearchIndexes < ActiveRecord::Migration[7.0]
-  def change
-    # Full-text search index (PostgreSQL)
-    execute <<-SQL
-      CREATE INDEX articles_title_search ON articles USING GIN (to_tsvector('english', title));
-      CREATE INDEX articles_body_search ON articles USING GIN (to_tsvector('english', body));
-    SQL
-    
-    # Composite index สำหรับ common queries
-    add_index :articles, [:published, :created_at]
-    add_index :articles, [:user_id, :published, :created_at]
-    add_index :articles, :views_count
-    
-    # GiST index สำหรับ similarity search
-    execute "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
-    execute <<-SQL
-      CREATE INDEX articles_title_trgm ON articles USING GIN (title gin_trgm_ops);
-    SQL
-  end
-end
-```
-
-### Elasticsearch Index Templates
-
-```ruby
-# app/models/article.rb - Custom Elasticsearch settings
-searchkick(
-  settings: {
-    index: {
-      number_of_shards: 1,
-      number_of_replicas: 0
-    },
-    analysis: {
-      analyzer: {
-        thai_analyzer: {
-          type: 'custom',
-          tokenizer: 'thai',
-          filter: ['lowercase']
-        }
-      }
-    }
-  },
-  mappings: {
-    properties: {
-      title: { 
-        type: 'text', 
-        analyzer: 'thai_analyzer',
-        fields: {
-          keyword: { type: 'keyword' }
-        }
-      },
-      body: { 
-        type: 'text', 
-        analyzer: 'thai_analyzer' 
-      }
-    }
-  }
-)
-```
-
----
-
-## แบบฝึกหัด (20 ข้อ)
-
-### ระดับพื้นฐาน
-
-**ข้อ 1:** เขียน simple search ที่ค้นหา articles ด้วย title และ body
-```ruby
-# เฉลย
-def index
-  @articles = if params[:search].present?
-    q = "%#{params[:search]}%"
-    Article.where("title ILIKE ? OR body ILIKE ?", q, q)
-  else
-    Article.all
-  end
-end
-```
-
-**ข้อ 2:** เพิ่ม search scope ใน Article model
-```ruby
-# เฉลย
-scope :search, ->(query) {
-  where("title ILIKE :q OR body ILIKE :q", q: "%#{query}%") if query.present?
-}
-```
-
-**ข้อ 3:** setup Ransack และสร้าง search form พื้นฐาน
-```ruby
-# เฉลย
-# controller
-def index
-  @q = Article.ransack(params[:q])
-  @articles = @q.result
-end
-
-# view
-<%= search_form_for @q do |f| %>
-  <%= f.search_field :title_cont %>
-  <%= f.submit "Search" %>
-<% end %>
-```
-
-**ข้อ 4:** เพิ่ม sorting ด้วย Ransack
 ```erb
-<%# เฉลย %>
-<%= sort_link(@q, :created_at, "วันที่") %>
-<%= sort_link(@q, :title, "หัวข้อ") %>
-<%= sort_link(@q, :views_count, "ยอดวิว") %>
+<%# view %>
+<div data-controller="search" data-search-url-value="<%= autocomplete_search_path %>">
+  <input type="text" 
+         data-search-target="input"
+         data-action="input->search#search"
+         placeholder="ค้นหา...">
+  <ul data-search-target="results"></ul>
+</div>
 ```
 
-**ข้อ 5:** setup pg_search สำหรับ Article model
+## ขั้นตอนที่ 1108: Search Indexing Strategies
+
 ```ruby
-# เฉลย
-class Article < ApplicationRecord
-  include PgSearch::Model
+# Async indexing (ใช้กับ Sidekiq)
+class Post < ApplicationRecord
+  searchkick callbacks: :async  # index ใน background
+end
+
+# Queue-based indexing
+class PostIndexJob < ApplicationJob
+  queue_as :search
   
-  pg_search_scope :full_text_search,
-    against: { title: 'A', body: 'B' },
-    using: { tsearch: { prefix: true } }
+  def perform(post_id)
+    post = Post.find_by(id: post_id)
+    post&.reindex
+  end
 end
+
+# Bulk indexing
+Post.reindex          # reindex ทั้งหมด
+Post.search_index.refresh  # refresh Elasticsearch index
 ```
 
-### ระดับกลาง
-
-**ข้อ 6:** เพิ่ม multi-search ที่ค้นหาได้ทั้ง articles และ users
 ```ruby
-# เฉลย
-class User < ApplicationRecord
-  include PgSearch::Model
-  multisearchable against: [:name, :email]
-end
-
-class Article < ApplicationRecord
-  include PgSearch::Model
-  multisearchable against: [:title, :body], if: :published?
-end
-
-# controller
-@results = PgSearch.multisearch(params[:q])
-```
-
-**ข้อ 7:** setup Searchkick สำหรับ Article model พร้อม custom search data
-```ruby
-# เฉลย
-class Article < ApplicationRecord
-  searchkick text_fields: [:title, :body], word_start: [:title]
+# Index management
+# ไม่ index บางกรณี
+class Post < ApplicationRecord
+  searchkick
   
-  def search_data
-    {
-      title: title,
-      body: body,
-      author: user.name,
-      tags: tags.map(&:name),
-      published: published
-    }
+  def should_index?
+    published? && !deleted?
   end
 end
 ```
 
-**ข้อ 8:** เพิ่ม autocomplete endpoint ที่ return suggestions เป็น JSON
-```ruby
-# เฉลย
-def suggestions
-  query = params[:q]
-  articles = Article.where("title ILIKE ?", "#{query}%").limit(5)
-  render json: { suggestions: articles.map { |a| { text: a.title, id: a.id } } }
-end
-```
-
-**ข้อ 9:** เพิ่ม faceted search กับ category filters
-```ruby
-# เฉลย
-results = Article.search(params[:q],
-  aggs: [:category, :tags],
-  where: build_facet_filters
-)
-
-def build_facet_filters
-  filters = { published: true }
-  filters[:category] = params[:category] if params[:category].present?
-  filters
-end
-```
-
-**ข้อ 10:** implement search result highlighting
-```ruby
-# เฉลย กับ pg_search
-pg_search_scope :search,
-  against: [:title, :body],
-  using: {
-    tsearch: {
-      highlight: {
-        StartSel: '<mark>',
-        StopSel: '</mark>',
-        MaxWords: 30,
-        MinWords: 15
-      }
-    }
-  }
-```
-
-### ระดับสูง
-
-**ข้อ 11-20:**
+## ขั้นตอนที่ 1109: Advanced Search Filters
 
 ```ruby
-# เฉลย ข้อ 11 - Search Caching
-def index
-  @query = params[:q]
-  cache_key = "search/#{Digest::MD5.hexdigest(@query)}/page/#{params[:page]}"
+# app/services/post_search_service.rb
+class PostSearchService
+  def initialize(params, current_user: nil)
+    @params = params
+    @current_user = current_user
+  end
   
-  @articles = Rails.cache.fetch(cache_key, expires_in: 5.minutes) do
-    Article.search(@query, page: params[:page]).to_a
+  def call
+    scope = base_scope
+    scope = apply_text_search(scope)
+    scope = apply_filters(scope)
+    scope = apply_sorting(scope)
+    scope
+  end
+  
+  private
+  
+  def base_scope
+    Post.includes(:user, :category, :tags).published
+  end
+  
+  def apply_text_search(scope)
+    return scope if @params[:query].blank?
+    
+    scope.search(@params[:query])
+  end
+  
+  def apply_filters(scope)
+    scope = scope.where(category_id: @params[:category_id]) if @params[:category_id].present?
+    scope = scope.tagged_with(@params[:tag]) if @params[:tag].present?
+    scope = filter_by_date(scope)
+    scope
+  end
+  
+  def filter_by_date(scope)
+    if @params[:date_from].present?
+      scope = scope.where("created_at >= ?", @params[:date_from].to_date.beginning_of_day)
+    end
+    if @params[:date_to].present?
+      scope = scope.where("created_at <= ?", @params[:date_to].to_date.end_of_day)
+    end
+    scope
+  end
+  
+  def apply_sorting(scope)
+    case @params[:sort]
+    when "newest"   then scope.order(created_at: :desc)
+    when "oldest"   then scope.order(created_at: :asc)
+    when "popular"  then scope.order(views_count: :desc)
+    when "az"       then scope.order(title: :asc)
+    else                 scope.order(created_at: :desc)
+    end
   end
 end
 ```
 
+## ขั้นตอนที่ 1110: Search Analytics
+
 ```ruby
-# เฉลย ข้อ 14 - Search Analytics
+# app/models/search_query.rb
 class SearchQuery < ApplicationRecord
-  def self.track(query, user = nil)
-    record = find_or_initialize_by(query: query.downcase.strip)
-    record.count += 1
-    record.last_searched_at = Time.current
-    record.user_id = user&.id
-    record.save!
-  end
+  # columns: query, results_count, user_id, ip_address, created_at
+  
+  validates :query, presence: true
+  
+  scope :popular, -> { group(:query).order('count_all DESC').count }
+  scope :no_results, -> { where(results_count: 0) }
+  scope :recent, -> { where("created_at > ?", 7.days.ago) }
 end
-
-# ใน controller
-SearchQuery.track(params[:q], current_user) if params[:q].present?
 ```
 
 ```ruby
-# เฉลย ข้อ 17 - Typo Tolerance
-Article.search(params[:q], misspellings: { below: 5, edit_distance: 1 })
+# Track searches
+class SearchController < ApplicationController
+  def index
+    @query = params[:q]&.strip
+    @results = perform_search
+    
+    track_search if @query.present?
+  end
+  
+  private
+  
+  def track_search
+    SearchQuery.create!(
+      query: @query,
+      results_count: @results.total_count,
+      user_id: current_user&.id,
+      ip_address: request.remote_ip
+    )
+  end
+end
 ```
 
 ---
 
-## สรุป
+## แบบฝึกหัด: Search (20 ข้อ)
 
-ในบทนี้เราได้เรียนรู้:
+### ข้อที่ 1: Basic LIKE Search
+**เขียน scope ค้นหา Post ด้วย title และ content:**
 
-1. **LIKE Search** - วิธีพื้นฐาน ง่ายแต่ช้าสำหรับ large data
-2. **Ransack** - search forms ที่สะดวก มี sort support
-3. **pg_search** - PostgreSQL full-text search ที่ดีมาก
-4. **Searchkick** - Elasticsearch integration ที่ง่าย
-5. **Meilisearch** - fast search engine ที่ setup ง่าย
-6. **Autocomplete** - suggestions ด้วย Stimulus
-7. **Indexes** - database indexes สำคัญสำหรับ performance
+**เฉลย:**
+```ruby
+scope :search, ->(query) {
+  where("title ILIKE :q OR content ILIKE :q", q: "%#{query}%") if query.present?
+}
+```
 
-**แนะนำ:**
-- โปรเจกต์เล็ก → pg_search (ไม่ต้องการ extra infrastructure)
-- โปรเจกต์ใหญ่ที่ต้องการ advanced features → Elasticsearch + Searchkick
-- ต้องการ setup ง่าย → Meilisearch
+### ข้อที่ 2: pg_search
+```
+ติดตั้ง pg_search และสร้าง search scope พร้อม weighted fields
+```
+
+### ข้อที่ 3: Ransack Form
+```
+สร้าง search form ด้วย Ransack ที่มี text, date range, และ dropdown
+```
+
+### ข้อที่ 4: Elasticsearch Reindex
+```
+สร้าง Rake task ที่ reindex Posts ทั้งหมดและแสดง progress
+```
+
+### ข้อที่ 5: Autocomplete API
+```
+สร้าง endpoint สำหรับ autocomplete ที่ return JSON array ของ suggestions
+```
+
+### ข้อที่ 6-20 (แบบสรุป)
+
+**ข้อ 6:** Meilisearch setup และ configuration
+**ข้อ 7:** Search with filters (category, date, status)
+**ข้อ 8:** Search analytics - track queries และ results count
+**ข้อ 9:** Highlight search terms ใน results
+**ข้อ 10:** Paginate search results
+**ข้อ 11:** Multi-model search ด้วย PgSearch multisearch
+**ข้อ 12:** Searchkick with aggregations (faceted search)
+**ข้อ 13:** Typeahead controller ด้วย Stimulus
+**ข้อ 14:** Search ด้วย synonyms
+**ข้อ 15:** Fuzzy search (ค้นหาแม้สะกดผิดเล็กน้อย)
+**ข้อ 16:** Search scopes ด้วย Ransack custom ransackers
+**ข้อ 17:** Search indexing ใน background job
+**ข้อ 18:** Cache search results
+**ข้อ 19:** Test search functionality
+**ข้อ 20:** Search API endpoint พร้อม JSON response
+
+---
+
+## สรุป: Search Strategies
+
+| วิธีการ | เหมาะกับ | ข้อดี | ข้อเสีย |
+|--------|---------|-------|--------|
+| LIKE/ILIKE | ข้อมูลน้อย | ง่าย ไม่ต้องติดตั้งเพิ่ม | ช้า, ไม่ flexible |
+| pg_search | PostgreSQL, ข้อมูลปานกลาง | ใช้ DB เดิม, full-text | ไม่ flexible เท่า Elasticsearch |
+| Ransack | Advanced filtering | Form helper, หลาย filter | ไม่เหมาะ full-text search |
+| Elasticsearch | ข้อมูลมาก, complex search | เร็ว, flexible มาก | ต้องติดตั้ง service เพิ่ม |
+| Meilisearch | UX-focused | เร็ว, typo-tolerant | เปรียบเทียบกับ ES |
+
+**Key Takeaways:**
+1. เริ่มด้วย LIKE/pg_search ก่อน
+2. ใช้ Ransack สำหรับ filter forms
+3. ใช้ Elasticsearch/Meilisearch เมื่อ traffic สูงหรือ search ซับซ้อน
+4. Track searches เพื่อ improve UX
+5. Cache search results เมื่อเหมาะสม

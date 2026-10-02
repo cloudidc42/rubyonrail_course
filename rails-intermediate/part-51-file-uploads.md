@@ -1,38 +1,24 @@
-# ตอนที่ 51: File Uploads กับ ActiveStorage (Steps 1121-1140)
+# Part 51: File Uploads ด้วย Active Storage
 
-## บทนำ
-
-ActiveStorage คือ Rails framework สำหรับจัดการ file attachments มาตั้งแต่ Rails 5.2 รองรับ local storage, Amazon S3, Google Cloud Storage และ Microsoft Azure Blob Storage
+## ขั้นตอนที่ 1121-1140: จัดการไฟล์อัพโหลด
 
 ---
 
-## Step 1121: ActiveStorage Setup
-
-### Installation
+## ขั้นตอนที่ 1121: Active Storage Setup
 
 ```bash
-# ใน Rails project ที่มีอยู่แล้ว
+# ติดตั้ง Active Storage
 rails active_storage:install
 rails db:migrate
-
-# สร้างไฟล์ 3 tables:
-# active_storage_blobs      - metadata ของ file
-# active_storage_attachments - link ระหว่าง blob กับ model
-# active_storage_variant_records - cached variants
+# สร้าง active_storage_blobs, active_storage_attachments, active_storage_variant_records tables
 ```
-
-### Configuration
 
 ```ruby
-# config/environments/development.rb
-config.active_storage.service = :local
-
-# config/environments/production.rb
-config.active_storage.service = :amazon  # หรือ :google, :azure
-```
-
-```yaml
 # config/storage.yml
+test:
+  service: Disk
+  root: <%= Rails.root.join("tmp/storage") %>
+
 local:
   service: Disk
   root: <%= Rails.root.join("storage") %>
@@ -42,193 +28,49 @@ amazon:
   access_key_id: <%= ENV['AWS_ACCESS_KEY_ID'] %>
   secret_access_key: <%= ENV['AWS_SECRET_ACCESS_KEY'] %>
   region: ap-southeast-1
-  bucket: <%= ENV['AWS_BUCKET_NAME'] %>
+  bucket: <%= ENV['AWS_S3_BUCKET'] %>
 
 google:
   service: GCS
-  project: <%= ENV['GCP_PROJECT'] %>
-  credentials: <%= Rails.root.join("config/google-credentials.json") %>
-  bucket: <%= ENV['GCP_BUCKET'] %>
+  project: <%= ENV['GCS_PROJECT'] %>
+  credentials: <%= ENV['GCS_CREDENTIALS'] %>
+  bucket: <%= ENV['GCS_BUCKET'] %>
 
 azure:
   service: AzureStorage
-  storage_account_name: <%= ENV['AZURE_STORAGE_ACCOUNT_NAME'] %>
-  storage_access_key: <%= ENV['AZURE_STORAGE_ACCESS_KEY'] %>
+  storage_account_name: <%= ENV['AZURE_STORAGE_ACCOUNT'] %>
+  storage_access_key: <%= ENV['AZURE_STORAGE_KEY'] %>
   container: <%= ENV['AZURE_STORAGE_CONTAINER'] %>
-
-# Test storage
-test:
-  service: Disk
-  root: <%= Rails.root.join("tmp/storage") %>
 ```
 
----
+```ruby
+# config/environments/development.rb
+config.active_storage.service = :local
 
-## Step 1122: has_one_attached และ has_many_attached
+# config/environments/production.rb
+config.active_storage.service = :amazon
+```
 
-### Single File Attachment
+## ขั้นตอนที่ 1122: has_one_attached
 
 ```ruby
 # app/models/user.rb
 class User < ApplicationRecord
   has_one_attached :avatar
-  has_one_attached :cover_photo
-  has_one_attached :resume, dependent: :purge_later  # ลบ file เมื่อ user ถูกลบ
+  has_one_attached :resume
   
-  validates :avatar, 
-    content_type: ['image/png', 'image/jpg', 'image/jpeg', 'image/gif'],
-    size: { less_than: 5.megabytes }
-end
-
-# การใช้งาน
-user = User.first
-user.avatar.attached?  # => true/false
-user.avatar.filename   # => "photo.jpg"
-user.avatar.content_type # => "image/jpeg"
-user.avatar.byte_size  # => 102400
-url_for(user.avatar)   # => URL ของ file
-```
-
-### Multiple Files Attachment
-
-```ruby
-# app/models/article.rb
-class Article < ApplicationRecord
-  has_one_attached :featured_image
-  has_many_attached :photos
-  has_many_attached :documents
-  
-  validate :acceptable_featured_image
-  validate :acceptable_photos
-  
-  private
-  
-  def acceptable_featured_image
-    return unless featured_image.attached?
-    
-    unless featured_image.content_type.in?(%w[image/jpeg image/png image/gif image/webp])
-      errors.add(:featured_image, "must be a JPEG, PNG, GIF, or WebP image")
-    end
-    
-    if featured_image.byte_size > 10.megabytes
-      errors.add(:featured_image, "is too large (max 10MB)")
-    end
-  end
-  
-  def acceptable_photos
-    return unless photos.attached?
-    
-    photos.each do |photo|
-      unless photo.content_type.in?(%w[image/jpeg image/png image/gif image/webp])
-        errors.add(:photos, "must be JPEG, PNG, GIF, or WebP")
-        break
-      end
-      
-      if photo.byte_size > 5.megabytes
-        errors.add(:photos, "each photo must be less than 5MB")
-        break
-      end
-    end
-  end
+  validates :avatar, content_type: ['image/png', 'image/jpg', 'image/jpeg'],
+                     size: { less_than: 5.megabytes }
 end
 ```
 
----
-
-## Step 1123: Attaching Files in Forms
-
-### Single File Upload Form
-
-```erb
-<%# app/views/users/_form.html.erb %>
-<%= form_with model: @user, multipart: true do |form| %>
-  <div class="field">
-    <%= form.label :name, "ชื่อ" %>
-    <%= form.text_field :name, class: "form-control" %>
-  </div>
-  
-  <div class="field">
-    <%= form.label :avatar, "รูปโปรไฟล์" %>
-    
-    <%# แสดงรูปปัจจุบัน %>
-    <% if @user.avatar.attached? %>
-      <%= image_tag @user.avatar.variant(resize_to_limit: [100, 100]), class: "preview-image" %>
-      <label>
-        <%= check_box_tag :remove_avatar %>
-        ลบรูปโปรไฟล์
-      </label>
-    <% end %>
-    
-    <%= form.file_field :avatar, 
-                        accept: "image/*",
-                        class: "form-control",
-                        data: { 
-                          controller: "preview",
-                          preview_target: "input"
-                        } %>
-    
-    <%# Preview ก่อน upload %>
-    <img data-preview-target="output" style="max-width: 200px; display: none;">
-  </div>
-  
-  <%= form.submit "บันทึก", class: "btn btn-primary" %>
-<% end %>
-```
-
-### Multiple Files Upload Form
-
-```erb
-<%# app/views/articles/_form.html.erb %>
-<%= form_with model: @article, multipart: true do |form| %>
-  <div class="field">
-    <%= form.label :featured_image, "รูปหน้าปก" %>
-    <%= form.file_field :featured_image, accept: "image/*" %>
-  </div>
-  
-  <div class="field">
-    <%= form.label :photos, "รูปภาพประกอบ (เลือกได้หลายรูป)" %>
-    <%= form.file_field :photos, 
-                        multiple: true,
-                        accept: "image/*",
-                        class: "form-control" %>
-    
-    <%# แสดงรูปที่มีอยู่แล้ว %>
-    <% if @article.photos.attached? %>
-      <div class="existing-photos">
-        <% @article.photos.each do |photo| %>
-          <div class="photo-item">
-            <%= image_tag photo.variant(resize_to_limit: [200, 200]), class: "thumbnail" %>
-            <%= link_to "ลบ", remove_photo_article_path(@article, photo_id: photo.id), 
-                        method: :delete, 
-                        data: { confirm: "ต้องการลบรูปนี้?" } %>
-          </div>
-        <% end %>
-      </div>
-    <% end %>
-  </div>
-  
-  <div class="field">
-    <%= form.label :documents, "เอกสารแนบ (PDF, Word)" %>
-    <%= form.file_field :documents, 
-                        multiple: true, 
-                        accept: ".pdf,.doc,.docx" %>
-  </div>
-  
-  <%= form.submit %>
-<% end %>
-```
-
-### Controller
-
 ```ruby
-# app/controllers/users_controller.rb
+# Controller
 class UsersController < ApplicationController
   def update
+    @user = current_user
     if @user.update(user_params)
-      # Handle avatar removal
-      @user.avatar.purge if params[:remove_avatar] == "1"
-      
-      redirect_to @user, notice: "อัปเดตสำเร็จ"
+      redirect_to profile_path, notice: "อัพเดทโปรไฟล์แล้ว"
     else
       render :edit
     end
@@ -237,177 +79,182 @@ class UsersController < ApplicationController
   private
   
   def user_params
-    params.require(:user).permit(:name, :email, :bio, :avatar, :cover_photo)
-  end
-end
-
-# app/controllers/articles_controller.rb
-class ArticlesController < ApplicationController
-  def update
-    if @article.update(article_params)
-      redirect_to @article, notice: "อัปเดตสำเร็จ"
-    else
-      render :edit
-    end
-  end
-  
-  # DELETE /articles/:id/remove_photo
-  def remove_photo
-    photo = @article.photos.find_by_blob_id!(params[:photo_id]) rescue nil
-    
-    if photo
-      photo.purge
-      redirect_to edit_article_path(@article), notice: "ลบรูปสำเร็จ"
-    else
-      redirect_to edit_article_path(@article), alert: "ไม่พบรูปที่ต้องการลบ"
-    end
-  end
-  
-  private
-  
-  def article_params
-    params.require(:article).permit(:title, :body, :published, :featured_image, photos: [], documents: [])
+    params.require(:user).permit(:name, :email, :avatar, :resume)
   end
 end
 ```
 
----
+```erb
+<%# View %>
+<%= form_with model: @user do |f| %>
+  <div class="field">
+    <%= f.label :avatar, "รูปโปรไฟล์" %>
+    
+    <% if @user.avatar.attached? %>
+      <%= image_tag @user.avatar.variant(resize_to_fill: [150, 150]) %>
+      <%= link_to "ลบรูป", purge_avatar_user_path(@user), method: :delete,
+                  data: { confirm: "ต้องการลบรูปใช่หรือไม่?" } %>
+    <% end %>
+    
+    <%= f.file_field :avatar, accept: "image/*" %>
+  </div>
+  
+  <%= f.submit "บันทึก" %>
+<% end %>
+```
 
-## Step 1124: Image Processing ด้วย image_processing
+## ขั้นตอนที่ 1123: has_many_attached
 
-### Setup
+```ruby
+# app/models/post.rb
+class Post < ApplicationRecord
+  has_many_attached :images
+  has_many_attached :documents
+  
+  validates :images, content_type: { in: ['image/png', 'image/jpg', 'image/jpeg', 'image/gif'],
+                                     message: "ต้องเป็นไฟล์รูปภาพ" },
+                     size: { less_than: 10.megabytes,
+                             message: "ไฟล์ต้องมีขนาดไม่เกิน 10MB" }
+  
+  validates :documents, content_type: ['application/pdf', 'application/msword'],
+                        size: { less_than: 20.megabytes }
+end
+```
+
+```ruby
+# Controller
+def create
+  @post = current_user.posts.build(post_params)
+  if @post.save
+    redirect_to @post
+  else
+    render :new
+  end
+end
+
+def update
+  if @post.update(post_params)
+    redirect_to @post
+  else
+    render :edit
+  end
+end
+
+private
+
+def post_params
+  params.require(:post).permit(:title, :content, images: [], documents: [])
+end
+```
+
+```erb
+<%# Multiple file upload %>
+<%= form_with model: @post do |f| %>
+  <div class="field">
+    <%= f.label :images, "รูปภาพ (เลือกได้หลายรูป)" %>
+    <%= f.file_field :images, multiple: true, accept: "image/*",
+                    data: { controller: "file-preview" } %>
+  </div>
+  
+  <%# แสดงรูปที่อัพโหลดแล้ว %>
+  <div class="existing-images">
+    <% @post.images.each do |image| %>
+      <div class="image-item">
+        <%= image_tag image.variant(resize_to_fill: [200, 200]) %>
+        <%= link_to "ลบ", remove_image_post_path(@post, image_id: image.id),
+                    method: :delete, data: { confirm: "ลบรูปนี้?" } %>
+      </div>
+    <% end %>
+  </div>
+  
+  <%= f.submit "บันทึก" %>
+<% end %>
+```
+
+## ขั้นตอนที่ 1124: Image Processing
 
 ```ruby
 # Gemfile
 gem 'image_processing', '~> 1.2'
 
-# ต้องติดตั้ง ImageMagick หรือ libvips
-# macOS: brew install imagemagick libvips
-# Ubuntu: apt-get install imagemagick libvips
+# bundle install
 ```
-
-### Image Variants
 
 ```ruby
 # app/models/user.rb
 class User < ApplicationRecord
-  has_one_attached :avatar
-  
-  def avatar_thumbnail
-    avatar.variant(
-      resize_to_fill: [50, 50],  # crop ให้พอดี 50x50
-      format: :webp,
-      quality: 80
-    )
-  end
-  
-  def avatar_medium
-    avatar.variant(
-      resize_to_limit: [300, 300],  # ย่อให้ไม่เกิน 300x300
-      format: :jpeg,
-      quality: 85
-    )
-  end
-  
-  def avatar_large
-    avatar.variant(
-      resize_to_limit: [600, 600],
-      format: :jpeg,
-      quality: 90
-    )
+  has_one_attached :avatar do |attachable|
+    attachable.variant :thumb, resize_to_fill: [100, 100]
+    attachable.variant :medium, resize_to_fill: [300, 300]
+    attachable.variant :profile, resize_to_limit: [500, 500]
   end
 end
+
+# ใน view
+image_tag current_user.avatar.variant(:thumb)
+image_tag current_user.avatar.variant(:profile)
 ```
-
-### Variants ใน Views
-
-```erb
-<%# app/views/users/show.html.erb %>
-
-<%# Thumbnail 50x50 %>
-<%= image_tag @user.avatar.variant(resize_to_fill: [50, 50]), 
-              class: "avatar-sm",
-              alt: @user.name %>
-
-<%# Medium 300x300 %>
-<%= image_tag @user.avatar.variant(resize_to_limit: [300, 300]),
-              class: "avatar-md" %>
-
-<%# ด้วย lazy loading %>
-<%= image_tag @user.avatar.variant(resize_to_limit: [200, 200]),
-              loading: "lazy",
-              class: "profile-photo" %>
-
-<%# WebP format %>
-<picture>
-  <source srcset="<%= url_for(@user.avatar.variant(format: :webp, resize_to_limit: [300, 300])) %>" type="image/webp">
-  <img src="<%= url_for(@user.avatar.variant(format: :jpeg, resize_to_limit: [300, 300])) %>" alt="<%= @user.name %>">
-</picture>
-```
-
-### Advanced Transformations
 
 ```ruby
-# Crop เฉพาะส่วน
-variant = avatar.variant(
-  crop: [100, 100, 200, 200],  # [x, y, width, height]
-  format: :jpeg
+# Variants ขั้นสูง
+user.avatar.variant(
+  resize_to_fill: [300, 300],
+  format: :webp,
+  quality: 85,
+  auto_orient: true,
+  strip_icc_profile: true  # ลบ metadata
 )
 
-# Rotate
-variant = photo.variant(
-  rotate: 90,
-  format: :jpeg
+# Resize ด้วย ImageMagick options
+user.avatar.variant(
+  resize_to_limit: [800, 600],
+  format: 'jpg',
+  saver: { quality: 90 }
 )
 
 # Convert format
-pdf_preview = document.variant(
-  format: :png,
-  saver: { quality: 80 }
-)
-
-# Grayscale
-thumbnail = photo.variant(
-  resize_to_fill: [100, 100],
-  colourspace: :grey16
-)
-
-# Multiple transforms
-avatar.variant(
-  resize_and_pad: [200, 200, background: :white],
-  format: :jpeg,
-  quality: 85
-)
+user.avatar.variant(convert: "png")
 ```
 
----
-
-## Step 1125: Direct Uploads to S3
-
-### Setup Direct Upload
+## ขั้นตอนที่ 1125: Direct Upload
 
 ```ruby
-# app/javascript/application.js
+# Gemfile
+gem 'activestorage'  # ติดตั้งอยู่แล้วใน Rails
+
+# config/environments/development.rb
+config.active_storage.service = :local
+```
+
+```erb
+<%# Enable direct upload %>
+<%= javascript_include_tag 'activestorage' %>
+
+<%# หรือใน importmap %>
+<%# config/importmap.rb %>
+<%# pin "@rails/activestorage", to: "activestorage.esm.js" %>
+```
+
+```javascript
+// app/javascript/application.js
 import * as ActiveStorage from "@rails/activestorage"
 ActiveStorage.start()
 ```
 
 ```erb
-<%# ใน form %>
-<%= form.file_field :photos, 
-                    multiple: true,
-                    direct_upload: true,
-                    class: "form-control",
-                    data: { 
-                      controller: "upload-progress"
-                    } %>
-
-<div class="upload-progress" data-upload-progress-target="progress" hidden>
-  <div class="progress-bar">
-    <div class="progress-fill" data-upload-progress-target="fill"></div>
+<%# Direct upload in form %>
+<%= form_with model: @post do |f| %>
+  <%= f.file_field :images, multiple: true, 
+                   direct_upload: true,
+                   data: { 
+                     controller: "upload-progress",
+                     action: "direct-upload:progress->upload-progress#progress"
+                   } %>
+  
+  <div class="upload-progress" data-upload-progress-target="bar" style="display:none">
+    <div class="progress-bar" style="width: 0%"></div>
   </div>
-  <span data-upload-progress-target="text">0%</span>
-</div>
+<% end %>
 ```
 
 ```javascript
@@ -415,561 +262,359 @@ ActiveStorage.start()
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
-  static targets = ["progress", "fill", "text"]
+  static targets = ["bar"]
   
-  connect() {
-    this.element.addEventListener("direct-upload:initialize", this.onInit.bind(this))
-    this.element.addEventListener("direct-upload:start", this.onStart.bind(this))
-    this.element.addEventListener("direct-upload:progress", this.onProgress.bind(this))
-    this.element.addEventListener("direct-upload:error", this.onError.bind(this))
-    this.element.addEventListener("direct-upload:end", this.onEnd.bind(this))
-  }
-  
-  onInit(event) {
-    this.progressTarget.hidden = false
-  }
-  
-  onStart(event) {
-    this.fillTarget.style.width = "0%"
-  }
-  
-  onProgress(event) {
-    const progress = event.detail.progress
-    this.fillTarget.style.width = `${progress}%`
-    this.textTarget.textContent = `${Math.round(progress)}%`
-  }
-  
-  onError(event) {
-    event.preventDefault()
-    this.textTarget.textContent = "Upload failed!"
-  }
-  
-  onEnd(event) {
-    this.textTarget.textContent = "Upload complete!"
-    setTimeout(() => { this.progressTarget.hidden = true }, 2000)
+  progress({ detail: { progress } }) {
+    const percentage = Math.round(progress * 100)
+    
+    this.barTarget.style.display = "block"
+    this.barTarget.querySelector('.progress-bar').style.width = `${percentage}%`
+    
+    if (percentage === 100) {
+      setTimeout(() => this.barTarget.style.display = "none", 1000)
+    }
   }
 }
 ```
 
-### CORS Configuration สำหรับ S3
-
-```xml
-<!-- S3 Bucket CORS Configuration -->
-<?xml version="1.0" encoding="UTF-8"?>
-<CORSConfiguration>
-  <CORSRule>
-    <AllowedOrigin>https://yourdomain.com</AllowedOrigin>
-    <AllowedMethod>GET</AllowedMethod>
-    <AllowedMethod>PUT</AllowedMethod>
-    <AllowedMethod>POST</AllowedMethod>
-    <AllowedHeader>*</AllowedHeader>
-    <ExposeHeader>ETag</ExposeHeader>
-    <MaxAgeSeconds>3000</MaxAgeSeconds>
-  </CORSRule>
-</CORSConfiguration>
-```
-
----
-
-## Step 1126: Storage Services
-
-### Local Storage
-
-```yaml
-# config/storage.yml
-local:
-  service: Disk
-  root: <%= Rails.root.join("storage") %>
-  
-# URL ที่ได้: http://localhost:3000/rails/active_storage/blobs/...
-```
-
-### Amazon S3
+## ขั้นตอนที่ 1126: S3 Configuration
 
 ```ruby
 # Gemfile
 gem 'aws-sdk-s3', require: false
+
+# bundle install
 ```
 
-```yaml
+```ruby
+# config/storage.yml
 amazon:
   service: S3
   access_key_id: <%= ENV['AWS_ACCESS_KEY_ID'] %>
   secret_access_key: <%= ENV['AWS_SECRET_ACCESS_KEY'] %>
-  region: ap-southeast-1
-  bucket: mybucket-production
+  region: <%= ENV['AWS_REGION'] || 'ap-southeast-1' %>
+  bucket: <%= ENV['AWS_S3_BUCKET'] %>
   
-  # IAM Role (แนะนำสำหรับ EC2/ECS)
-  # ไม่ต้องระบุ access_key_id และ secret_access_key
+  # Optional: Specify endpoint for compatible services
+  # endpoint: "https://nyc3.digitaloceanspaces.com"
   
-  # Public access
-  public: false  # หรือ true สำหรับ public files
-  
-  # Server-side encryption
-  upload: { server_side_encryption: "AES256" }
+  # Upload settings
+  upload:
+    server_side_encryption: "AES256"
+    multipart_threshold: 100.megabytes
 ```
 
-### IAM Policy สำหรับ S3
+```ruby
+# config/environments/production.rb
+config.active_storage.service = :amazon
 
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "s3:GetObject",
-        "s3:PutObject",
-        "s3:DeleteObject"
-      ],
-      "Resource": "arn:aws:s3:::mybucket-production/*"
-    },
-    {
-      "Effect": "Allow",
-      "Action": "s3:ListBucket",
-      "Resource": "arn:aws:s3:::mybucket-production"
-    }
-  ]
-}
+# Expire signed URLs (สำหรับ private files)
+config.active_storage.service_urls_expire_in = 1.hour
 ```
 
-### Google Cloud Storage
+```ruby
+# Public vs Private files
+# Public - ทุกคนเข้าถึงได้
+class Post < ApplicationRecord
+  has_one_attached :cover_image  # สำหรับรูปที่เปิด public
+end
+
+# Private - ต้อง signed URL
+class Document < ApplicationRecord
+  has_one_attached :file  # ต้องผ่าน authentication
+  
+  def download_url
+    Rails.application.routes.url_helpers.url_for(file)
+    # จะสร้าง pre-signed URL อัตโนมัติ
+  end
+end
+```
+
+## ขั้นตอนที่ 1127: GCS Configuration
 
 ```ruby
 # Gemfile
 gem 'google-cloud-storage', '~> 1.11', require: false
-```
 
-```yaml
+# config/storage.yml
 google:
   service: GCS
-  project: my-gcp-project
-  credentials: <%= Rails.root.join("config/gcs-credentials.json") %>
-  bucket: mybucket-production
+  project: <%= ENV['GCS_PROJECT'] %>
+  credentials: <%= JSON.parse(ENV['GCS_CREDENTIALS']) %>
+  bucket: <%= ENV['GCS_BUCKET'] %>
+  cache_control: "public, max-age=3600"
 ```
 
----
-
-## Step 1127: Displaying Files in Views
-
-### Images
-
-```erb
-<%# Basic image display %>
-<%= image_tag @user.avatar if @user.avatar.attached? %>
-
-<%# With variant %>
-<%= image_tag @user.avatar.variant(resize_to_fill: [100, 100]) if @user.avatar.attached? %>
-
-<%# With fallback %>
-<% if @user.avatar.attached? %>
-  <%= image_tag @user.avatar.variant(resize_to_limit: [200, 200]), 
-                alt: @user.name,
-                loading: "lazy" %>
-<% else %>
-  <%= image_tag "default-avatar.png", alt: "Default avatar" %>
-<% end %>
-
-<%# Direct URL %>
-<img src="<%= url_for(@user.avatar) %>" alt="<%= @user.name %>">
-```
-
-### Documents
-
-```erb
-<%# Download link %>
-<% @article.documents.each do |doc| %>
-  <div class="document">
-    <%= link_to doc.filename.to_s, url_for(doc), 
-                target: "_blank",
-                data: { turbo: false } %>
-    <span class="file-size"><%= number_to_human_size(doc.byte_size) %></span>
-    <span class="file-type"><%= doc.content_type %></span>
-  </div>
-<% end %>
-```
-
-### Video/Audio
-
-```erb
-<%# Video player %>
-<% if @product.demo_video.attached? %>
-  <video controls width="640" height="360">
-    <source src="<%= url_for(@product.demo_video) %>" 
-            type="<%= @product.demo_video.content_type %>">
-    Browser ของคุณไม่รองรับ video
-  </video>
-<% end %>
-```
-
----
-
-## Step 1128: Validation of Attachments
-
-### Custom Validation
+## ขั้นตอนที่ 1128: File Validations
 
 ```ruby
-# app/validators/file_size_validator.rb
-class FileSizeValidator < ActiveModel::EachValidator
-  def validate_each(record, attribute, value)
-    return unless value.attached?
-    
-    max_size = options[:max] || 10.megabytes
-    
-    attachments = value.respond_to?(:each) ? value : [value]
-    
+# app/models/post.rb
+class Post < ApplicationRecord
+  has_many_attached :attachments
+  
+  # Custom validation
+  validate :attachments_size_and_type
+  
+  private
+  
+  def attachments_size_and_type
     attachments.each do |attachment|
-      if attachment.byte_size > max_size
-        record.errors.add(attribute, 
-          "is too large (max #{ActiveSupport::NumberHelper.number_to_human_size(max_size)})")
+      unless attachment.content_type.in?(%w[
+        image/png image/jpg image/jpeg image/gif
+        application/pdf application/msword
+      ])
+        errors.add(:attachments, "ประเภทไฟล์ #{attachment.content_type} ไม่รองรับ")
+      end
+      
+      if attachment.blob.byte_size > 20.megabytes
+        errors.add(:attachments, "ไฟล์ #{attachment.filename} ขนาดใหญ่เกิน 20MB")
       end
     end
-  end
-end
-
-# app/validators/content_type_validator.rb
-class ContentTypeValidator < ActiveModel::EachValidator
-  def validate_each(record, attribute, value)
-    return unless value.attached?
     
-    allowed_types = options[:in] || []
-    
-    attachments = value.respond_to?(:each) ? value : [value]
-    
-    attachments.each do |attachment|
-      unless allowed_types.include?(attachment.content_type)
-        record.errors.add(attribute, 
-          "must be #{allowed_types.join(' or ')} (got #{attachment.content_type})")
-      end
+    if attachments.count > 10
+      errors.add(:attachments, "อัพโหลดได้ไม่เกิน 10 ไฟล์")
     end
   end
 end
 ```
 
 ```ruby
-# app/models/user.rb
+# ใช้ active_storage_validations gem
+# Gemfile
+gem 'active_storage_validations'
+
 class User < ApplicationRecord
   has_one_attached :avatar
   
   validates :avatar, 
-    file_size: { max: 5.megabytes },
-    content_type: { in: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'] },
-    if: -> { avatar.attached? }
-end
-
-# app/models/article.rb
-class Article < ApplicationRecord
-  has_many_attached :photos
-  has_many_attached :documents
-  
-  validates :photos,
-    file_size: { max: 10.megabytes },
-    content_type: { in: ['image/jpeg', 'image/png', 'image/webp'] }
-  
-  validates :documents,
-    file_size: { max: 25.megabytes },
-    content_type: { in: ['application/pdf', 'application/msword', 
-                         'application/vnd.openxmlformats-officedocument.wordprocessingml.document'] }
-end
-```
-
-### ActiveStorage Validations Gem
-
-```ruby
-# Gemfile (alternative)
-gem 'active_storage_validations'
-
-# app/models/user.rb
-class User < ApplicationRecord
-  has_one_attached :avatar
-  
-  validates :avatar,
-    attached: true,  # ต้องมีไฟล์
-    content_type: {
-      in: ['image/jpeg', 'image/png', 'image/gif'],
-      message: "ต้องเป็นรูปภาพ"
-    },
-    size: {
-      less_than: 5.megabytes,
-      message: "ขนาดไม่เกิน 5MB"
-    },
-    dimension: {
+    attached: true,
+    content_type: ['image/png', 'image/jpg', 'image/jpeg'],
+    size: { less_than: 5.megabytes },
+    dimension: { 
       width: { min: 100, max: 2000 },
       height: { min: 100, max: 2000 },
-      message: "ขนาดรูปต้องระหว่าง 100x100 ถึง 2000x2000 pixels"
+      in: 100..2000
     }
 end
 ```
 
----
-
-## Step 1129: Deleting Attachments
-
-### Purge Attachment
+## ขั้นตอนที่ 1129: Serving Files
 
 ```ruby
-# ลบ file ทันที
-user.avatar.purge
-
-# ลบ file ใน background job (แนะนำ)
-user.avatar.purge_later
-
-# ลบ specific photo จาก has_many_attached
-photo_to_delete = @article.photos.find_by_blob_id(blob_id)
-photo_to_delete.purge
-
-# ลบทุก photos
-@article.photos.purge
-```
-
-### Controller สำหรับ Delete
-
-```ruby
-# app/controllers/attachments_controller.rb
-class AttachmentsController < ApplicationController
-  before_action :authenticate_user!
-  
-  def destroy
-    attachment = ActiveStorage::Attachment.find(params[:id])
-    
-    # ตรวจสอบ ownership
-    unless can_delete?(attachment)
-      return render json: { error: "ไม่มีสิทธิ์ลบไฟล์นี้" }, status: :forbidden
-    end
-    
-    attachment.purge_later
-    
-    respond_to do |format|
-      format.json { render json: { success: true } }
-      format.html { redirect_back fallback_location: root_path, notice: "ลบไฟล์สำเร็จ" }
-    end
-  end
-  
-  private
-  
-  def can_delete?(attachment)
-    record = attachment.record
-    case record
-    when User
-      record == current_user || current_user.admin?
-    when Article
-      record.user == current_user || current_user.admin?
-    else
-      current_user.admin?
+# routes.rb
+Rails.application.routes.draw do
+  resources :documents do
+    member do
+      get :download
     end
   end
 end
 ```
 
----
-
-## Step 1130: Security Considerations
-
-### Secure File URLs
-
 ```ruby
-# config/environments/production.rb
-
-# URL ที่ expire หลังจาก 30 นาที (สำหรับ private files)
-config.active_storage.service_urls_expire_in = 30.minutes
-
-# ป้องกัน public access โดยตรง
-config.active_storage.draw_routes = true
-```
-
-```ruby
-# app/controllers/downloads_controller.rb
-class DownloadsController < ApplicationController
+# app/controllers/documents_controller.rb
+class DocumentsController < ApplicationController
   before_action :authenticate_user!
-  before_action :authorize_download!
+  before_action :set_document
   
   def show
-    blob = ActiveStorage::Blob.find_signed!(params[:signed_id])
-    
-    # Redirect ไปยัง signed URL (expire ใน 1 ชั่วโมง)
-    redirect_to blob.url(expires_in: 1.hour, disposition: :attachment)
+    # Inline display
+    redirect_to url_for(@document.file)
+  end
+  
+  def download
+    # Force download
+    if @document.file.attached?
+      send_data @document.file.download,
+                filename: @document.file.filename.to_s,
+                type: @document.file.content_type,
+                disposition: 'attachment'
+    else
+      redirect_to @document, alert: "ไม่พบไฟล์"
+    end
   end
   
   private
   
-  def authorize_download!
-    # ตรวจสอบว่าผู้ใช้มีสิทธิ์ download
-    unless current_user.can_download?(params[:signed_id])
-      render json: { error: "Unauthorized" }, status: :unauthorized
-    end
+  def set_document
+    @document = current_user.documents.find(params[:id])
   end
 end
 ```
 
-### ป้องกัน File Type Spoofing
+## ขั้นตอนที่ 1130: Background Processing
 
 ```ruby
-# ตรวจสอบ actual file type ไม่ใช่แค่ extension
-require 'open3'
-
-class FileTypeValidator
-  MAGIC_NUMBERS = {
-    "\x89PNG\r\n\x1a\n" => 'image/png',
-    "\xFF\xD8\xFF" => 'image/jpeg',
-    "GIF87a" => 'image/gif',
-    "GIF89a" => 'image/gif',
-    "%PDF" => 'application/pdf'
-  }
+# Process images ใน background
+class ImageProcessingJob < ApplicationJob
+  queue_as :default
   
-  def self.valid_type?(file, expected_type)
-    header = File.read(file.path, 8)
-    detected_type = MAGIC_NUMBERS.find { |magic, _| header.start_with?(magic) }&.last
-    detected_type == expected_type
-  end
-end
-```
-
----
-
-## แบบฝึกหัด (20 ข้อ)
-
-### ระดับพื้นฐาน
-
-**ข้อ 1:** Setup ActiveStorage ใน Rails project ใหม่
-```bash
-# เฉลย
-rails active_storage:install
-rails db:migrate
-```
-
-**ข้อ 2:** เพิ่ม avatar attachment ใน User model
-```ruby
-# เฉลย
-class User < ApplicationRecord
-  has_one_attached :avatar
-end
-```
-
-**ข้อ 3:** สร้าง form สำหรับ upload avatar
-```erb
-<%# เฉลย %>
-<%= form_with model: @user, multipart: true do |f| %>
-  <%= f.file_field :avatar, accept: "image/*" %>
-  <%= f.submit %>
-<% end %>
-```
-
-**ข้อ 4:** แสดงรูป avatar ใน view พร้อม fallback
-```erb
-<%# เฉลย %>
-<% if @user.avatar.attached? %>
-  <%= image_tag @user.avatar.variant(resize_to_fill: [100, 100]) %>
-<% else %>
-  <%= image_tag "default-avatar.png" %>
-<% end %>
-```
-
-**ข้อ 5:** เพิ่ม validation ตรวจสอบ file type และ size
-```ruby
-# เฉลย
-validates :avatar,
-  content_type: { in: ['image/jpeg', 'image/png', 'image/gif'] },
-  size: { less_than: 5.megabytes },
-  if: -> { avatar.attached? }
-```
-
-### ระดับกลาง
-
-**ข้อ 6:** ตั้งค่า S3 storage สำหรับ production
-```yaml
-# เฉลย - config/storage.yml
-amazon:
-  service: S3
-  access_key_id: <%= ENV['AWS_ACCESS_KEY_ID'] %>
-  secret_access_key: <%= ENV['AWS_SECRET_ACCESS_KEY'] %>
-  region: ap-southeast-1
-  bucket: <%= ENV['AWS_BUCKET'] %>
-```
-
-**ข้อ 7:** implement direct upload ไปยัง S3
-```erb
-<%# เฉลย %>
-<%= form.file_field :photos, 
-                    multiple: true,
-                    direct_upload: true %>
-```
-
-**ข้อ 8:** สร้าง image variant สำหรับ thumbnail, medium, large
-```ruby
-# เฉลย
-def thumbnail
-  avatar.variant(resize_to_fill: [50, 50], format: :webp)
-end
-
-def medium
-  avatar.variant(resize_to_limit: [300, 300], format: :jpeg, quality: 85)
-end
-```
-
-**ข้อ 9:** เพิ่ม delete attachment functionality
-```ruby
-# เฉลย
-def remove_photo
-  photo = @article.photos.find_by_blob_id!(params[:photo_id])
-  photo.purge_later
-  redirect_to @article
-end
-```
-
-**ข้อ 10:** เพิ่ม upload progress bar ด้วย Stimulus
-```javascript
-// เฉลย - implement ในข้อ 10
-addEventListener("direct-upload:progress", event => {
-  const { progress } = event.detail
-  progressBar.style.width = `${progress}%`
-})
-```
-
-### ระดับสูง
-
-**ข้อ 11-20:** (แบบฝึกหัดเพิ่มเติม)
-
-```ruby
-# เฉลย ข้อ 11 - Batch image processing
-class ProcessImagesJob < ApplicationJob
-  def perform(article_id)
-    article = Article.find(article_id)
-    article.photos.each do |photo|
-      # Pre-generate variants
-      photo.variant(resize_to_limit: [800, 800]).processed
-      photo.variant(resize_to_fill: [400, 400]).processed
-      photo.variant(resize_to_fill: [100, 100]).processed
-    end
-  end
-end
-```
-
-```ruby
-# เฉลย ข้อ 14 - Custom Storage Service
-class SecureFileService
-  def self.url_for(attachment, user:)
-    unless user.can_access?(attachment.record)
-      raise "Unauthorized"
-    end
+  def perform(attachment_id)
+    attachment = ActiveStorage::Attachment.find(attachment_id)
+    blob = attachment.blob
     
-    attachment.blob.url(expires_in: 1.hour, disposition: :attachment)
+    return unless blob.image?
+    
+    # Generate variants
+    blob.open do |file|
+      processed = ImageProcessing::Vips
+        .source(file)
+        .resize_to_fill(800, 600)
+        .convert("webp")
+        .call
+      
+      # Store processed version
+      attachment.record.optimized_image.attach(
+        io: processed,
+        filename: "#{blob.filename.base}.webp",
+        content_type: "image/webp"
+      )
+    end
   end
+end
+
+# Trigger after upload
+class Post < ApplicationRecord
+  has_one_attached :image
+  has_one_attached :optimized_image
+  
+  after_create_commit :process_image
+  
+  private
+  
+  def process_image
+    ImageProcessingJob.perform_later(image.id) if image.attached?
+  end
+end
+```
+
+## ขั้นตอนที่ 1131: Purge / Delete Files
+
+```ruby
+# ลบไฟล์เดี่ยว
+user.avatar.purge       # ลบทันที
+user.avatar.purge_later # ลบใน background job
+
+# ลบหลายไฟล์
+post.images.purge
+post.images.purge_later
+
+# ลบไฟล์เฉพาะ
+post.images.find { |img| img.filename == "old.jpg" }.purge
+
+# ใน controller
+def remove_image
+  @post = current_user.posts.find(params[:id])
+  image = @post.images.find_by_id(params[:image_id])
+  
+  if image
+    image.purge
+    redirect_to edit_post_path(@post), notice: "ลบรูปภาพแล้ว"
+  else
+    redirect_to edit_post_path(@post), alert: "ไม่พบรูปภาพ"
+  end
+end
+```
+
+## ขั้นตอนที่ 1132: Metadata Extraction
+
+```ruby
+# ดู metadata ของไฟล์
+blob = user.avatar.blob
+
+blob.filename      # => "photo.jpg"
+blob.content_type  # => "image/jpeg"
+blob.byte_size     # => 1234567
+blob.checksum      # => "abc123..."
+blob.metadata      # => { "identified" => true, "width" => 800, "height" => 600 }
+blob.created_at    # => 2024-01-01 12:00:00
+
+# Image metadata
+if blob.image?
+  puts blob.metadata["width"]
+  puts blob.metadata["height"]
+end
+
+# Video metadata
+if blob.video?
+  puts blob.metadata["duration"]
 end
 ```
 
 ---
 
-## สรุป
+## แบบฝึกหัด: File Uploads (20 ข้อ)
 
-ในบทนี้เราได้เรียนรู้:
+### ข้อที่ 1: Setup Active Storage
+```bash
+rails active_storage:install && rails db:migrate
+```
 
-1. **ActiveStorage Setup** - installation และ configuration
-2. **Attachments** - has_one_attached และ has_many_attached
-3. **Forms** - file upload forms
-4. **Image Processing** - variants, resize, crop, convert
-5. **Direct Upload** - upload ตรงไปยัง S3
-6. **Storage Services** - Local, S3, GCS
-7. **Validation** - ตรวจสอบ type, size, dimensions
-8. **Security** - secure URLs, type spoofing prevention
+### ข้อที่ 2: User Avatar
+```
+เพิ่ม avatar ให้ User model และ form สำหรับอัพโหลด
+```
 
-ActiveStorage เป็นส่วนสำคัญของ modern Rails apps โดยเฉพาะที่ต้องจัดการกับ user-uploaded content
+**เฉลย:**
+```ruby
+# model
+has_one_attached :avatar
+
+# view
+<%= f.file_field :avatar, accept: "image/*" %>
+<%= image_tag user.avatar.variant(resize_to_fill: [100, 100]) if user.avatar.attached? %>
+```
+
+### ข้อที่ 3: Multiple Images
+```
+Post ที่มี has_many_attached :images พร้อม validation
+```
+
+### ข้อที่ 4: Image Variants
+```
+สร้าง variants: thumb (100x100), medium (400x400), large (800x600)
+```
+
+### ข้อที่ 5: S3 Configuration
+```
+ตั้งค่า production ให้ใช้ Amazon S3
+```
+
+### ข้อที่ 6-20 (แบบสรุป)
+
+**ข้อ 6:** Direct upload พร้อม progress bar
+**ข้อ 7:** File validation (type, size, dimension)
+**ข้อ 8:** Force download endpoint
+**ข้อ 9:** Purge attachment
+**ข้อ 10:** Image processing ใน background job
+**ข้อ 11:** GCS setup
+**ข้อ 12:** Display file metadata
+**ข้อ 13:** Generate pre-signed URL
+**ข้อ 14:** Drag-and-drop upload ด้วย Stimulus
+**ข้อ 15:** Multiple file types (image + PDF)
+**ข้อ 16:** Optimize images ก่อน save
+**ข้อ 17:** Test file uploads ด้วย RSpec
+**ข้อ 18:** CDN URL configuration
+**ข้อ 19:** Migrate files ระหว่าง storage services
+**ข้อ 20:** Track upload statistics
+
+---
+
+## สรุป: Active Storage
+
+| Feature | Method |
+|---------|--------|
+| Single file | `has_one_attached` |
+| Multiple files | `has_many_attached` |
+| Image resize | `.variant(resize_to_fill: [w, h])` |
+| Check attached | `.attached?` |
+| Download | `.download` |
+| Delete | `.purge` / `.purge_later` |
+| Direct upload | `direct_upload: true` |
+
+**Key Takeaways:**
+1. ใช้ `purge_later` แทน `purge` เพื่อไม่บล็อก request
+2. ตรวจสอบ content_type และ size เสมอ
+3. ใช้ Direct Upload สำหรับไฟล์ขนาดใหญ่
+4. สร้าง variants ไว้ล่วงหน้าเพื่อประสิทธิภาพ
+5. ใช้ Cloud Storage (S3/GCS) ใน production
