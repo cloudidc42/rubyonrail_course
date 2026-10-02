@@ -1,84 +1,30 @@
-# ตอนที่ 53: WebSockets กับ Action Cable (Steps 1161-1180)
+# Part 53: WebSockets ด้วย Action Cable
 
-## บทนำ
-
-WebSockets ช่วยให้ server สามารถ push ข้อมูลไปยัง client ได้ทันทีโดยไม่ต้องรอ client ส่ง request ก่อน Action Cable คือ Rails framework สำหรับ WebSockets ที่รวม real-time features เข้ากับ Rails ได้อย่าง seamless
+## ขั้นตอนที่ 1161-1180: Real-time Communication
 
 ---
 
-## Step 1161: WebSockets คืออะไร?
+## ขั้นตอนที่ 1161: Action Cable Overview
 
-### HTTP vs WebSocket
-
-```
-HTTP (Traditional):
-Client → Server: "GET /messages"
-Server → Client: [list of messages]
-(connection closed)
-
-Client → Server: "GET /messages" (polling every 2 seconds)
-Server → Client: [new messages if any]
-...
-
-WebSocket (Persistent):
-Client → Server: "WebSocket Handshake"
-Server → Client: "Handshake confirmed"
-[Connection stays open...]
-Server → Client: "New message!" (anytime)
-Server → Client: "User joined!" (anytime)
-Client → Server: "Message sent" (anytime)
-```
-
-### ใช้ WebSocket เมื่อไหร่
-
-- Chat applications
-- Real-time notifications
-- Collaborative editing
-- Live dashboards
-- Online games
-- Real-time tracking (delivery, location)
-- Live sports scores
-
----
-
-## Step 1162: Action Cable Architecture
-
-### Components
+Action Cable ผสาน WebSockets เข้ากับ Rails อย่างสมบูรณ์
 
 ```
-Browser (Consumer)
-    ↕ WebSocket
-Action Cable Server
-    ↕ pub/sub
-Redis (or PostgreSQL)
-    ↕ subscribe
-Channel (Ruby class)
-    ↕
-Rails Application
+Architecture:
+Browser ↔ WebSocket Connection ↔ Action Cable Server ↔ Redis PubSub ↔ Rails App
+
+Components:
+- Channel: Ruby class ใน server (เหมือน controller)
+- Subscription: JavaScript class ใน browser
+- Stream: การส่งข้อมูลจาก server ไปยัง browser
+- Broadcast: ส่งข้อมูลไปยัง subscribers ทั้งหมด
 ```
 
-### Key Concepts
-
-- **Consumer** - client ที่ connect ผ่าน WebSocket
-- **Connection** - WebSocket connection สำหรับแต่ละ consumer
-- **Channel** - ช่องทางสำหรับ group ของ streams
-- **Subscription** - consumer subscribe ไปยัง channel
-- **Stream** - data stream ชื่อ string
-- **Broadcast** - ส่ง data ไปยัง stream
-
----
-
-## Step 1163: Setup Action Cable
-
-### Configuration
+## ขั้นตอนที่ 1162: Setup
 
 ```ruby
-# config/application.rb
-config.action_cable.mount_path = '/cable'
-
 # config/cable.yml
 development:
-  adapter: async  # In-process (development only)
+  adapter: async  # In-memory, development only
 
 test:
   adapter: test
@@ -90,38 +36,32 @@ production:
 ```
 
 ```ruby
-# config/environments/production.rb
+# config/application.rb
 config.action_cable.url = "wss://myapp.com/cable"
 config.action_cable.allowed_request_origins = [
   "https://myapp.com",
-  /http:\/\/myapp.*/  # regex
+  /http:\/\/localhost.*/
 ]
-```
 
-### JavaScript Setup
+# mount ใน routes.rb
+Rails.application.routes.draw do
+  mount ActionCable.server => '/cable'
+end
+```
 
 ```javascript
 // app/javascript/application.js
 import { createConsumer } from "@rails/actioncable"
-
-const consumer = createConsumer()
-
-export default consumer
+export default createConsumer()
 ```
 
----
+## ขั้นตอนที่ 1163: สร้าง Channel
 
-## Step 1164: Creating a Channel
-
-### Generate Channel
-
-```bash
-rails generate channel Chat
-rails generate channel Notification
-rails generate channel Room speaking
+```ruby
+# rails generate channel Chat
+# สร้าง: app/channels/chat_channel.rb
+# สร้าง: app/javascript/channels/chat_channel.js
 ```
-
-### Channel Class
 
 ```ruby
 # app/channels/application_cable/connection.rb
@@ -131,20 +71,13 @@ module ApplicationCable
     
     def connect
       self.current_user = find_verified_user
-      logger.add_tags "ActionCable", "User #{current_user.id}"
-    end
-    
-    def disconnect
-      # Called when connection is closed
-      logger.info "User #{current_user&.id} disconnected"
     end
     
     private
     
     def find_verified_user
-      # ตรวจสอบ session (สำหรับ browser-based)
-      if (current_user = env["warden"].user)
-        current_user
+      if (user_id = cookies.encrypted[:user_id])
+        User.find_by(id: user_id) || reject_unauthorized_connection
       else
         reject_unauthorized_connection
       end
@@ -154,773 +87,476 @@ end
 ```
 
 ```ruby
-# app/channels/application_cable/channel.rb
-module ApplicationCable
-  class Channel < ActionCable::Channel::Base
-    # Base class สำหรับทุก channels
-  end
-end
-```
-
----
-
-## Step 1165: Chat Application Complete
-
-### Models
-
-```ruby
-# app/models/room.rb
-class Room < ApplicationRecord
-  has_many :messages, dependent: :destroy
-  has_many :room_memberships, dependent: :destroy
-  has_many :users, through: :room_memberships
-  
-  validates :name, presence: true, uniqueness: true, length: { maximum: 100 }
-  
-  scope :public_rooms, -> { where(private: false) }
-  scope :recent, -> { order(updated_at: :desc) }
-end
-
-# app/models/message.rb
-class Message < ApplicationRecord
-  belongs_to :user
-  belongs_to :room
-  
-  validates :body, presence: true, length: { maximum: 2000 }
-  
-  after_create_commit :broadcast_message
-  
-  def as_json(options = {})
-    super(only: [:id, :body, :created_at]).merge(
-      user: { id: user.id, name: user.name, avatar_url: user.avatar_url },
-      formatted_time: created_at.strftime("%H:%M"),
-      is_own: options[:current_user] == user
-    )
-  end
-  
-  private
-  
-  def broadcast_message
-    ActionCable.server.broadcast(
-      "room_#{room_id}",
-      {
-        type: 'new_message',
-        message: as_json
-      }
-    )
-  end
-end
-```
-
-### Chat Channel
-
-```ruby
 # app/channels/chat_channel.rb
 class ChatChannel < ApplicationCable::Channel
   def subscribed
-    @room = Room.find_by(id: params[:room_id])
+    # รับ params[:room_id] จาก JavaScript
+    @room = ChatRoom.find(params[:room_id])
     
-    if @room && can_access_room?(@room)
-      stream_for @room
-      # หรือ stream_from "room_#{@room.id}"
-      
-      # Notify others ว่า user เข้าร่วม
-      ActionCable.server.broadcast(
-        "room_#{@room.id}",
-        {
-          type: 'user_joined',
-          user: { id: current_user.id, name: current_user.name }
-        }
-      )
-      
-      # Track online users
-      $redis.sadd("online_users_room_#{@room.id}", current_user.id)
-      
-      transmit({
-        type: 'connected',
-        message: "Connected to #{@room.name}",
-        online_users: online_users_count
-      })
-    else
-      reject  # Reject subscription
-    end
+    # ตรวจสอบสิทธิ์
+    reject unless current_user.member_of?(@room)
+    
+    # Subscribe ไปยัง stream
+    stream_for @room
+    # หรือ stream ด้วย string key
+    # stream_from "chat_room_#{@room.id}"
+    
+    # Broadcast เมื่อ user เข้าร่วม
+    broadcast_presence(:online)
   end
   
   def unsubscribed
-    # Cleanup เมื่อ disconnect
-    if @room
-      $redis.srem("online_users_room_#{@room.id}", current_user.id)
-      
-      ActionCable.server.broadcast(
-        "room_#{@room.id}",
-        {
-          type: 'user_left',
-          user: { id: current_user.id, name: current_user.name }
-        }
-      )
-    end
-    stop_all_streams
+    # ทำงานเมื่อ browser disconnect
+    broadcast_presence(:offline)
   end
   
-  def receive(data)
-    # Receive data from client
-    case data['action']
-    when 'message'
-      create_message(data['message'])
-    when 'typing'
-      broadcast_typing_indicator(data['is_typing'])
-    when 'mark_read'
-      mark_messages_read
-    end
+  # รับ action จาก client
+  def speak(data)
+    Message.create!(
+      body: data['message'],
+      user: current_user,
+      chat_room: @room
+    )
   end
   
-  # Custom actions
-  def load_history(data)
-    page = data['page'] || 1
-    messages = @room.messages.includes(:user).order(created_at: :desc).page(page).per(30)
-    
-    transmit({
-      type: 'history',
-      messages: messages.map { |m| m.as_json(current_user: current_user) },
-      has_more: messages.next_page.present?
+  def typing(data)
+    ChatChannel.broadcast_to(@room, {
+      type: "typing",
+      user: current_user.name,
+      is_typing: data['typing']
     })
   end
   
   private
   
-  def create_message(body)
-    return if body.blank?
-    
-    message = @room.messages.create!(
-      user: current_user,
-      body: body.strip.truncate(2000)
-    )
-    
-    # Broadcast อยู่ใน after_create_commit callback
-  end
-  
-  def broadcast_typing_indicator(is_typing)
-    ActionCable.server.broadcast(
-      "room_#{@room.id}",
-      {
-        type: 'typing',
-        user: { id: current_user.id, name: current_user.name },
-        is_typing: is_typing
-      }
-    )
-  end
-  
-  def mark_messages_read
-    current_user.mark_room_messages_read!(@room)
-  end
-  
-  def can_access_room?(room)
-    !room.private? || room.users.include?(current_user)
-  end
-  
-  def online_users_count
-    $redis.scard("online_users_room_#{@room.id}").to_i
+  def broadcast_presence(status)
+    ChatChannel.broadcast_to(@room, {
+      type: "presence",
+      user: current_user.name,
+      status: status
+    })
   end
 end
 ```
 
-### JavaScript Consumer
+## ขั้นตอนที่ 1164: JavaScript Subscription
 
 ```javascript
 // app/javascript/channels/chat_channel.js
 import consumer from "./consumer"
 
-let chatChannel = null
-
-function initChat(roomId) {
-  // Unsubscribe from previous room
-  if (chatChannel) {
-    chatChannel.unsubscribe()
-  }
-  
-  chatChannel = consumer.subscriptions.create(
-    { channel: "ChatChannel", room_id: roomId },
-    {
-      connected() {
-        console.log("Connected to chat")
-        document.querySelector(".connection-status").textContent = "🟢 Connected"
-        this.loadHistory({ page: 1 })
-      },
-      
-      disconnected() {
-        console.log("Disconnected from chat")
-        document.querySelector(".connection-status").textContent = "🔴 Disconnected"
-      },
-      
-      received(data) {
-        switch (data.type) {
-          case 'new_message':
-            appendMessage(data.message)
-            break
-          case 'user_joined':
-            showSystemMessage(`${data.user.name} เข้าร่วมห้องแชท`)
-            updateOnlineCount()
-            break
-          case 'user_left':
-            showSystemMessage(`${data.user.name} ออกจากห้องแชท`)
-            updateOnlineCount()
-            break
-          case 'typing':
-            showTypingIndicator(data.user, data.is_typing)
-            break
-          case 'history':
-            prependMessages(data.messages, data.has_more)
-            break
-          case 'connected':
-            document.querySelector(".online-count").textContent = data.online_users
-            break
-        }
-      },
-      
-      sendMessage(message) {
-        this.perform('receive', { action: 'message', message: message })
-      },
-      
-      sendTyping(isTyping) {
-        this.perform('receive', { action: 'typing', is_typing: isTyping })
-      },
-      
-      loadHistory(params) {
-        this.perform('load_history', params)
-      }
-    }
-  )
-  
-  return chatChannel
-}
-
-function appendMessage(message) {
-  const messagesContainer = document.getElementById("messages")
-  const messageEl = createMessageElement(message)
-  messagesContainer.appendChild(messageEl)
-  messagesContainer.scrollTop = messagesContainer.scrollHeight
-}
-
-function createMessageElement(message) {
-  const div = document.createElement("div")
-  div.className = `message ${message.is_own ? 'own' : 'other'}`
-  div.innerHTML = `
-    <div class="message-header">
-      <img src="${message.user.avatar_url}" alt="${message.user.name}" class="avatar">
-      <span class="user-name">${message.user.name}</span>
-      <span class="time">${message.formatted_time}</span>
-    </div>
-    <div class="message-body">${escapeHtml(message.body)}</div>
-  `
-  return div
-}
-
-function showSystemMessage(text) {
-  const div = document.createElement("div")
-  div.className = "system-message"
-  div.textContent = text
-  document.getElementById("messages").appendChild(div)
-}
-
-let typingTimeout = null
-function showTypingIndicator(user, isTyping) {
-  const indicator = document.getElementById("typing-indicator")
-  
-  if (isTyping) {
-    indicator.textContent = `${user.name} กำลังพิมพ์...`
-    clearTimeout(typingTimeout)
-    typingTimeout = setTimeout(() => {
-      indicator.textContent = ""
-    }, 3000)
-  } else {
-    indicator.textContent = ""
-  }
-}
-
-function escapeHtml(text) {
-  const div = document.createElement('div')
-  div.appendChild(document.createTextNode(text))
-  return div.innerHTML
-}
-
-// Event Listeners
-document.addEventListener("DOMContentLoaded", function() {
-  const roomId = document.querySelector("[data-room-id]")?.dataset.roomId
-  if (!roomId) return
-  
-  const channel = initChat(roomId)
-  const messageInput = document.getElementById("message-input")
-  const sendButton = document.getElementById("send-button")
-  
-  // Send message
-  function sendMessage() {
-    const message = messageInput.value.trim()
-    if (message) {
-      channel.sendMessage(message)
-      messageInput.value = ""
-      channel.sendTyping(false)
-    }
-  }
-  
-  sendButton.addEventListener("click", sendMessage)
-  
-  messageInput.addEventListener("keypress", function(e) {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      sendMessage()
-    }
-  })
-  
-  // Typing indicator
-  let typingTimer = null
-  messageInput.addEventListener("input", function() {
-    channel.sendTyping(true)
-    clearTimeout(typingTimer)
-    typingTimer = setTimeout(() => channel.sendTyping(false), 1000)
-  })
-  
-  // Load more history on scroll
-  const messagesContainer = document.getElementById("messages")
-  let currentPage = 1
-  let hasMore = true
-  
-  messagesContainer.addEventListener("scroll", function() {
-    if (messagesContainer.scrollTop === 0 && hasMore) {
-      currentPage++
-      channel.loadHistory({ page: currentPage })
-    }
-  })
-})
-
-export { initChat }
-```
-
-### Chat Views
-
-```erb
-<%# app/views/rooms/show.html.erb %>
-<div class="chat-container" data-room-id="<%= @room.id %>">
-  <div class="chat-header">
-    <h2><%= @room.name %></h2>
-    <span class="connection-status">🔄 Connecting...</span>
-    <span class="online-count">-</span> คนออนไลน์
-  </div>
-  
-  <div id="messages" class="messages-container">
-    <% @messages.each do |message| %>
-      <div class="message <%= message.user == current_user ? 'own' : 'other' %>">
-        <div class="message-header">
-          <img src="<%= message.user.avatar_url || gravatar_url(message.user.email) %>" 
-               alt="<%= message.user.name %>"
-               class="avatar">
-          <span class="user-name"><%= message.user.name %></span>
-          <span class="time"><%= message.created_at.strftime("%H:%M") %></span>
-        </div>
-        <div class="message-body"><%= message.body %></div>
-      </div>
-    <% end %>
-  </div>
-  
-  <div id="typing-indicator" class="typing-indicator"></div>
-  
-  <div class="message-input-container">
-    <textarea id="message-input" 
-              placeholder="พิมพ์ข้อความ... (Enter เพื่อส่ง)"
-              class="message-input"
-              rows="1"></textarea>
-    <button id="send-button" class="send-button">ส่ง</button>
-  </div>
-</div>
-
-<script>
-  // Auto-scroll to bottom on load
-  const messages = document.getElementById("messages")
-  messages.scrollTop = messages.scrollHeight
-</script>
-```
-
----
-
-## Step 1166: Broadcasting from Server
-
-### Broadcast ใน Controller
-
-```ruby
-# app/controllers/messages_controller.rb
-class MessagesController < ApplicationController
-  def create
-    @message = @room.messages.new(message_params)
-    @message.user = current_user
-    
-    if @message.save
-      # Broadcast อัตโนมัติผ่าน after_create_commit ใน model
-      # หรือ broadcast manually:
-      ActionCable.server.broadcast(
-        "room_#{@room.id}",
-        { type: 'new_message', message: @message.as_json(current_user: current_user) }
-      )
-      
-      render json: { success: true, message: @message.as_json }
-    else
-      render json: { success: false, errors: @message.errors.full_messages }, 
-             status: :unprocessable_entity
-    end
-  end
-end
-```
-
-### Broadcast ใน Model Callbacks
-
-```ruby
-# app/models/message.rb
-class Message < ApplicationRecord
-  after_create_commit :broadcast_new_message
-  after_update_commit :broadcast_updated_message
-  after_destroy_commit :broadcast_deleted_message
-  
-  private
-  
-  def broadcast_new_message
-    ChatChannel.broadcast_to(room, {
-      type: 'new_message',
-      message: as_json
-    })
-  end
-  
-  def broadcast_updated_message
-    ChatChannel.broadcast_to(room, {
-      type: 'message_updated',
-      message_id: id,
-      new_body: body
-    })
-  end
-  
-  def broadcast_deleted_message
-    ChatChannel.broadcast_to(room, {
-      type: 'message_deleted',
-      message_id: id
-    })
-  end
-end
-```
-
----
-
-## Step 1167: Turbo Streams
-
-### Real-time Updates ด้วย Turbo
-
-```ruby
-# app/models/message.rb
-class Message < ApplicationRecord
-  after_create_commit lambda { 
-    broadcast_prepend_to "messages",
-                         target: "messages",
-                         partial: "messages/message",
-                         locals: { message: self }
-  }
-  
-  after_update_commit lambda {
-    broadcast_replace_to "messages",
-                         target: self,
-                         partial: "messages/message",
-                         locals: { message: self }
-  }
-  
-  after_destroy_commit lambda {
-    broadcast_remove_to "messages", target: self
-  }
-end
-```
-
-```erb
-<%# app/views/messages/index.html.erb %>
-<%= turbo_stream_from "messages" %>
-
-<div id="messages">
-  <%= render @messages %>
-</div>
-```
-
-```erb
-<%# app/views/messages/_message.html.erb %>
-<div id="<%= dom_id(message) %>" class="message">
-  <strong><%= message.user.name %></strong>
-  <span><%= message.body %></span>
-  <time><%= message.created_at.strftime("%H:%M") %></time>
-</div>
-```
-
----
-
-## Step 1168: Real-time Notifications
-
-### Notification Channel
-
-```ruby
-# app/channels/notification_channel.rb
-class NotificationChannel < ApplicationCable::Channel
-  def subscribed
-    stream_for current_user
-  end
-  
-  def unsubscribed
-    stop_all_streams
-  end
-  
-  # MarkNotificationAsRead
-  def mark_read(data)
-    notification = current_user.notifications.find_by(id: data['notification_id'])
-    notification&.update!(read: true, read_at: Time.current)
-    
-    transmit({
-      type: 'notification_read',
-      unread_count: current_user.notifications.unread.count
-    })
-  end
-  
-  def mark_all_read
-    current_user.notifications.unread.update_all(read: true, read_at: Time.current)
-    
-    transmit({
-      type: 'all_read',
-      unread_count: 0
-    })
-  end
-end
-```
-
-```ruby
-# app/services/notification_service.rb
-class NotificationService
-  def self.notify(user, type:, title:, body:, data: {})
-    notification = user.notifications.create!(
-      notification_type: type,
-      title: title,
-      body: body,
-      data: data
-    )
-    
-    # Push ผ่าน Action Cable
-    NotificationChannel.broadcast_to(user, {
-      type: 'new_notification',
-      notification: {
-        id: notification.id,
-        type: notification.notification_type,
-        title: notification.title,
-        body: notification.body,
-        created_at: notification.created_at.iso8601,
-        data: notification.data
-      },
-      unread_count: user.notifications.unread.count
-    })
-    
-    # Optional: Push notification ไปยัง mobile
-    if user.push_token.present?
-      PushNotificationService.send(user, title, body)
-    end
-    
-    notification
-  end
-end
-```
-
-```javascript
-// app/javascript/channels/notification_channel.js
-import consumer from "./consumer"
-
-const notificationChannel = consumer.subscriptions.create(
-  { channel: "NotificationChannel" },
+const chatChannel = consumer.subscriptions.create(
+  { channel: "ChatChannel", room_id: roomId },
   {
+    // Lifecycle callbacks
     connected() {
-      console.log("Connected to notifications")
+      console.log("Connected to ChatChannel")
+      this.enableSendButton()
     },
     
+    disconnected() {
+      console.log("Disconnected from ChatChannel")
+      this.disableSendButton()
+    },
+    
+    rejected() {
+      console.log("Connection rejected")
+    },
+    
+    // รับข้อมูลจาก server
     received(data) {
-      switch (data.type) {
-        case 'new_notification':
-          showToast(data.notification)
-          updateNotificationBadge(data.unread_count)
-          addNotificationToList(data.notification)
+      switch(data.type) {
+        case "message":
+          this.appendMessage(data)
           break
-          
-        case 'notification_read':
-        case 'all_read':
-          updateNotificationBadge(data.unread_count)
+        case "typing":
+          this.showTypingIndicator(data)
+          break
+        case "presence":
+          this.updatePresence(data)
           break
       }
     },
     
-    markRead(notificationId) {
-      this.perform('mark_read', { notification_id: notificationId })
+    // ส่งข้อมูลไป server
+    speak(message) {
+      this.perform("speak", { message })
     },
     
-    markAllRead() {
-      this.perform('mark_all_read')
+    typing(isTyping) {
+      this.perform("typing", { typing: isTyping })
+    },
+    
+    // UI helpers
+    appendMessage(data) {
+      const messages = document.getElementById("messages")
+      messages.insertAdjacentHTML("beforeend", `
+        <div class="message ${data.current_user ? 'mine' : 'theirs'}">
+          <span class="name">${data.user}</span>
+          <p>${data.body}</p>
+          <small>${data.created_at}</small>
+        </div>
+      `)
+      messages.scrollTop = messages.scrollHeight
+    },
+    
+    showTypingIndicator(data) {
+      const indicator = document.getElementById("typing-indicator")
+      if (data.is_typing) {
+        indicator.textContent = `${data.user} กำลังพิมพ์...`
+      } else {
+        indicator.textContent = ""
+      }
+    },
+    
+    enableSendButton() {
+      document.getElementById("send-btn").disabled = false
+    },
+    
+    disableSendButton() {
+      document.getElementById("send-btn").disabled = true
     }
   }
 )
 
-function showToast(notification) {
-  const toast = document.createElement("div")
-  toast.className = "toast notification-toast"
-  toast.innerHTML = `
-    <div class="toast-header">
-      <strong>${notification.title}</strong>
-      <button class="btn-close" onclick="this.closest('.toast').remove()">×</button>
-    </div>
-    <div class="toast-body">${notification.body}</div>
-  `
+// Event listeners
+document.getElementById("message-form").addEventListener("submit", (e) => {
+  e.preventDefault()
+  const input = document.getElementById("message-input")
+  const message = input.value.trim()
   
-  document.getElementById("toast-container").appendChild(toast)
-  
-  setTimeout(() => toast.remove(), 5000)
-}
-
-function updateNotificationBadge(count) {
-  const badge = document.getElementById("notification-badge")
-  if (badge) {
-    badge.textContent = count
-    badge.hidden = count === 0
+  if (message) {
+    chatChannel.speak(message)
+    input.value = ""
   }
-}
+})
 
-export { notificationChannel }
+let typingTimer
+document.getElementById("message-input").addEventListener("input", () => {
+  chatChannel.typing(true)
+  clearTimeout(typingTimer)
+  typingTimer = setTimeout(() => chatChannel.typing(false), 1000)
+})
+
+export default chatChannel
 ```
 
----
-
-## Step 1169: Authentication ใน Action Cable
-
-### JWT Authentication
+## ขั้นตอนที่ 1165: Broadcasting
 
 ```ruby
-# app/channels/application_cable/connection.rb
-module ApplicationCable
-  class Connection < ActionCable::Connection::Base
-    identified_by :current_user
-    
-    def connect
-      self.current_user = find_verified_user
-    end
-    
-    private
-    
-    def find_verified_user
-      # Method 1: จาก session (Devise)
-      if (user = env["warden"]&.user)
-        return user
-      end
-      
-      # Method 2: จาก JWT token
-      token = request.params[:token] || 
-              request.headers['Authorization']&.split(' ')&.last
-      
-      if token.present?
-        payload = JwtService.decode(token)
-        if payload && (user = User.find_by(id: payload['user_id']))
-          return user
-        end
-      end
-      
-      # Method 3: จาก cookies
-      if (token = cookies.signed[:auth_token])
-        if (user = User.find_by(auth_token: token))
-          return user
-        end
-      end
-      
-      reject_unauthorized_connection
-    end
+# Broadcast จาก Model callback
+class Message < ApplicationRecord
+  belongs_to :user
+  belongs_to :chat_room
+  
+  after_create_commit :broadcast_message
+  
+  private
+  
+  def broadcast_message
+    ChatChannel.broadcast_to(
+      chat_room,
+      {
+        type: "message",
+        id: id,
+        body: body,
+        user: user.name,
+        user_id: user_id,
+        avatar_url: user.avatar_url,
+        created_at: created_at.strftime("%H:%M"),
+        html: ApplicationController.renderer.render(
+          partial: "messages/message",
+          locals: { message: self }
+        )
+      }
+    )
   end
 end
 ```
 
-### Client ส่ง JWT Token
+```ruby
+# Broadcast จาก controller หรือ service
+class MessagesController < ApplicationController
+  def create
+    @message = current_user.messages.build(message_params)
+    @message.chat_room = @chat_room
+    
+    if @message.save
+      # Broadcast จะเกิดขึ้นอัตโนมัติจาก after_create_commit
+      render json: { status: "ok" }
+    else
+      render json: { errors: @message.errors }, status: :unprocessable_entity
+    end
+  end
+end
 
-```javascript
-// Connect กับ JWT token
-import { createConsumer } from "@rails/actioncable"
-
-const token = localStorage.getItem('auth_token')
-const consumer = createConsumer(`/cable?token=${token}`)
+# Broadcast จาก background job
+class NotificationJob < ApplicationJob
+  def perform(user_id, notification_data)
+    ActionCable.server.broadcast(
+      "notifications_#{user_id}",
+      notification_data
+    )
+  end
+end
 ```
 
----
+## ขั้นตอนที่ 1166: Turbo Streams กับ Action Cable
 
-## Step 1170: Testing Action Cable
+```ruby
+# app/channels/turbo_streams_channel.rb (ใช้ gem hotwire-rails)
+# Turbo จัดการให้อัตโนมัติ
 
-### Channel Tests
+# app/models/message.rb
+class Message < ApplicationRecord
+  belongs_to :chat_room
+  belongs_to :user
+  
+  # Broadcast Turbo Stream
+  after_create_commit -> { broadcast_append_to chat_room }
+  after_update_commit -> { broadcast_replace_to chat_room }
+  after_destroy_commit -> { broadcast_remove_to chat_room }
+end
+```
+
+```erb
+<%# app/views/chat_rooms/show.html.erb %>
+<%= turbo_stream_from @chat_room %>
+
+<div id="messages">
+  <%= render @chat_room.messages.recent %>
+</div>
+
+<%= turbo_frame_tag "new_message" do %>
+  <%= render "messages/form", chat_room: @chat_room, message: Message.new %>
+<% end %>
+```
+
+```erb
+<%# app/views/messages/_message.html.erb %>
+<%= turbo_frame_tag message do %>
+  <div class="message" id="message_<%= message.id %>">
+    <strong><%= message.user.name %>:</strong>
+    <%= message.body %>
+    <small><%= message.created_at.strftime("%H:%M") %></small>
+  </div>
+<% end %>
+```
+
+## ขั้นตอนที่ 1167: Chat App สมบูรณ์
+
+```ruby
+# app/models/chat_room.rb
+class ChatRoom < ApplicationRecord
+  has_many :messages, dependent: :destroy
+  has_many :memberships, dependent: :destroy
+  has_many :users, through: :memberships
+  
+  validates :name, presence: true, uniqueness: true
+  
+  def self.general
+    find_or_create_by(name: "General", public: true)
+  end
+end
+```
+
+```ruby
+# app/models/message.rb
+class Message < ApplicationRecord
+  belongs_to :chat_room
+  belongs_to :user
+  
+  validates :body, presence: true, length: { maximum: 1000 }
+  
+  scope :recent, -> { order(created_at: :asc).last(50) }
+  
+  after_create_commit :broadcast_new_message
+  
+  private
+  
+  def broadcast_new_message
+    ChatChannel.broadcast_to(
+      chat_room,
+      type: "message",
+      id: id,
+      body: ActionController::Base.helpers.sanitize(body),
+      user: user.name,
+      user_id: user_id,
+      created_at: created_at.strftime("%H:%M น.")
+    )
+  end
+end
+```
+
+```ruby
+# app/controllers/chat_rooms_controller.rb
+class ChatRoomsController < ApplicationController
+  before_action :authenticate_user!
+  
+  def show
+    @chat_room = ChatRoom.find(params[:id])
+    @messages = @chat_room.messages.includes(:user).recent
+    @message = Message.new
+    
+    # Mark as read
+    current_user.mark_room_as_read(@chat_room)
+  end
+end
+
+# app/controllers/messages_controller.rb
+class MessagesController < ApplicationController
+  before_action :authenticate_user!
+  before_action :set_chat_room
+  
+  def create
+    @message = @chat_room.messages.build(message_params)
+    @message.user = current_user
+    
+    if @message.save
+      head :ok
+    else
+      render json: { errors: @message.errors.full_messages }, status: :unprocessable_entity
+    end
+  end
+  
+  private
+  
+  def set_chat_room
+    @chat_room = ChatRoom.find(params[:chat_room_id])
+  end
+  
+  def message_params
+    params.require(:message).permit(:body)
+  end
+end
+```
+
+## ขั้นตอนที่ 1168: Notifications Channel
+
+```ruby
+# app/channels/notifications_channel.rb
+class NotificationsChannel < ApplicationCable::Channel
+  def subscribed
+    stream_for current_user
+    
+    # Mark as connected
+    current_user.update(online_at: Time.current)
+  end
+  
+  def unsubscribed
+    current_user.update(online_at: nil)
+  end
+end
+```
+
+```ruby
+# app/models/notification.rb
+class Notification < ApplicationRecord
+  belongs_to :user
+  belongs_to :notifiable, polymorphic: true
+  
+  after_create_commit :broadcast_notification
+  
+  private
+  
+  def broadcast_notification
+    NotificationsChannel.broadcast_to(
+      user,
+      {
+        id: id,
+        type: notification_type,
+        message: message,
+        url: notifiable_url,
+        created_at: created_at.to_s
+      }
+    )
+  end
+  
+  def notifiable_url
+    Rails.application.routes.url_helpers.url_for(notifiable)
+  rescue
+    "/"
+  end
+end
+```
+
+## ขั้นตอนที่ 1169: Online Presence
+
+```ruby
+# app/channels/presence_channel.rb
+class PresenceChannel < ApplicationCable::Channel
+  def subscribed
+    stream_from "presence_channel"
+    
+    # เพิ่ม user ใน Redis set
+    Redis.current.sadd("online_users", current_user.id)
+    
+    # Broadcast
+    broadcast_presence_update
+  end
+  
+  def unsubscribed
+    Redis.current.srem("online_users", current_user.id)
+    broadcast_presence_update
+  end
+  
+  private
+  
+  def broadcast_presence_update
+    online_users = User.where(
+      id: Redis.current.smembers("online_users").map(&:to_i)
+    ).map { |u| { id: u.id, name: u.name } }
+    
+    ActionCable.server.broadcast("presence_channel", {
+      type: "presence_update",
+      online_users: online_users,
+      count: online_users.length
+    })
+  end
+end
+```
+
+## ขั้นตอนที่ 1170: Testing Action Cable
 
 ```ruby
 # spec/channels/chat_channel_spec.rb
-require 'rails_helper'
-
 RSpec.describe ChatChannel, type: :channel do
   let(:user) { create(:user) }
-  let(:room) { create(:room) }
+  let(:room) { create(:chat_room) }
   
   before do
     stub_connection current_user: user
   end
   
   describe "#subscribed" do
-    it "subscribes to the room" do
+    it "subscribes to room stream" do
       subscribe(room_id: room.id)
       
       expect(subscription).to be_confirmed
-      expect(streams).to include("room_#{room.id}")
+      expect(streams).to include("chat_room_#{room.id}")
     end
     
-    it "rejects invalid room subscription" do
-      subscribe(room_id: 99999)
+    it "rejects if not a member" do
+      another_room = create(:chat_room, private: true)
+      subscribe(room_id: another_room.id)
       
       expect(subscription).to be_rejected
     end
-    
-    it "transmits connected message" do
-      expect {
-        subscribe(room_id: room.id)
-      }.to have_broadcasted_to(room).from_channel(ChatChannel)
-    end
   end
   
-  describe "#receive" do
+  describe "#speak" do
     before { subscribe(room_id: room.id) }
     
-    context "with message action" do
-      it "creates a message" do
-        expect {
-          perform(:receive, action: 'message', message: 'Hello!')
-        }.to change(Message, :count).by(1)
-      end
-      
-      it "broadcasts the message to the room" do
-        expect {
-          perform(:receive, action: 'message', message: 'Hello!')
-        }.to have_broadcasted_to(room)
-      end
-      
-      it "ignores blank messages" do
-        expect {
-          perform(:receive, action: 'message', message: '')
-        }.not_to change(Message, :count)
-      end
-    end
-  end
-  
-  describe "#unsubscribed" do
-    before { subscribe(room_id: room.id) }
-    
-    it "stops all streams" do
-      unsubscribe
-      expect(streams).to be_empty
-    end
-    
-    it "broadcasts user left notification" do
+    it "creates a message" do
       expect {
-        unsubscribe
-      }.to have_broadcasted_to(room)
+        perform(:speak, message: "Hello!")
+      }.to change(Message, :count).by(1)
+    end
+    
+    it "broadcasts the message" do
+      perform(:speak, message: "Hello World!")
+      
+      expect(broadcasts("chat_room_#{room.id}")).not_to be_empty
     end
   end
 end
@@ -928,198 +564,67 @@ end
 
 ---
 
-## แบบฝึกหัด (20 ข้อ)
+## แบบฝึกหัด: WebSockets (20 ข้อ)
 
-### ระดับพื้นฐาน
-
-**ข้อ 1:** สร้าง ChatChannel ด้วย generator
+### ข้อที่ 1: Generate Channel
 ```bash
-# เฉลย
-rails generate channel Chat
+rails generate channel Chat speak
 ```
 
-**ข้อ 2:** ตั้งค่า Action Cable ให้ใช้ Redis ใน production
-```yaml
-# เฉลย - config/cable.yml
-production:
-  adapter: redis
-  url: <%= ENV['REDIS_URL'] %>
-  channel_prefix: myapp_production
+### ข้อที่ 2: Connection Authentication
+```
+เชื่อม current_user กับ Connection class
 ```
 
-**ข้อ 3:** สร้าง Connection class ที่ authenticate ด้วย Devise session
-```ruby
-# เฉลย
-def find_verified_user
-  if (user = env["warden"].user)
-    user
-  else
-    reject_unauthorized_connection
-  end
-end
+### ข้อที่ 3: Chat Room
+```
+สร้าง chat channel ที่รับ room_id params
 ```
 
-**ข้อ 4:** Broadcast message จาก model callback
-```ruby
-# เฉลย
-class Message < ApplicationRecord
-  after_create_commit { broadcast_append_to "messages" }
-end
+### ข้อที่ 4: Turbo Streams Broadcast
+```
+ใช้ broadcast_append_to เพื่อ append messages
 ```
 
-**ข้อ 5:** สร้าง JavaScript subscription
-```javascript
-// เฉลย
-const channel = consumer.subscriptions.create("ChatChannel", {
-  received(data) { console.log(data) }
-})
+### ข้อที่ 5: Typing Indicator
+```
+สร้าง typing indicator ที่แสดงเมื่อ user พิมพ์
 ```
 
-### ระดับกลาง
+### ข้อที่ 6-20 (แบบสรุป)
 
-**ข้อ 6:** เพิ่ม typing indicator ใน chat
-```ruby
-# เฉลย - channel
-def typing(data)
-  ActionCable.server.broadcast("room_#{@room.id}", {
-    type: 'typing',
-    user: current_user.name,
-    is_typing: data['is_typing']
-  })
-end
-```
-
-**ข้อ 7:** implement online users counter
-```ruby
-# เฉลย
-def subscribed
-  $redis.sadd("online_users", current_user.id)
-  broadcast_online_count
-end
-
-def unsubscribed
-  $redis.srem("online_users", current_user.id)
-  broadcast_online_count
-end
-
-def broadcast_online_count
-  ActionCable.server.broadcast("presence", {
-    online_count: $redis.scard("online_users")
-  })
-end
-```
-
-**ข้อ 8:** เพิ่ม message read receipts
-```javascript
-// เฉลย
-document.addEventListener('scroll', function() {
-  const visibleMessages = getVisibleMessages()
-  visibleMessages.forEach(msg => {
-    channel.perform('mark_read', { message_id: msg.id })
-  })
-})
-```
-
-**ข้อ 9:** เขียน channel test ด้วย RSpec
-```ruby
-# เฉลย
-RSpec.describe ChatChannel, type: :channel do
-  let(:user) { create(:user) }
-  before { stub_connection current_user: user }
-  
-  it "subscribes successfully" do
-    subscribe(room_id: create(:room).id)
-    expect(subscription).to be_confirmed
-  end
-end
-```
-
-**ข้อ 10:** implement reconnection logic ใน JavaScript
-```javascript
-// เฉลย
-consumer.subscriptions.create("ChatChannel", {
-  disconnected() {
-    this.retryConnection()
-  },
-  retryConnection() {
-    setTimeout(() => {
-      if (this.consumer.connection.disconnected) {
-        this.consumer.connect()
-      }
-    }, 3000)
-  }
-})
-```
-
-### ระดับสูง
-
-**ข้อ 11-20:**
-
-```ruby
-# เฉลย ข้อ 11 - Private messaging channel
-class DirectMessageChannel < ApplicationCable::Channel
-  def subscribed
-    @other_user = User.find(params[:user_id])
-    room_name = [current_user.id, @other_user.id].sort.join("_")
-    stream_from "direct_message_#{room_name}"
-  end
-end
-```
-
-```ruby
-# เฉลย ข้อ 14 - Rate limiting
-class ChatChannel < ApplicationCable::Channel
-  RATE_LIMIT = 5  # messages per second
-  
-  def receive(data)
-    key = "rate_limit_#{current_user.id}"
-    count = $redis.incr(key)
-    $redis.expire(key, 1) if count == 1
-    
-    if count > RATE_LIMIT
-      transmit({ type: 'error', message: "ส่งข้อความเร็วเกินไป กรุณารอสักครู่" })
-      return
-    end
-    
-    create_message(data['message'])
-  end
-end
-```
-
-```javascript
-// เฉลย ข้อ 17 - Message queue for offline
-class OfflineMessageQueue {
-  constructor() {
-    this.queue = JSON.parse(localStorage.getItem('pending_messages') || '[]')
-  }
-  
-  add(message) {
-    this.queue.push(message)
-    localStorage.setItem('pending_messages', JSON.stringify(this.queue))
-  }
-  
-  flush(channel) {
-    this.queue.forEach(msg => channel.sendMessage(msg))
-    this.queue = []
-    localStorage.removeItem('pending_messages')
-  }
-}
-```
+**ข้อ 6:** Notification channel
+**ข้อ 7:** Online presence tracking
+**ข้อ 8:** Read receipts
+**ข้อ 9:** Unread message count
+**ข้อ 10:** Room member list
+**ข้อ 11:** File sharing ใน chat
+**ข้อ 12:** Message reactions (emoji)
+**ข้อ 13:** Private messaging
+**ข้อ 14:** Channel testing
+**ข้อ 15:** Redis Pub/Sub setup
+**ข้อ 16:** Rate limiting connections
+**ข้อ 17:** Message pagination (load more)
+**ข้อ 18:** Push notifications (Web Push)
+**ข้อ 19:** Reconnection logic
+**ข้อ 20:** Deploy Action Cable with Puma
 
 ---
 
-## สรุป
+## สรุป: Action Cable
 
-ในบทนี้เราได้เรียนรู้:
+| Component | หน้าที่ |
+|-----------|--------|
+| Connection | Authenticate WebSocket connection |
+| Channel | Handle subscriptions & actions |
+| Stream | Send data to specific subscribers |
+| Broadcast | Push data to all channel subscribers |
+| Consumer | JavaScript client |
+| Subscription | JavaScript channel handler |
 
-1. **WebSockets** - persistent connection ระหว่าง client และ server
-2. **Action Cable Architecture** - Consumer, Channel, Stream
-3. **Creating Channels** - channel class สำหรับ different features
-4. **Broadcasting** - ส่ง data จาก server ไปยัง clients
-5. **Complete Chat App** - message, typing indicator, online users
-6. **Turbo Streams** - real-time DOM updates
-7. **Notifications** - real-time notification system
-8. **Authentication** - ตรวจสอบ identity ใน WebSocket
-9. **Testing** - test channels ด้วย RSpec
-
-Action Cable เป็นวิธีที่ elegant ในการเพิ่ม real-time features ให้กับ Rails applications โดยรวมเข้ากับ ecosystem ของ Rails ได้ดีมาก
+**Key Takeaways:**
+1. ใช้ Redis adapter ใน production
+2. Authenticate ใน Connection class
+3. Turbo Streams ทำงานร่วมกับ Action Cable
+4. ทดสอบ channel ด้วย `stub_connection`
+5. Monitor WebSocket connections ใน production
