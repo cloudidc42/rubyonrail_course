@@ -1,849 +1,1057 @@
-# ตอนที่ 10: Blocks, Procs, Lambdas (ขั้นตอนที่ 171-200)
+# ตอนที่ 10: Blocks, Procs, Lambdas (Steps 171-200)
 
-## บทนำ
-
-Blocks, Procs, และ Lambdas เป็นหัวใจของ functional programming ใน Ruby เป็น feature ที่ทำให้ Ruby มีความยืดหยุ่นสูงและมีพลังมาก เข้าใจ concept นี้จะช่วยให้เขียน Ruby ได้ดีขึ้นอย่างมาก
-
-ในบทนี้เราจะเรียนรู้:
-- Block คืออะไรและการใช้ yield
-- block_given? 
-- Proc.new และ proc {}
-- Lambda vs Proc ความแตกต่างสำคัญ
-- Closures และ scope
-- Method objects
-- Currying และ partial application
-- Practical patterns
-- Custom iterators
-- Proc composition
+> **เป้าหมาย**: เข้าใจ blocks, procs, lambdas อย่างลึกซึ้ง — หัวใจของ functional programming ใน Ruby
 
 ---
 
-## ขั้นตอนที่ 171: Block คืออะไร?
+## Step 171: Block คืออะไร?
 
-Block เป็น anonymous code snippet ที่ส่งให้กับ method ไม่ใช่ object แบบเต็ม ๆ (ต่างจาก Proc)
+Block คือชิ้นส่วนของโค้ดที่ส่งผ่านไปยัง method ได้ เป็นส่วนสำคัญที่สุดของ Ruby และทำให้ Ruby มีพลัง
+
+### สองรูปแบบของ Block
 
 ```ruby
-# Block แบบ {} - single line
-[1, 2, 3].each { |n| puts n }
-
-# Block แบบ do...end - multi line
+# รูปแบบที่ 1: do...end (สำหรับ multi-line)
 [1, 2, 3].each do |n|
-  square = n ** 2
-  puts "#{n}^2 = #{square}"
+  squared = n ** 2
+  puts "#{n}^2 = #{squared}"
+end
+# 1^2 = 1
+# 2^2 = 4
+# 3^2 = 9
+
+# รูปแบบที่ 2: { } (สำหรับ single-line)
+[1, 2, 3].each { |n| puts n ** 2 }
+# 1
+# 4
+# 9
+
+# ทั้งสองทำงานเหมือนกัน แต่ {} มี operator precedence สูงกว่า do...end
+```
+
+### Block ไม่ใช่ Object (โดยตรง)
+
+```ruby
+# Block ไม่สามารถเก็บใน variable ได้โดยตรง
+# block = { puts "hello" }  # SyntaxError!
+
+# ต้องใช้ Proc หรือ Lambda แทน
+block_as_proc = Proc.new { puts "hello" }
+block_as_proc.call  # hello
+
+# หรือใช้ -> (stabby lambda)
+block_as_lambda = -> { puts "hello" }
+block_as_lambda.call  # hello
+```
+
+### Block กับ Method
+
+```ruby
+# Block ส่งผ่านไปยัง method ได้
+def run_block
+  yield if block_given?
 end
 
-# Block ในชีวิตประจำวัน
-# เปิดไฟล์
-File.open("file.txt", "w") { |f| f.write("Hello") }
+run_block { puts "Block ทำงาน!" }  # Block ทำงาน!
+run_block                           # (ไม่ทำอะไร)
 
-# วัดเวลา
-require 'benchmark'
-Benchmark.bm do |x|
-  x.report("sort") { (1..1000).to_a.shuffle.sort }
+# Block กับ arguments
+def run_with_value(x)
+  yield x if block_given?
 end
 
-# Transaction
-# ActiveRecord::Base.transaction do
-#   account1.withdraw(100)
-#   account2.deposit(100)
-# end
-
-# Convention: ใช้ {} สำหรับ single line, do..end สำหรับ multi line
-# (แต่ความแตกต่าง precedence ก็สำคัญ)
-foo bar { |x| x }      # block ถูกส่งให้ bar
-foo bar do |x| x end   # block ถูกส่งให้ foo
+run_with_value(42) { |n| puts "ค่าคือ: #{n}" }
+# ค่าคือ: 42
 ```
 
 ---
 
-## ขั้นตอนที่ 172: yield Keyword
+## Step 172: yield — เรียก Block ที่ส่งเข้ามา
 
-`yield` ใช้ใน method เพื่อ execute block ที่ส่งมา
+`yield` เป็น keyword ที่ใช้เรียก block ที่ถูกส่งเข้ามาใน method
 
 ```ruby
-# method ที่รับ block ด้วย yield
-def greet
+# yield พื้นฐาน
+def say_hello
   puts "ก่อน yield"
-  yield   # execute block ที่ส่งมา
+  yield
   puts "หลัง yield"
 end
 
-greet { puts "สวัสดี!" }
-# => ก่อน yield
-# => สวัสดี!
-# => หลัง yield
+say_hello { puts "อยู่ใน block!" }
+# ก่อน yield
+# อยู่ใน block!
+# หลัง yield
 
 # yield กับ arguments
-def repeat(n)
-  n.times { yield }
+def transform(value)
+  yield value
 end
 
-repeat(3) { puts "Hello" }
-# => Hello x 3
-
-# ส่งข้อมูลให้ block ผ่าน yield
-def double_it(n)
-  yield(n * 2)
-end
-
-double_it(5) { |result| puts result }   # => 10
-
-# yield คืนค่าจาก block
-def transform(n)
-  result = yield(n)
-  "Result: #{result}"
-end
-
-output = transform(5) { |n| n ** 2 }
-puts output   # => Result: 25
+result = transform(5) { |n| n * 2 }
+puts result  # 10
 
 # yield หลายครั้ง
-def multi_yield
-  yield(1)
-  yield(2)
-  yield(3)
+def repeat_three_times
+  yield 1
+  yield 2
+  yield 3
 end
 
-multi_yield { |n| puts "Got #{n}" }
-# => Got 1, Got 2, Got 3
+repeat_three_times { |i| puts "ครั้งที่ #{i}" }
+# ครั้งที่ 1
+# ครั้งที่ 2
+# ครั้งที่ 3
+```
 
-# yield ใน loop
-def each_pair(array)
-  i = 0
-  while i < array.length - 1
-    yield array[i], array[i + 1]
-    i += 2
+### สร้าง Custom Iterator ด้วย yield
+
+```ruby
+# สร้าง each_odd
+def each_odd(array)
+  array.each_with_index do |item, i|
+    yield item if i.odd?
   end
 end
 
-each_pair([1, 2, 3, 4, 5, 6]) do |a, b|
-  puts "#{a} + #{b} = #{a + b}"
+each_odd([10, 20, 30, 40, 50]) { |n| puts n }
+# 20
+# 40
+
+# สร้าง countdown
+def countdown(from, to = 0)
+  n = from
+  while n >= to
+    yield n
+    n -= 1
+  end
 end
+
+countdown(5) { |n| print "#{n} " }  # 5 4 3 2 1 0
+
+# สร้าง retry_on_failure
+def retry_on_failure(max_attempts: 3)
+  attempts = 0
+  begin
+    attempts += 1
+    yield attempts
+  rescue => e
+    retry if attempts < max_attempts
+    raise "ล้มเหลวหลังจากลอง #{max_attempts} ครั้ง: #{e.message}"
+  end
+end
+
+retry_on_failure(max_attempts: 3) do |attempt|
+  puts "ลองครั้งที่ #{attempt}"
+  raise "Connection failed" if attempt < 3
+  puts "สำเร็จ!"
+end
+# ลองครั้งที่ 1
+# ลองครั้งที่ 2
+# ลองครั้งที่ 3
+# สำเร็จ!
 ```
 
 ---
 
-## ขั้นตอนที่ 173: block_given?
+## Step 173: block_given? — ตรวจสอบว่ามี Block ส่งมาไหม
 
 ```ruby
-# ตรวจสอบว่ามี block ส่งมาหรือไม่
-def flexible
+# block_given? คืน true ถ้ามี block ส่งมา
+def optional_block
   if block_given?
-    puts "มี block!"
     yield
   else
     puts "ไม่มี block"
   end
 end
 
-flexible             # => ไม่มี block
-flexible { puts "block content" }  # => มี block! => block content
+optional_block { puts "มี block!" }  # มี block!
+optional_block                        # ไม่มี block
 
-# ตัวอย่างจริง: method ที่ optional block
-def log(message, level = :info)
-  output = "[#{level.upcase}] #{message}"
+# ใช้งานจริง: default behavior
+def process_data(data)
+  result = data.map { |x| x * 2 }
+  
   if block_given?
-    output + "\n" + yield
+    result.each { |item| yield item }
   else
-    output
+    result  # คืน array ถ้าไม่มี block
   end
 end
 
-puts log("Server started")
-puts log("Query executed") { "SELECT * FROM users" }
+# ไม่มี block: คืน array
+arr = process_data([1, 2, 3])
+puts arr.inspect  # [2, 4, 6]
 
-# Enumerator return pattern
-def my_each(array)
-  return to_enum(:my_each, array) unless block_given?
-  array.each { |item| yield item }
+# มี block: yield แต่ละตัว
+process_data([1, 2, 3]) { |n| print "#{n} " }
+# 2 4 6
+```
+
+### block_given? กับ Default Behavior
+
+```ruby
+def log(message, &block)
+  # ถ้าไม่มี block ใช้ default formatter
+  formatter = block_given? ? block : ->(msg) { "[DEFAULT] #{msg}" }
+  puts formatter.call(message)
 end
 
-# สามารถใช้แบบ block
-my_each([1, 2, 3]) { |n| puts n }
+log("สวัสดี")
+# [DEFAULT] สวัสดี
 
-# หรือแบบ Enumerator
-enum = my_each([1, 2, 3])
-puts enum.map { |n| n * 2 }.inspect   # => [2, 4, 6]
+log("สวัสดี") { |msg| "🟢 #{msg}" }
+# 🟢 สวัสดี
 
-# Rails-style: return value ต่าง ๆ
-def find_or_create(key, store = {})
-  if store.key?(key)
-    store[key]
-  elsif block_given?
-    store[key] = yield
-  else
-    nil
-  end
+# guard against missing block
+def divide_safe(a, b)
+  return yield(ZeroDivisionError.new("หารด้วยศูนย์")) if b == 0 && block_given?
+  return nil if b == 0
+  a.to_f / b
 end
 
-cache = {}
-value1 = find_or_create(:user, cache) { { name: "Alice" } }
-value2 = find_or_create(:user, cache) { { name: "Bob" } }  # ไม่ execute block
-puts value1.inspect   # => {:name=>"Alice"}
-puts value2.inspect   # => {:name=>"Alice"} (cached)
+result = divide_safe(10, 0) { |err| "Error: #{err.message}" }
+puts result  # Error: หารด้วยศูนย์
 ```
 
 ---
 
-## ขั้นตอนที่ 174: Explicit Block Parameter (&block)
+## Step 174: Passing Explicit Block (&block)
 
 ```ruby
-# &block - รับ block เป็น Proc object
+# & รับ block เป็น explicit Proc object
 def capture_block(&block)
-  puts block.class     # => Proc
-  puts block.call(5)   # execute the block
+  puts block.class  # Proc
+  block.call
 end
 
-capture_block { |n| n * 2 }   # => Proc, 10
+capture_block { puts "ฉันถูก capture!" }
+# Proc
+# ฉันถูก capture!
 
-# เก็บ block ไว้ใช้ภายหลัง
-class EventHandler
-  def initialize
-    @callbacks = []
+# เก็บ block ใน variable
+def save_block(&block)
+  @saved_block = block
+end
+
+def run_saved_block
+  @saved_block.call if @saved_block
+end
+
+save_block { puts "Block ที่บันทึกไว้!" }
+run_saved_block  # Block ที่บันทึกไว้!
+
+# ส่ง block ต่อไปยัง method อื่น
+def my_map(array, &block)
+  result = []
+  array.each do |item|
+    result << block.call(item)
   end
+  result
+end
 
-  def on_event(&callback)
-    @callbacks << callback
-    self
+puts my_map([1, 2, 3]) { |n| n * 10 }.inspect  # [10, 20, 30]
+
+# ส่ง block ต่อ
+def my_select(array, &block)
+  result = []
+  array.each do |item|
+    result << item if block.call(item)
   end
-
-  def trigger(event_data)
-    @callbacks.each { |cb| cb.call(event_data) }
-  end
+  result
 end
 
-handler = EventHandler.new
-handler
-  .on_event { |data| puts "Handler 1: #{data}" }
-  .on_event { |data| puts "Handler 2: #{data.upcase}" }
-
-handler.trigger("hello world")
-# => Handler 1: hello world
-# => Handler 2: HELLO WORLD
-
-# ส่ง block ต่อ (&block)
-def outer(&block)
-  inner(&block)
+def filter_and_transform(array, &block)
+  filtered = my_select(array) { |n| n > 2 }  # ไม่ส่ง block ต่อ
+  my_map(filtered, &block)  # ส่ง block ต่อด้วย &block
 end
 
-def inner
-  yield 42
-end
-
-outer { |n| puts n }   # => 42
-
-# แปลง Proc เป็น block ด้วย &
-multiplier = Proc.new { |n| n * 3 }
-puts [1, 2, 3].map(&multiplier).inspect   # => [3, 6, 9]
-
-# Symbol to Proc
-puts ["hello", "world"].map(&:upcase).inspect   # => ["HELLO", "WORLD"]
-# :upcase.to_proc เหมือน Proc.new { |x| x.upcase }
+puts filter_and_transform([1, 2, 3, 4, 5]) { |n| n ** 2 }.inspect  # [9, 16, 25]
 ```
 
 ---
 
-## ขั้นตอนที่ 175: Proc.new และ proc {}
+## Step 175: Proc.new {} — สร้าง Proc Object
 
-Proc เป็น object ที่เก็บ block ได้
+Proc คือ block ที่ถูก objectify แล้ว เก็บได้ในตัวแปร ส่งต่อได้ เรียกซ้ำได้
 
 ```ruby
-# สร้าง Proc
-p1 = Proc.new { |n| n * 2 }
-p2 = proc { |n| n * 2 }   # shorthand
+# สร้าง Proc ด้วย Proc.new
+greet = Proc.new { |name| puts "สวัสดี, #{name}!" }
+greet.call("Alice")   # สวัสดี, Alice!
+greet.call("Bob")     # สวัสดี, Bob!
 
-puts p1.call(5)   # => 10
-puts p2.(5)       # => 10
-puts p2[5]        # => 10
+# Proc เป็น object จริงๆ
+puts greet.class   # Proc
+puts greet.arity   # 1 (รับ 1 argument)
+puts greet.lambda? # false
 
-# Proc เป็น first-class object
-def apply_twice(func, value)
-  func.call(func.call(value))
-end
-
-double = proc { |n| n * 2 }
-puts apply_twice(double, 3)   # => 12
-
-# Proc สามารถเก็บใน variable, array, hash
-operations = {
-  double: proc { |n| n * 2 },
-  square: proc { |n| n ** 2 },
-  negate: proc { |n| -n }
-}
-
-puts operations[:double].call(5)   # => 10
-puts operations[:square].call(4)   # => 16
-
-# Proc ใน Array
-transforms = [
-  proc { |n| n + 1 },
-  proc { |n| n * 2 },
-  proc { |n| n ** 2 }
+# เก็บใน array
+formatters = [
+  Proc.new { |x| x.upcase },
+  Proc.new { |x| x.reverse },
+  Proc.new { |x| x.gsub("a", "*") }
 ]
 
-result = transforms.reduce(3) { |acc, t| t.call(acc) }
-puts result   # => ((3+1)*2)^2 = 64
+text = "banana"
+formatters.each do |f|
+  puts f.call(text)
+end
+# BANANA
+# ananab
+# b*n*n*
+```
 
-# Proc สามารถ store state (closure)
+### Proc กับ Closures
+
+```ruby
+# Proc จำตัวแปรจาก context ที่สร้าง (closure)
 def make_counter(start = 0)
   count = start
-  increment = proc { count += 1; count }
-  decrement = proc { count -= 1; count }
-  get = proc { count }
-  [increment, decrement, get]
+  Proc.new { count += 1; count }
 end
 
-inc, dec, get = make_counter(10)
-puts get.call    # => 10
-puts inc.call    # => 11
-puts inc.call    # => 12
-puts dec.call    # => 11
-puts get.call    # => 11
+counter1 = make_counter
+counter2 = make_counter(10)
+
+puts counter1.call  # 1
+puts counter1.call  # 2
+puts counter2.call  # 11
+puts counter1.call  # 3  (independent จาก counter2)
 ```
 
 ---
 
-## ขั้นตอนที่ 176: Lambda
-
-Lambda คือ Proc ชนิดพิเศษที่มีกฎเรื่อง arguments และ return ที่เข้มงวดกว่า
+## Step 176: proc {} — Shorthand สำหรับ Proc
 
 ```ruby
-# สร้าง Lambda
-l1 = lambda { |n| n * 2 }
-l2 = ->(n) { n * 2 }   # stabby lambda (Ruby 1.9+)
+# proc {} เป็น shorthand ของ Proc.new {}
+greeter = proc { |name| "Hello, #{name}!" }
+puts greeter.call("World")  # Hello, World!
 
-puts l1.call(5)   # => 10
-puts l2.(5)       # => 10
-puts l2[5]        # => 10
+# เหมือนกัน 100%
+p1 = Proc.new { |x| x * 2 }
+p2 = proc { |x| x * 2 }
 
-puts l1.class      # => Proc
-puts l1.lambda?    # => true
-puts proc {}.lambda?  # => false
+puts p1.call(5)  # 10
+puts p2.call(5)  # 10
+puts p1.class    # Proc
+puts p2.class    # Proc
+puts p1.lambda?  # false
+puts p2.lambda?  # false
 
-# Lambda กับ multiple parameters
-add = ->(a, b) { a + b }
-puts add.(3, 4)   # => 7
+# ใช้งานจริง: factory functions
+def make_adder(n)
+  proc { |x| x + n }
+end
 
-# Lambda กับ default parameters
-greet = ->(name, greeting = "สวัสดี") { "#{greeting} #{name}!" }
-puts greet.("Alice")           # => สวัสดี Alice!
-puts greet.("Bob", "Hello")   # => Hello Bob!
+add5  = make_adder(5)
+add10 = make_adder(10)
+add20 = make_adder(20)
 
-# Lambda กับ keyword arguments
-create_point = ->(x:, y:, z: 0) { { x: x, y: y, z: z } }
-puts create_point.(x: 1, y: 2).inspect          # => {:x=>1, :y=>2, :z=>0}
-puts create_point.(x: 3, y: 4, z: 5).inspect   # => {:x=>3, :y=>4, :z=>5}
+puts add5.call(3)   # 8
+puts add10.call(3)  # 13
+puts add20.call(3)  # 23
 
-# Lambda เหมาะสำหรับ:
-# 1. สร้าง callable objects
-validators = {
-  positive: ->(n) { n > 0 },
-  even: ->(n) { n.even? },
-  in_range: ->(n, min, max) { (min..max).include?(n) }
+# ใช้กับ map
+[1, 2, 3, 4, 5].map(&add5).tap { |r| puts r.inspect }  # [6, 7, 8, 9, 10]
+```
+
+---
+
+## Step 177: Lambda — lambda {} และ -> {}
+
+Lambda คือ Proc พิเศษที่มี strict argument checking และ return behavior ที่แตกต่าง
+
+```ruby
+# สร้าง lambda ด้วย lambda {}
+greet = lambda { |name| "Hello, #{name}!" }
+puts greet.call("Alice")   # Hello, Alice!
+puts greet.class           # Proc
+puts greet.lambda?         # true  ← ต่างจาก Proc ทั่วไป
+
+# สร้าง lambda ด้วย -> {} (stabby lambda, Ruby 1.9+)
+greet2 = ->(name) { "Hi, #{name}!" }
+puts greet2.call("Bob")  # Hi, Bob!
+puts greet2.lambda?      # true
+
+# Multi-line stabby lambda
+process = ->(x, y) {
+  sum = x + y
+  product = x * y
+  { sum: sum, product: product }
 }
 
-puts validators[:positive].call(5)              # => true
-puts validators[:even].call(3)                  # => false
-puts validators[:in_range].curry.call(5).call(1, 10)  # => true
+puts process.call(3, 4).inspect  # {:sum=>7, :product=>12}
+
+# Lambda ที่ไม่มี argument
+say_hello = -> { puts "สวัสดี!" }
+say_hello.call  # สวัสดี!
+```
+
+### Lambda กับ arity
+
+```ruby
+# Lambda strict เรื่อง argument count
+strict = lambda { |a, b| a + b }
+puts strict.call(3, 4)  # 7
+
+# strict.call(3)    # ArgumentError: wrong number of arguments
+# strict.call(3, 4, 5)  # ArgumentError
+
+# Proc ไม่ strict
+loose = Proc.new { |a, b| "#{a}, #{b}" }
+puts loose.call(3, 4)     # 3, 4
+puts loose.call(3)        # 3,    (b เป็น nil)
+puts loose.call(3, 4, 5)  # 3, 4  (ตัวเกินถูกละเว้น)
 ```
 
 ---
 
-## ขั้นตอนที่ 177: Lambda vs Proc - ความแตกต่างสำคัญ
+## Step 178: Proc.call, .(), [] — วิธีเรียก Proc/Lambda
 
 ```ruby
-# ความแตกต่าง 1: Return behavior
-# Lambda: return ออกจาก lambda เท่านั้น
-# Proc: return ออกจาก method ที่ Proc อยู่
+# 3 วิธีในการเรียก Proc/Lambda
+double = proc { |n| n * 2 }
 
-def test_lambda
-  l = lambda { return "from lambda" }
-  result = l.call
-  "Method continues: #{result}"  # ยังทำงานต่อ
+# 1. .call()
+puts double.call(5)   # 10
+
+# 2. .() — syntax sugar สำหรับ call
+puts double.(5)       # 10
+
+# 3. [] — bracket notation
+puts double[5]        # 10
+
+# 4. === — ใช้กับ case/when
+puts double === 5     # 10 (ค่า truthy)
+
+# ทั้งหมดเหมือนกัน
+square = ->(n) { n ** 2 }
+puts [square.call(3), square.(3), square[3], square === 3].inspect
+# [9, 9, 9, 9]
+```
+
+### === กับ case/when
+
+```ruby
+# Proc/Lambda ใช้กับ case/when ได้!
+even?   = ->(n) { n.even? }
+positive? = ->(n) { n > 0 }
+large?   = ->(n) { n > 100 }
+
+numbers = [-5, 0, 4, 7, 150, -200]
+
+numbers.each do |n|
+  description = case n
+                when large?    then "ใหญ่มาก"
+                when positive? then "บวก"
+                when even?     then "คู่และไม่บวก"
+                else                "ลบและคี่"
+                end
+  puts "#{n}: #{description}"
 end
+# -5: ลบและคี่
+# 0: คู่และไม่บวก
+# 4: บวก
+# 7: บวก
+# 150: ใหญ่มาก
+# -200: คู่และไม่บวก
+```
 
-def test_proc
-  p = proc { return "from proc" }
+---
+
+## Step 179: Proc vs Lambda — ความแตกต่างสำคัญ
+
+### ความแตกต่างที่ 1: Arity (จำนวน arguments)
+
+```ruby
+# Proc: ไม่ strict เรื่อง arity
+loose_proc = Proc.new { |a, b, c| "#{a}, #{b}, #{c}" }
+puts loose_proc.call(1, 2)         # "1, 2, "  (c = nil)
+puts loose_proc.call(1, 2, 3, 4)  # "1, 2, 3"  (ตัวเกินละเว้น)
+
+# Lambda: strict เรื่อง arity
+strict_lambda = lambda { |a, b, c| "#{a}, #{b}, #{c}" }
+# strict_lambda.call(1, 2)     # ArgumentError!
+# strict_lambda.call(1, 2, 3, 4) # ArgumentError!
+puts strict_lambda.call(1, 2, 3)  # "1, 2, 3"  ✅
+```
+
+### ความแตกต่างที่ 2: return Behavior
+
+```ruby
+# PROC: return ออกจาก method ที่ล้อม Proc อยู่
+def proc_return_test
+  puts "ก่อน Proc"
+  p = Proc.new { return "จาก Proc" }
   p.call
-  "Method continues"  # ไม่ถึงบรรทัดนี้!
+  puts "หลัง Proc"  # ← ไม่ถูก execute!
+  "จาก method"
 end
 
-puts test_lambda   # => Method continues: from lambda
-puts test_proc     # => from proc (method หยุดที่ proc return)
+puts proc_return_test
+# ก่อน Proc
+# จาก Proc   ← method จบที่นี่เลย
 
-# ความแตกต่าง 2: Argument checking
-my_lambda = lambda { |a, b| a + b }
-my_proc = proc { |a, b| [a, b] }
+# LAMBDA: return ออกแค่จาก Lambda เอง
+def lambda_return_test
+  puts "ก่อน Lambda"
+  l = lambda { return "จาก Lambda" }
+  result = l.call
+  puts "หลัง Lambda: #{result}"  # ← ยังทำงานอยู่!
+  "จาก method"
+end
 
-# Lambda strict
-# my_lambda.call(1, 2, 3)   # ArgumentError: wrong number of arguments
+puts lambda_return_test
+# ก่อน Lambda
+# หลัง Lambda: จาก Lambda
+# จาก method
+```
 
-# Proc lenient
-puts my_proc.call(1, 2, 3).inspect   # => [1, 2] (extra args ignored)
-puts my_proc.call(1).inspect          # => [1, nil] (missing args = nil)
+### สรุปความแตกต่าง
 
-# ความแตกต่าง 3: arity
-puts my_lambda.arity   # => 2
-puts my_proc.arity     # => 2 (แต่ behavior ต่างกัน)
-
-# เมื่อไหรใช้ Lambda? เมื่อไหรใช้ Proc?
-# Lambda: เมื่อต้องการ function ที่ independent (ส่งผ่านได้ปลอดภัย)
-# Proc: เมื่อต้องการ code snippet ที่ทำงานในบริบทของ method
+```ruby
+# ตารางเปรียบเทียบ Proc vs Lambda
+#
+# Feature          | Proc                | Lambda
+# ----------------|---------------------|------------------
+# สร้าง           | Proc.new {} / proc{}| lambda {} / -> {}
+# lambda?          | false               | true
+# arity            | ไม่ strict          | strict
+# return           | ออกจาก method      | ออกจาก lambda
+# break            | ออกจาก method      | ออกจาก lambda
+# next             | เหมือนกัน          | เหมือนกัน
 ```
 
 ---
 
-## ขั้นตอนที่ 178: Closures และ Scope
+## Step 180: Closure คืออะไร? — Capturing Variables
+
+Closure คือ block/proc/lambda ที่ "จดจำ" ตัวแปรจาก environment ที่มันถูกสร้างขึ้น
 
 ```ruby
-# Closure - function ที่ capture environment ที่สร้างมัน
-def make_adder(n)
-  lambda { |x| x + n }  # capture n จาก outer scope
+# Closure จำ variable จาก scope ที่สร้าง
+def make_multiplier(factor)
+  # lambda นี้ "จำ" ค่า factor แม้ว่า make_multiplier จะ return แล้ว
+  ->(n) { n * factor }
 end
 
-add5 = make_adder(5)
-add10 = make_adder(10)
+double = make_multiplier(2)
+triple = make_multiplier(3)
+times10 = make_multiplier(10)
 
-puts add5.(3)    # => 8
-puts add10.(3)   # => 13
+puts double.call(5)   # 10
+puts triple.call(5)   # 15
+puts times10.call(5)  # 50
 
-# Closure capture variables by reference (ไม่ใช่ by value)
-x = 10
-double_x = proc { x * 2 }
+# Closure สามารถแก้ไขตัวแปรจาก scope ได้
+def make_counter
+  count = 0  # ตัวแปรที่ closure จะ capture
+  
+  increment = -> { count += 1; count }
+  decrement = -> { count -= 1; count }
+  reset     = -> { count = 0 }
+  get       = -> { count }
+  
+  { increment: increment, decrement: decrement, reset: reset, get: get }
+end
 
-puts double_x.call   # => 20
-x = 20
-puts double_x.call   # => 40 (ค่า x เปลี่ยน!)
+counter = make_counter
+puts counter[:increment].call  # 1
+puts counter[:increment].call  # 2
+puts counter[:increment].call  # 3
+puts counter[:decrement].call  # 2
+puts counter[:get].call        # 2
+counter[:reset].call
+puts counter[:get].call        # 0
+```
 
-# สร้าง private state ด้วย closure
+### Closure กับ Shared State
+
+```ruby
+# หลาย closures แชร์ state เดียวกัน
 def make_bank_account(initial_balance)
   balance = initial_balance
-
-  deposit = lambda { |amount| balance += amount; balance }
-  withdraw = lambda do |amount|
-    raise "Insufficient funds" if amount > balance
+  
+  deposit  = ->(amount) { balance += amount; balance }
+  withdraw = ->(amount) {
+    return "ยอดไม่พอ" if amount > balance
     balance -= amount
     balance
-  end
-  check = lambda { balance }
-
-  { deposit: deposit, withdraw: withdraw, check: check }
+  }
+  statement = -> { "ยอดคงเหลือ: #{balance} บาท" }
+  
+  { deposit: deposit, withdraw: withdraw, statement: statement }
 end
 
 account = make_bank_account(1000)
-puts account[:check].call          # => 1000
-puts account[:deposit].(500)       # => 1500
-puts account[:withdraw].(200)      # => 1300
-# puts account[:withdraw].(2000)   # => RuntimeError: Insufficient funds
+puts account[:deposit].call(500)    # 1500
+puts account[:withdraw].call(200)   # 1300
+puts account[:statement].call       # ยอดคงเหลือ: 1300 บาท
+puts account[:withdraw].call(2000)  # ยอดไม่พอ
+```
 
-# Binding - closure's scope
-def get_binding(x)
-  binding   # current binding
+### ระวัง: Variable Capture ใน Loops
+
+```ruby
+# ❌ ปัญหา: ทุก proc capture i เดียวกัน (ใน Python/JS มีปัญหานี้)
+procs = []
+[1, 2, 3].each do |i|
+  procs << proc { i }  # ใน Ruby each สร้าง scope ใหม่ทุก iteration
 end
 
-b = get_binding(42)
-puts eval("x * 2", b)   # => 84
+puts procs.map(&:call).inspect  # [1, 2, 3] ✅ ใน Ruby ทำงานถูกต้อง!
+
+# Ruby each ปลอดภัยเพราะสร้าง new binding ทุก iteration
 ```
 
 ---
 
-## ขั้นตอนที่ 179: Proc Composition ด้วย >> และ <<
+## Step 181: Method Objects — .method(:name)
 
 ```ruby
-# >> (forward composition): f >> g = g(f(x))
-# << (backward composition): f << g = f(g(x))
+# method(:name) คืน Method object
+def square(n)
+  n ** 2
+end
 
-double = ->(n) { n * 2 }
-increment = ->(n) { n + 1 }
-square = ->(n) { n ** 2 }
+m = method(:square)
+puts m.class    # Method
+puts m.call(5)  # 25
+puts m.arity    # 1
 
-# >> forward composition
-double_then_inc = double >> increment
-puts double_then_inc.(5)   # => 11 (5*2=10, 10+1=11)
-
-inc_then_double = double << increment
-puts inc_then_double.(5)   # => 12 (5+1=6, 6*2=12)
-
-# Chain หลาย operations
-pipeline = double >> increment >> square
-puts pipeline.(3)   # => 49 (3*2=6, 6+1=7, 7^2=49)
-
-# ตัวอย่างจริง
-strip = :strip.to_proc
-downcase = :downcase.to_proc
-capitalize = :capitalize.to_proc
-
-clean_name = strip >> downcase >> capitalize
-puts clean_name.("  ALICE  ")   # => Alice
+# Method object ทำงานเหมือน Proc/Lambda
+puts m.(5)     # 25
+puts m[5]      # 25
 
 # ใช้กับ map
-names = ["  ALICE  ", "  BOB  ", "  CAROL  "]
-puts names.map(&clean_name).inspect
-# => ["Alice", "Bob", "Carol"]
+puts [1, 2, 3, 4, 5].map(&method(:square)).inspect  # [1, 4, 9, 16, 25]
 
-# Compose method objects
-require 'ostruct'
-to_open_struct = ->(h) { OpenStruct.new(h) }
-get_name = ->(obj) { obj.name }
+# Instance method
+class Greeter
+  def hello(name)
+    "Hello, #{name}!"
+  end
+end
 
-name_from_hash = to_open_struct >> get_name
-puts name_from_hash.({ name: "Alice", age: 30 })   # => Alice
+g = Greeter.new
+m = g.method(:hello)
+puts m.call("World")  # Hello, World!
+
+# ส่งเป็น argument
+def apply(value, func)
+  func.call(value)
+end
+
+upcase_method = "hello".method(:*)  # ❌ ไม่ได้
+# ใช้แบบนี้แทน:
+def double_str(s)
+  s * 2
+end
+puts apply("ha", method(:double_str))  # haha
+```
+
+### to_proc กับ Method
+
+```ruby
+# Method มี to_proc method
+class Temperature
+  def initialize(celsius)
+    @celsius = celsius
+  end
+
+  def to_fahrenheit
+    @celsius * 9.0 / 5 + 32
+  end
+end
+
+temps = [0, 20, 37, 100].map { |c| Temperature.new(c) }
+fahrenheit_values = temps.map(&:to_fahrenheit)
+puts fahrenheit_values.inspect  # [32.0, 68.0, 98.6, 212.0]
 ```
 
 ---
 
-## ขั้นตอนที่ 180: Method#to_proc
+## Step 182: Symbol to Proc (&:method_name)
+
+`&:symbol` เป็น shortcut ที่ทรงพลังมาก Ruby จะแปลง symbol เป็น proc โดยเรียก method ชื่อนั้นบน argument
 
 ```ruby
-# Method objects สามารถแปลงเป็น Proc ได้ด้วย &
-def double(n)
-  n * 2
-end
+# &:upcase เท่ากับ proc { |s| s.upcase }
+["hello", "world"].map(&:upcase)    # ["HELLO", "WORLD"]
 
-# แปลง method เป็น proc
-double_proc = method(:double).to_proc
-puts double_proc.call(5)   # => 10
+# &:to_i เท่ากับ proc { |s| s.to_i }
+["1", "2", "3"].map(&:to_i)         # [1, 2, 3]
 
-# ใช้ & ใน argument
-puts [1, 2, 3].map(&method(:double)).inspect   # => [2, 4, 6]
+# &:even? เท่ากับ proc { |n| n.even? }
+[1, 2, 3, 4, 5].select(&:even?)     # [2, 4]
 
-# Methods ของ Object
-puts [1, -2, 3, -4].map(&method(:puts))   # => prints each
+# &:nil? เท่ากับ proc { |x| x.nil? }
+[1, nil, 2, nil, 3].reject(&:nil?)  # [1, 2, 3]
 
-# Instance methods
-class Converter
-  def celsius_to_fahrenheit(c)
-    c * 9.0 / 5 + 32
+# &:itself เท่ากับ proc { |x| x }
+[1, nil, false, 2, "", 3].select(&:itself)  # [1, 2, "", 3]
+# (nil และ false ถูกกรองออก)
+
+# ตัวอย่างที่ซับซ้อนขึ้น
+words = ["hello", "world", "ruby"]
+puts words.map(&:length).inspect     # [5, 5, 4]
+puts words.map(&:chars).inspect      # [["h","e","l","l","o"], ["w","o","r","l","d"], ["r","u","b","y"]]
+puts words.flat_map(&:chars).inspect # ["h","e","l","l","o","w","o","r","l","d","r","u","b","y"]
+puts words.sort_by(&:length).inspect # ["ruby", "hello", "world"]
+```
+
+### สร้าง Symbol to Proc เอง
+
+```ruby
+# Ruby ใช้ Symbol#to_proc ในการทำ &:symbol
+class Symbol
+  def to_proc
+    ->(receiver, *args) { receiver.send(self, *args) }
   end
 end
 
-converter = Converter.new
-c_to_f = converter.method(:celsius_to_fahrenheit).to_proc
+# ตัวอย่าง: method ที่รับ argument
+# เพิ่ม argument ด้วย method(:name)
+add_n = ->(n) { ->(x) { x + n } }
 
-puts [0, 20, 37, 100].map(&c_to_f).inspect
-# => [32.0, 68.0, 98.6, 212.0]
-
-# UnboundMethod
-class StringFormatter
-  def shout
-    upcase + "!!!"
-  end
-end
-
-unbound_shout = StringFormatter.instance_method(:shout)
-bound = unbound_shout.bind("hello")
-puts bound.call   # => HELLO!!!
-
-# ใช้ &:method pattern กับ custom classes
-class Product
-  attr_reader :name, :price
-  
-  def initialize(name, price)
-    @name = name
-    @price = price
-  end
-
-  def to_s
-    "#{name}: ฿#{price}"
-  end
-end
-
-products = [
-  Product.new("Apple", 20),
-  Product.new("Banana", 15),
-  Product.new("Cherry", 50)
-]
-
-puts products.map(&:to_s).inspect
-puts products.map(&:price).sum   # => 85
-puts products.min_by(&:price).name  # => Banana
+# ใช้กับ map
+puts [1, 2, 3].map(&add_n.(5)).inspect   # [6, 7, 8]
 ```
 
 ---
 
-## ขั้นตอนที่ 181: Currying
+## Step 183: Currying — Partial Application
 
-Currying คือการแปลง function ที่รับ arguments หลายตัว ให้เป็น chain ของ functions ที่แต่ละอันรับ argument เดียว
+Currying คือการแปลง function ที่รับหลาย argument เป็น chain ของ functions ที่รับ argument ทีละตัว
 
 ```ruby
-# Lambda currying
+# curry พื้นฐาน
 add = ->(a, b) { a + b }
 curried_add = add.curry
 
-add5 = curried_add.(5)   # partial application
-puts add5.(3)    # => 8
-puts add5.(10)   # => 15
+add5 = curried_add.call(5)  # ส่ง argument แรก
+puts add5.call(3)           # 8
+puts add5.call(10)          # 15
 
-# Proc currying
-multiply = proc { |a, b| a * b }
-double = multiply.curry.(2)
-triple = multiply.curry.(3)
+# หรือเรียกพร้อมกัน
+puts curried_add.call(5).call(3)  # 8
+puts curried_add.(5).(3)          # 8
 
-puts [1, 2, 3, 4, 5].map(&double).inspect   # => [2, 4, 6, 8, 10]
-puts [1, 2, 3, 4, 5].map(&triple).inspect   # => [3, 6, 9, 12, 15]
+# curry กับ 3 arguments
+multiply = ->(a, b, c) { a * b * c }
+curried = multiply.curry
 
-# ตัวอย่างที่มีประโยชน์: Parameterized filters
-in_range = ->(min, max, value) { (min..max).include?(value) }
-valid_age = in_range.curry.(0).(120)
-valid_score = in_range.curry.(0).(100)
+double_and_half = curried.(2).(0.5)  # multiply(2, 0.5, ?)
+puts double_and_half.(10)             # 10.0
 
-puts [25, 150, -1, 99].select(&valid_age).inspect    # => [25, 99]
-puts [85, 101, -5, 70].select(&valid_score).inspect  # => [85, 70]
+# ตัวอย่างจริง: ฟิลเตอร์ด้วย curry
+filter_by = ->(field, value, obj) { obj[field] == value }
 
-# สร้าง operators ด้วย curry
-greater_than = ->(threshold, value) { value > threshold }
-less_than = ->(threshold, value) { value < threshold }
-
-above_zero = greater_than.curry.(0)
-below_hundred = less_than.curry.(100)
-
-numbers = [-5, 0, 50, 100, 150]
-puts numbers.select(&above_zero).inspect      # => [50, 100, 150]
-puts numbers.select(&below_hundred).inspect   # => [-5, 0, 50]
-
-# Curried method composition
-format_currency = ->(symbol, amount) { "#{symbol}#{amount.round(2)}" }
-thb = format_currency.curry.("฿")
-usd = format_currency.curry.("$")
-
-amounts = [100.5, 200.33, 50.0]
-puts amounts.map(&thb).inspect   # => ["฿100.5", "฿200.33", "฿50.0"]
-puts amounts.map(&usd).inspect   # => ["$100.5", "$200.33", "$50.0"]
-```
-
----
-
-## ขั้นตอนที่ 182: Custom Iterators ด้วย Block
-
-```ruby
-# สร้าง custom iterator
-class NumberList
-  def initialize(*numbers)
-    @numbers = numbers
-  end
-
-  def each_even
-    @numbers.each { |n| yield n if n.even? }
-  end
-
-  def each_odd
-    @numbers.each { |n| yield n if n.odd? }
-  end
-
-  def each_with_running_sum
-    sum = 0
-    @numbers.each do |n|
-      sum += n
-      yield n, sum
-    end
-  end
-end
-
-list = NumberList.new(1, 2, 3, 4, 5, 6)
-
-list.each_even { |n| print "#{n} " }
-puts   # => 2 4 6
-
-list.each_odd { |n| print "#{n} " }
-puts   # => 1 3 5
-
-list.each_with_running_sum { |n, sum| puts "#{n}: running sum = #{sum}" }
-
-# Iterator ที่ return Enumerator
-class PaginatedList
-  def initialize(items, page_size)
-    @items = items
-    @page_size = page_size
-  end
-
-  def each_page
-    return enum_for(:each_page) unless block_given?
-    
-    @items.each_slice(@page_size) do |page|
-      yield page
-    end
-  end
-end
-
-pages = PaginatedList.new((1..25).to_a, 10)
-
-# ใช้แบบ block
-pages.each_page do |page|
-  puts "Page: #{page.inspect}"
-end
-
-# ใช้แบบ Enumerator
-first_page = pages.each_page.first
-puts first_page.inspect   # => [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-```
-
----
-
-## ขั้นตอนที่ 183: Practical Block Patterns
-
-```ruby
-# Pattern 1: Transaction
-def with_transaction
-  puts "BEGIN TRANSACTION"
-  result = yield
-  puts "COMMIT"
-  result
-rescue => e
-  puts "ROLLBACK: #{e.message}"
-  raise
-end
-
-with_transaction do
-  puts "กำลัง update database..."
-  # ทำงานจริง ๆ ที่นี่
-  "success"
-end
-
-# Pattern 2: Resource Management
-def with_resource(resource)
-  resource_obj = acquire_resource(resource)
-  begin
-    yield resource_obj
-  ensure
-    release_resource(resource_obj)
-  end
-end
-
-def acquire_resource(name)
-  puts "Acquiring #{name}"
-  name
-end
-
-def release_resource(resource)
-  puts "Releasing #{resource}"
-end
-
-with_resource("database connection") do |conn|
-  puts "Using #{conn}"
-end
-# => Acquiring database connection
-# => Using database connection
-# => Releasing database connection
-
-# Pattern 3: Measure Performance
-def benchmark(label = "block")
-  start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-  result = yield
-  elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start
-  printf "%-20s %.6f seconds\n", label, elapsed
-  result
-end
-
-benchmark("Array creation") { (1..100000).to_a }
-benchmark("Hash creation") { (1..100000).each_with_object({}) { |n, h| h[n] = n } }
-
-# Pattern 4: Builder
-class HtmlBuilder
-  def initialize(tag)
-    @tag = tag
-    @attributes = {}
-    @content = []
-  end
-
-  def with_attr(key, value)
-    @attributes[key] = value
-    self
-  end
-
-  def with_content
-    @content << yield
-    self
-  end
-
-  def build
-    attrs = @attributes.map { |k, v| " #{k}=\"#{v}\"" }.join
-    content = @content.join
-    "<#{@tag}#{attrs}>#{content}</#{@tag}>"
-  end
-end
-
-html = HtmlBuilder.new("a")
-  .with_attr("href", "https://ruby-lang.org")
-  .with_attr("class", "link")
-  .with_content { "Ruby Language" }
-  .build
-
-puts html
-# => <a href="https://ruby-lang.org" class="link">Ruby Language</a>
-```
-
----
-
-## ขั้นตอนที่ 184: Proc ใน Data Structures
-
-```ruby
-# เก็บ behaviors ใน Hash
-handlers = {
-  success: proc { |data| puts "✓ Success: #{data}" },
-  error: proc { |msg| puts "✗ Error: #{msg}" },
-  warning: proc { |msg| puts "⚠ Warning: #{msg}" }
-}
-
-handlers[:success].call("Order created")
-handlers[:error].call("Database connection failed")
-handlers[:warning].call("Low memory")
-
-# Strategy Pattern ด้วย Proc
-class Sorter
-  STRATEGIES = {
-    by_name: ->(a, b) { a[:name] <=> b[:name] },
-    by_age: ->(a, b) { a[:age] <=> b[:age] },
-    by_salary_desc: ->(a, b) { b[:salary] <=> a[:salary] }
-  }
-
-  def initialize(strategy = :by_name)
-    @strategy = STRATEGIES[strategy] || STRATEGIES[:by_name]
-  end
-
-  def sort(people)
-    people.sort(&@strategy)
-  end
-
-  def change_strategy(new_strategy)
-    @strategy = STRATEGIES[new_strategy]
-    self
-  end
-end
-
-people = [
-  { name: "Charlie", age: 35, salary: 70000 },
-  { name: "Alice", age: 25, salary: 80000 },
-  { name: "Bob", age: 30, salary: 60000 }
+users = [
+  { name: "Alice", role: :admin },
+  { name: "Bob", role: :user },
+  { name: "Charlie", role: :admin }
 ]
 
-sorter = Sorter.new(:by_age)
-puts sorter.sort(people).map { |p| p[:name] }.inspect
-# => ["Alice", "Bob", "Charlie"]
+is_admin = filter_by.curry.(:role).(:admin)
+admins = users.select(&is_admin)
+puts admins.map { |u| u[:name] }.inspect  # ["Alice", "Charlie"]
+```
 
-sorter.change_strategy(:by_salary_desc)
-puts sorter.sort(people).map { |p| p[:name] }.inspect
-# => ["Alice", "Charlie", "Bob"]
+### Currying กับ Proc ธรรมดา
+
+```ruby
+# Proc ก็ curry ได้
+multiply_proc = proc { |a, b| a * b }
+triple = multiply_proc.curry.(3)
+puts triple.(7)  # 21
+
+# สร้าง pipeline ด้วย curry
+def pipeline(*fns)
+  fns.reduce { |composed, f| composed >> f }
+end
+
+add_one = ->(n) { n + 1 }
+double  = ->(n) { n * 2 }
+square  = ->(n) { n ** 2 }
+
+transform = pipeline(add_one, double, square)
+puts transform.(3)  # ((3+1)*2)^2 = 64
 ```
 
 ---
 
-## ขั้นตอนที่ 185: Fibers - Cooperative Concurrency
+## Step 184: Proc Composition — >> และ <<
+
+Ruby 2.6+ เพิ่ม `>>` และ `<<` สำหรับ compose procs/lambdas
 
 ```ruby
-# Fiber - lightweight concurrency primitive
-fiber = Fiber.new do
-  puts "Step 1"
-  Fiber.yield   # หยุดชั่วคราว
-  puts "Step 2"
-  Fiber.yield
-  puts "Step 3"
+# >> (compose forward): f >> g หมายถึง g(f(x))
+double  = ->(n) { n * 2 }
+add_one = ->(n) { n + 1 }
+
+# double แล้ว add_one
+double_then_add = double >> add_one
+puts double_then_add.(5)  # (5*2)+1 = 11
+
+# << (compose backward): f << g หมายถึง f(g(x))
+add_then_double = double << add_one
+puts add_then_double.(5)  # (5+1)*2 = 12
+
+# chain หลายตัว
+upcase   = :upcase.to_proc
+reverse  = :reverse.to_proc
+strip    = :strip.to_proc
+
+clean_string = strip >> downcase >> reverse
+# หมายเหตุ: Symbol#to_proc ไม่รองรับ >> โดยตรง ต้องใช้ lambda
+
+clean = ->(s) { s.strip } >> ->(s) { s.downcase } >> ->(s) { s.reverse }
+puts clean.("  Hello World  ")  # dlrow olleh
+```
+
+### ตัวอย่างจริง: Text Processing Pipeline
+
+```ruby
+# สร้าง text processing pipeline
+normalize_whitespace = ->(text) { text.gsub(/\s+/, " ").strip }
+remove_punctuation   = ->(text) { text.gsub(/[^a-zA-Z0-9\s]/, "") }
+downcase_text        = ->(text) { text.downcase }
+tokenize             = ->(text) { text.split }
+remove_stopwords     = ->(tokens) {
+  stopwords = %w[the a an is are was were in on at to for of and but]
+  tokens.reject { |t| stopwords.include?(t) }
+}
+
+text_pipeline = normalize_whitespace >>
+                remove_punctuation >>
+                downcase_text >>
+                tokenize >>
+                remove_stopwords
+
+result = text_pipeline.("The Quick Brown Fox Jumps Over the Lazy Dog!")
+puts result.inspect  # ["quick", "brown", "fox", "jumps", "over", "lazy", "dog"]
+```
+
+---
+
+## Step 185: Practical Uses — Custom Iterators
+
+```ruby
+# สร้าง custom iterators ที่ยืดหยุ่น
+class Tree
+  attr_accessor :value, :children
+
+  def initialize(value, children = [])
+    @value = value
+    @children = children
+  end
+
+  # depth-first traversal
+  def each_dfs(&block)
+    yield value
+    children.each { |child| child.each_dfs(&block) }
+  end
+
+  # breadth-first traversal
+  def each_bfs(&block)
+    queue = [self]
+    until queue.empty?
+      node = queue.shift
+      yield node.value
+      queue.concat(node.children)
+    end
+  end
 end
 
-fiber.resume   # => Step 1
-fiber.resume   # => Step 2
-fiber.resume   # => Step 3
+tree = Tree.new(1, [
+  Tree.new(2, [
+    Tree.new(4),
+    Tree.new(5)
+  ]),
+  Tree.new(3, [
+    Tree.new(6),
+    Tree.new(7)
+  ])
+])
 
-# Fiber สำหรับ generator pattern
+print "DFS: "
+tree.each_dfs { |v| print "#{v} " }
+# DFS: 1 2 4 5 3 6 7
+
+print "\nBFS: "
+tree.each_bfs { |v| print "#{v} " }
+# BFS: 1 2 3 4 5 6 7
+```
+
+---
+
+## Step 186: Callbacks Pattern
+
+```ruby
+# Event system ด้วย Procs
+class EventEmitter
+  def initialize
+    @listeners = Hash.new { |h, k| h[k] = [] }
+  end
+
+  def on(event, &block)
+    @listeners[event] << block
+    self  # chain
+  end
+
+  def off(event)
+    @listeners.delete(event)
+    self
+  end
+
+  def emit(event, *args)
+    @listeners[event].each { |listener| listener.call(*args) }
+    self
+  end
+end
+
+emitter = EventEmitter.new
+
+emitter
+  .on(:data) { |msg| puts "Handler 1: #{msg}" }
+  .on(:data) { |msg| puts "Handler 2: #{msg.upcase}" }
+  .on(:error) { |err| puts "Error: #{err}" }
+
+emitter.emit(:data, "hello world")
+# Handler 1: hello world
+# Handler 2: HELLO WORLD
+
+emitter.emit(:error, "Something went wrong")
+# Error: Something went wrong
+```
+
+---
+
+## Step 187: DSL (Domain Specific Language) ด้วย Blocks
+
+```ruby
+# สร้าง DSL สำหรับ configuration
+class Config
+  def initialize
+    @settings = {}
+  end
+
+  def method_missing(name, *args)
+    if name.to_s.end_with?("=")
+      @settings[name.to_s.chomp("=").to_sym] = args.first
+    else
+      @settings[name]
+    end
+  end
+
+  def to_h
+    @settings
+  end
+end
+
+def configure(&block)
+  config = Config.new
+  config.instance_eval(&block)
+  config
+end
+
+app_config = configure do
+  self.database_url = "postgresql://localhost/mydb"
+  self.redis_url = "redis://localhost:6379"
+  self.max_connections = 10
+  self.debug = false
+  self.log_level = "info"
+end
+
+puts app_config.database_url  # postgresql://localhost/mydb
+puts app_config.debug         # false
+puts app_config.to_h.inspect
+```
+
+### HTML Builder DSL
+
+```ruby
+class HtmlDsl
+  def initialize
+    @html = ""
+    @indent = 0
+  end
+
+  def method_missing(tag, *args, **attrs, &block)
+    content = args.first
+    attr_str = attrs.map { |k, v| " #{k}=\"#{v}\"" }.join
+    
+    indent = "  " * @indent
+    @html += "#{indent}<#{tag}#{attr_str}>"
+    
+    if block
+      @html += "\n"
+      @indent += 1
+      block.call
+      @indent -= 1
+      @html += "#{indent}</#{tag}>\n"
+    elsif content
+      @html += "#{content}</#{tag}>\n"
+    else
+      @html += "</#{tag}>\n"
+    end
+  end
+
+  def to_s
+    @html
+  end
+end
+
+def html(&block)
+  builder = HtmlDsl.new
+  builder.instance_eval(&block)
+  builder.to_s
+end
+
+result = html do
+  div(class: "container") do
+    h1 "สวัสดี Ruby DSL"
+    p("เรียนรู้ Blocks ใน Ruby", class: "intro")
+    ul do
+      li "Blocks"
+      li "Procs"
+      li "Lambdas"
+    end
+  end
+end
+
+puts result
+```
+
+---
+
+## Step 188–190: Advanced Block Patterns
+
+### Step 188: Fiber — Coroutines
+
+```ruby
+# Fiber คือ lightweight coroutine ที่ใช้ yield ในการ pause/resume
+fiber = Fiber.new do
+  puts "Step 1"
+  Fiber.yield "first"
+  
+  puts "Step 2"
+  Fiber.yield "second"
+  
+  puts "Step 3"
+  "third"
+end
+
+puts fiber.resume  # Step 1 → first
+puts fiber.resume  # Step 2 → second
+puts fiber.resume  # Step 3 → third
+# fiber.resume   # FiberError: dead fiber called
+
+# ใช้สร้าง infinite generator
 def fibonacci_fiber
   Fiber.new do
     a, b = 0, 1
@@ -856,1041 +1064,232 @@ end
 
 fib = fibonacci_fiber
 10.times { print "#{fib.resume} " }
-puts   # => 0 1 1 2 3 5 8 13 21 34
-
-# Fiber สำหรับ infinite sequences
-def counter_fiber(start = 0, step = 1)
-  Fiber.new do
-    n = start
-    loop do
-      Fiber.yield n
-      n += step
-    end
-  end
-end
-
-odds = counter_fiber(1, 2)
-puts 5.times.map { odds.resume }.inspect   # => [1, 3, 5, 7, 9]
-
-evens = counter_fiber(0, 2)
-puts 5.times.map { evens.resume }.inspect  # => [0, 2, 4, 6, 8]
-
-# Fiber.yield กับ value
-producer = Fiber.new do
-  (1..5).each do |n|
-    Fiber.yield n * n
-  end
-  nil
-end
-
-loop do
-  val = producer.resume
-  break if val.nil?
-  puts val
-end
+# 0 1 1 2 3 5 8 13 21 34
 ```
 
----
-
-## ขั้นตอนที่ 186: Enumerator::Lazy กับ Block
+### Step 189: Enumerator.new กับ Blocks
 
 ```ruby
-# Lazy block evaluation
-def infinite_series
+# สร้าง custom Enumerator
+def infinite_primes
   Enumerator.new do |yielder|
-    n = 1
-    loop do
-      yielder << n
-      n += 1
-    end
-  end
-end
-
-series = infinite_series.lazy
-
-# ทำงานกับ infinite series อย่างมีประสิทธิภาพ
-result = series.select { |n| n % 3 == 0 }
-              .map { |n| n ** 2 }
-              .first(5)
-puts result.inspect   # => [9, 36, 81, 144, 225]
-
-# Lazy with complex pipeline
-primes_lazy = (2..Float::INFINITY).lazy.select do |n|
-  (2..Math.sqrt(n).to_i).none? { |i| n % i == 0 }
-end
-
-puts primes_lazy.first(10).inspect
-# => [2, 3, 5, 7, 11, 13, 17, 19, 23, 29]
-
-# Combining lazy enumerators
-evens = (0..Float::INFINITY).lazy.select(&:even?)
-first_10_even_squares = evens.map { |n| n ** 2 }.first(10)
-puts first_10_even_squares.inspect
-# => [0, 4, 16, 36, 64, 100, 144, 196, 256, 324]
-
-# Lazy สำหรับ file processing
-# File.open("large_file.txt").each_line.lazy
-#   .select { |line| line.include?("ERROR") }
-#   .map { |line| line.strip }
-#   .first(100)
-```
-
----
-
-## ขั้นตอนที่ 187: Proc ใน OOP
-
-```ruby
-# Callback pattern
-class Button
-  attr_reader :label
-
-  def initialize(label, &click_handler)
-    @label = label
-    @click_handler = click_handler || -> { puts "Default action" }
-  end
-
-  def click
-    @click_handler.call(self)
-  end
-end
-
-save_btn = Button.new("Save") do |btn|
-  puts "#{btn.label} clicked! Saving..."
-end
-
-cancel_btn = Button.new("Cancel") { |btn| puts "Cancelled!" }
-default_btn = Button.new("OK")
-
-save_btn.click    # => Save clicked! Saving...
-cancel_btn.click  # => Cancelled!
-default_btn.click # => Default action
-
-# Observer Pattern ด้วย Proc
-class EventEmitter
-  def initialize
-    @listeners = Hash.new { |h, k| h[k] = [] }
-  end
-
-  def on(event, &callback)
-    @listeners[event] << callback
-    self
-  end
-
-  def emit(event, *args)
-    @listeners[event].each { |cb| cb.call(*args) }
-  end
-
-  def off(event)
-    @listeners.delete(event)
-    self
-  end
-end
-
-emitter = EventEmitter.new
-
-emitter
-  .on(:login) { |user| puts "Welcome #{user}!" }
-  .on(:login) { |user| puts "Logged at #{Time.now}" }
-  .on(:logout) { |user| puts "Goodbye #{user}!" }
-
-emitter.emit(:login, "Alice")
-emitter.emit(:logout, "Alice")
-```
-
----
-
-## ขั้นตอนที่ 188: Memoization ด้วย Proc/Lambda
-
-```ruby
-# Simple memoization
-def memoize(callable)
-  cache = {}
-  ->(n) { cache[n] ||= callable.(n) }
-end
-
-slow_fibonacci = ->(n) do
-  return n if n <= 1
-  slow_fibonacci.(n - 1) + slow_fibonacci.(n - 2)
-end
-
-# เร็วขึ้นด้วย memoization
-fast_fibonacci = memoize(slow_fibonacci)
-puts fast_fibonacci.(30)   # เร็วมาก
-
-# Memoize ด้วย hash และ closure
-def create_memoized(func)
-  cache = {}
-  lambda do |*args|
-    cache[args] ||= func.call(*args)
-  end
-end
-
-expensive = ->(n) { sleep(0.01); n ** 3 }
-memoized = create_memoized(expensive)
-
-puts memoized.(5)   # => 125 (computed)
-puts memoized.(5)   # => 125 (cached)
-puts memoized.(3)   # => 27 (computed)
-puts memoized.(3)   # => 27 (cached)
-
-# Generic memoize module
-module Memoization
-  def memoize_method(method_name)
-    original = instance_method(method_name)
-    cache_var = "@#{method_name}_cache"
-
-    define_method(method_name) do |*args|
-      cache = instance_variable_get(cache_var) || {}
-      unless cache.key?(args)
-        cache[args] = original.bind(self).call(*args)
-        instance_variable_set(cache_var, cache)
-      end
-      cache[args]
-    end
-  end
-end
-
-class Calculator
-  extend Memoization
-
-  def fib(n)
-    n <= 1 ? n : fib(n - 1) + fib(n - 2)
-  end
-
-  memoize_method :fib
-end
-
-calc = Calculator.new
-puts calc.fib(40)   # เร็วมาก
-```
-
----
-
-## ขั้นตอนที่ 189: Advanced Block Patterns
-
-```ruby
-# Pattern 1: Middleware/Pipeline
-class Pipeline
-  def initialize
-    @middlewares = []
-  end
-
-  def use(middleware = nil, &block)
-    @middlewares << (middleware || block)
-    self
-  end
-
-  def call(input)
-    @middlewares.reduce(input) do |result, middleware|
-      middleware.call(result)
-    end
-  end
-end
-
-text_pipeline = Pipeline.new
-  .use { |text| text.strip }
-  .use { |text| text.downcase }
-  .use { |text| text.gsub(/[^\w\s]/, '') }
-  .use { |text| text.split.map(&:capitalize).join(" ") }
-
-puts text_pipeline.call("  HELLO, WORLD!  ")   # => Hello World
-
-# Pattern 2: Lazy Evaluation
-class LazyValue
-  def initialize(&block)
-    @block = block
-    @evaluated = false
-  end
-
-  def value
-    unless @evaluated
-      @value = @block.call
-      @evaluated = true
-    end
-    @value
-  end
-
-  def to_s
-    value.to_s
-  end
-end
-
-lazy_config = LazyValue.new do
-  puts "กำลังโหลด config..."
-  { host: "localhost", port: 3000 }
-end
-
-puts "สร้าง lazy value แล้ว"
-sleep(0.01)
-puts "กำลังเข้าถึง value..."
-puts lazy_config.value[:host]   # => "กำลังโหลด config..." แล้ว localhost
-
-# Pattern 3: Continuation Passing Style (CPS)
-def divide_cps(a, b, success_cont, error_cont)
-  if b.zero?
-    error_cont.call("Division by zero")
-  else
-    success_cont.call(a.to_f / b)
-  end
-end
-
-on_success = ->(result) { puts "Result: #{result}" }
-on_error = ->(msg) { puts "Error: #{msg}" }
-
-divide_cps(10, 2, on_success, on_error)    # => Result: 5.0
-divide_cps(10, 0, on_success, on_error)    # => Error: Division by zero
-```
-
----
-
-## ขั้นตอนที่ 190: Blocks สำหรับ DSL (Domain Specific Language)
-
-```ruby
-# DSL ด้วย instance_eval
-class HtmlDSL
-  def initialize
-    @html = ""
-  end
-
-  def method_missing(tag, attrs = {}, &block)
-    attr_str = attrs.map { |k, v| " #{k}=\"#{v}\"" }.join
-    @html += "<#{tag}#{attr_str}>"
-    if block
-      @html += block.call.to_s
-    end
-    @html += "</#{tag}>"
-    @html
-  end
-
-  def text(content)
-    @html += content
-  end
-
-  def to_s
-    @html
-  end
-end
-
-class HtmlBuilder
-  def self.build(&block)
-    builder = HtmlDSL.new
-    builder.instance_eval(&block)
-    builder.to_s
-  end
-end
-
-# ตัวอย่าง simple DSL
-class Config
-  attr_reader :settings
-
-  def initialize
-    @settings = {}
-  end
-
-  def self.configure(&block)
-    config = new
-    config.instance_eval(&block)
-    config
-  end
-
-  def set(key, value)
-    @settings[key] = value
-  end
-
-  def database(&block)
-    db_config = Config.new
-    db_config.instance_eval(&block) if block
-    @settings[:database] = db_config.settings
-  end
-end
-
-app_config = Config.configure do
-  set :app_name, "My App"
-  set :version, "1.0.0"
-  set :debug, false
-
-  database do
-    set :host, "localhost"
-    set :port, 5432
-    set :name, "my_app_db"
-  end
-end
-
-puts app_config.settings.inspect
-```
-
----
-
-## ขั้นตอนที่ 191-200: Advanced Topics
-
-```ruby
-# ขั้นตอนที่ 191: Proc arity
-puts proc { }.arity            # => 0
-puts proc { |x| }.arity       # => 1
-puts proc { |x, y| }.arity    # => 2
-puts proc { |*x| }.arity      # => -1
-puts proc { |x, *y| }.arity   # => -2 (ต้องมีอย่างน้อย 1)
-
-puts lambda { }.arity          # => 0
-puts lambda { |x| }.arity     # => 1
-puts ->(x, y) {}.arity        # => 2
-puts ->(*x) {}.arity          # => -1
-
-# ขั้นตอนที่ 192: Proc#>> และ Proc#<< (Ruby 2.6+)
-not_nil = method(:puts).>>(proc {}) rescue nil   # example
-add1 = ->(n) { n + 1 }
-mul2 = ->(n) { n * 2 }
-
-composed = add1 >> mul2   # mul2(add1(x))
-puts composed.(5)   # => 12
-
-composed2 = add1 << mul2  # add1(mul2(x))
-puts composed2.(5)  # => 11
-
-# ขั้นตอนที่ 193: Callable Duck Typing
-class Adder
-  def call(a, b)
-    a + b
-  end
-  
-  # ทำให้ respond to () syntax
-  alias_method :[], :call
-end
-
-adder = Adder.new
-puts adder.(3, 4)    # => 7
-puts adder[3, 4]     # => 7
-puts adder.call(3, 4) # => 7
-
-# ขั้นตอนที่ 194: instance_exec vs instance_eval
-class MyClass
-  def initialize
-    @value = 42
-  end
-end
-
-obj = MyClass.new
-
-# instance_eval กับ block
-result = obj.instance_eval { @value }
-puts result   # => 42
-
-# instance_exec สามารถส่ง arguments ได้
-result = obj.instance_exec(10) { |factor| @value * factor }
-puts result   # => 420
-
-# ขั้นตอนที่ 195: Proc กับ Exception Handling
-safe_div = proc do |a, b|
-  begin
-    a / b
-  rescue ZeroDivisionError
-    puts "Cannot divide by zero!"
-    nil
-  end
-end
-
-puts safe_div.(10, 2).inspect   # => 5
-puts safe_div.(10, 0).inspect   # => Cannot divide by zero! => nil
-
-# ขั้นตอนที่ 196: Lazy Proc Chain
-pipeline = [
-  ->(n) { n * 2 },
-  ->(n) { n + 1 },
-  ->(n) { n.to_s }
-]
-
-result = pipeline.reduce(5) { |val, func| func.(val) }
-puts result   # => "11"
-
-# ขั้นตอนที่ 197: Partial Application ด้วย Currying
-def partial(func, *partial_args)
-  ->(*args) { func.call(*partial_args, *args) }
-end
-
-multiply = ->(a, b) { a * b }
-double = partial(multiply, 2)
-triple = partial(multiply, 3)
-
-puts [1, 2, 3, 4, 5].map(&double).inspect   # => [2, 4, 6, 8, 10]
-puts [1, 2, 3, 4, 5].map(&triple).inspect   # => [3, 6, 9, 12, 15]
-
-# ขั้นตอนที่ 198: Blocks กับ Concurrency
-require 'thread'
-
-mutex = Mutex.new
-results = []
-
-threads = 5.times.map do |i|
-  Thread.new do
-    result = i * i
-    mutex.synchronize { results << result }
-  end
-end
-
-threads.each(&:join)
-puts results.sort.inspect   # => [0, 1, 4, 9, 16]
-
-# ขั้นตอนที่ 199: Proc สำหรับ Testing
-class TestSuite
-  def initialize(name)
-    @name = name
-    @tests = []
-    @passed = 0
-    @failed = 0
-  end
-
-  def test(description, &block)
-    @tests << { description: description, test: block }
-  end
-
-  def run
-    puts "=== #{@name} ==="
-    @tests.each do |t|
-      begin
-        t[:test].call
-        @passed += 1
-        puts "  ✓ #{t[:description]}"
-      rescue => e
-        @failed += 1
-        puts "  ✗ #{t[:description]}: #{e.message}"
+    candidates = (2..Float::INFINITY)
+    primes = []
+    
+    candidates.each do |n|
+      is_prime = primes.none? { |p| n % p == 0 }
+      if is_prime
+        primes << n
+        yielder << n
       end
     end
-    puts "Results: #{@passed} passed, #{@failed} failed"
   end
 end
 
-suite = TestSuite.new("Basic Math Tests")
+puts infinite_primes.first(10).inspect
+# [2, 3, 5, 7, 11, 13, 17, 19, 23, 29]
 
-suite.test("Addition works") do
-  raise "Failed" unless 2 + 2 == 4
-end
+puts infinite_primes.lazy.select { |p| p > 50 }.first(5).inspect
+# [53, 59, 61, 67, 71]
 
-suite.test("Division works") do
-  raise "Failed" unless 10 / 2 == 5
-end
-
-suite.test("This will fail") do
-  raise "Intentional failure"
-end
-
-suite.run
-
-# ขั้นตอนที่ 200: Summary - Best Practices
-# 1. ใช้ lambda สำหรับ functions ที่ส่งผ่าน
-# 2. ใช้ proc/block สำหรับ callbacks
-# 3. ใช้ >> และ << สำหรับ composition
-# 4. curry สำหรับ partial application
-# 5. Fibers สำหรับ generators
-# 6. Lazy สำหรับ infinite sequences
+# Enumerator::Chain (Ruby 2.6+)
+natural_numbers = Enumerator.new { |y| n = 1; loop { y << n; n += 1 } }
+squares = natural_numbers.lazy.map { |n| n ** 2 }
+puts squares.first(5).inspect  # [1, 4, 9, 16, 25]
 ```
 
----
-
-## แบบฝึกหัด (ขั้นตอนที่ 171-200)
-
-### ข้อที่ 1: Custom Map
+### Step 190: Proc Memoization
 
 ```ruby
-# เฉลย
-def my_map(array)
-  return to_enum(:my_map, array) unless block_given?
-  result = []
-  array.each { |item| result << yield(item) }
-  result
-end
-
-puts my_map([1, 2, 3]) { |n| n * 2 }.inspect   # => [2, 4, 6]
-puts my_map(["a", "b", "c"], &:upcase).inspect  # => ["A", "B", "C"]
-```
-
-### ข้อที่ 2: Memoize Function
-
-```ruby
-# เฉลย
+# Memoize lambda calls
 def memoize(func)
   cache = {}
   lambda do |*args|
-    cache[args] ||= func.call(*args)
+    key = args.hash
+    cache[key] ||= func.call(*args)
   end
 end
 
-slow_calc = ->(n) { sleep(0.001); n ** 3 }
-fast_calc = memoize(slow_calc)
+# Fibonacci naive (exponential time)
+fib_naive = lambda { |n| n <= 1 ? n : fib_naive.(n-1) + fib_naive.(n-2) }
 
-10.times { puts fast_calc.(5) }   # คำนวณครั้งเดียว
+# Memoized Fibonacci
+fib_memo = nil  # ต้องประกาศก่อน
+fib_memo = memoize(lambda { |n|
+  n <= 1 ? n : fib_memo.(n-1) + fib_memo.(n-2)
+})
+
+puts fib_memo.(50)  # 12586269025 (เร็วมาก!)
+
+# Generic memoize decorator
+class Proc
+  def memoized
+    cache = {}
+    ->(*args) { cache[args] ||= call(*args) }
+  end
+end
+
+expensive = ->(n) {
+  sleep(0.001)  # simulate expensive operation
+  n ** 3
+}.memoized
+
+[1, 2, 3, 1, 2, 3].each { |n| puts expensive.(n) }
+# 1, 8, 27, 1(cached), 8(cached), 27(cached)
 ```
 
-### ข้อที่ 3: Event System
+---
+
+## Step 191–195: Real-world Patterns
+
+### Step 191: Strategy Pattern
 
 ```ruby
-# เฉลย
-class EventBus
+# ใช้ Lambda แทน Strategy objects
+class Sorter
+  STRATEGIES = {
+    asc:        ->(a, b) { a <=> b },
+    desc:       ->(a, b) { b <=> a },
+    by_length:  ->(a, b) { a.length <=> b.length },
+    random:     ->(a, b) { [-1, 0, 1].sample },
+    case_insensitive: ->(a, b) { a.downcase <=> b.downcase }
+  }
+
+  def initialize(strategy = :asc)
+    @strategy = STRATEGIES[strategy] || strategy
+  end
+
+  def sort(collection)
+    collection.sort(&@strategy)
+  end
+end
+
+words = ["Banana", "apple", "Cherry", "date"]
+
+[:asc, :desc, :by_length, :case_insensitive].each do |s|
+  puts "#{s}: #{Sorter.new(s).sort(words).inspect}"
+end
+# asc: ["Banana", "Cherry", "apple", "date"]
+# desc: ["date", "apple", "Cherry", "Banana"]
+# by_length: ["date", "apple", "Banana", "Cherry"]
+# case_insensitive: ["apple", "Banana", "Cherry", "date"]
+```
+
+### Step 192: Command Pattern
+
+```ruby
+class CommandHistory
   def initialize
-    @subscribers = Hash.new { |h, k| h[k] = [] }
+    @history = []
+    @redo_stack = []
   end
 
-  def subscribe(event, &handler)
-    @subscribers[event] << handler
-    -> { @subscribers[event].delete(handler) }  # return unsubscribe function
+  def execute(command)
+    @history << command
+    @redo_stack.clear
+    command[:do].call
   end
 
-  def publish(event, data = nil)
-    @subscribers[event].each { |h| h.call(data) }
+  def undo
+    return puts "ไม่มีคำสั่งที่จะ undo" if @history.empty?
+    command = @history.pop
+    @redo_stack << command
+    command[:undo].call
+  end
+
+  def redo
+    return puts "ไม่มีคำสั่งที่จะ redo" if @redo_stack.empty?
+    command = @redo_stack.pop
+    @history << command
+    command[:do].call
   end
 end
 
-bus = EventBus.new
+text = ""
+history = CommandHistory.new
 
-unsubscribe = bus.subscribe(:user_created) { |user| puts "Welcome #{user[:name]}!" }
-bus.subscribe(:user_created) { |user| puts "Sending email to #{user[:email]}" }
+def make_type_command(text_ref, chars)
+  {
+    do:   -> { text_ref << chars; puts "พิมพ์: '#{chars}' → '#{text_ref}'" },
+    undo: -> { text_ref.slice!(-chars.length..-1); puts "undo → '#{text_ref}'" }
+  }
+end
 
-bus.publish(:user_created, { name: "Alice", email: "alice@example.com" })
-
-unsubscribe.call  # ยกเลิก subscription แรก
-bus.publish(:user_created, { name: "Bob", email: "bob@example.com" })
-# เฉพาะ email handler ที่ทำงาน
+# ต้องใช้ reference wrapper เพื่อให้ lambda edit ตัวแปรได้
+# (simplified version)
 ```
 
-### ข้อที่ 4: Function Pipeline
+### Step 193: Observer Pattern
 
 ```ruby
-# เฉลย
-class FunctionPipeline
-  def initialize(*functions)
-    @functions = functions
-  end
-
-  def <<(function)
-    @functions << function
-    self
-  end
-
-  def call(input)
-    @functions.reduce(input) { |result, func| func.call(result) }
-  end
-
-  def +(other_pipeline)
-    self.class.new(*@functions, *other_pipeline.functions)
-  end
-
-  protected
-
-  def functions
-    @functions
-  end
-end
-
-pipeline = FunctionPipeline.new(
-  ->(x) { x * 2 },
-  ->(x) { x + 1 }
-)
-
-pipeline << ->(x) { x ** 2 }
-
-puts pipeline.call(3)   # => ((3*2)+1)^2 = 49
-```
-
-### ข้อที่ 5: Lazy Fibonacci
-
-```ruby
-# เฉลย
-def lazy_fibonacci
-  Enumerator.new do |y|
-    a, b = 0, 1
-    loop do
-      y << a
-      a, b = b, a + b
-    end
-  end.lazy
-end
-
-fibs = lazy_fibonacci
-
-# First 10 fibonacci numbers
-puts fibs.first(10).inspect
-# => [0, 1, 1, 2, 3, 5, 8, 13, 21, 34]
-
-# Fibonacci ที่มากกว่า 100
-puts fibs.select { |n| n > 100 }.first(5).inspect
-# => [144, 233, 377, 610, 987]
-
-# Fibonacci คู่
-puts fibs.select(&:even?).first(5).inspect
-# => [0, 2, 8, 34, 144]
-```
-
-### ข้อที่ 6: Builder Pattern
-
-```ruby
-# เฉลย
-class SqlQueryBuilder
-  def initialize
-    @select = ["*"]
-    @from = nil
-    @wheres = []
-    @order = nil
-    @limit = nil
-    @joins = []
-  end
-
-  def select(*fields)
-    @select = fields
-    self
-  end
-
-  def from(table)
-    @from = table
-    self
-  end
-
-  def join(table, condition)
-    @joins << "JOIN #{table} ON #{condition}"
-    self
-  end
-
-  def where(condition)
-    @wheres << condition
-    self
-  end
-
-  def order(field, direction = "ASC")
-    @order = "#{field} #{direction}"
-    self
-  end
-
-  def limit(n)
-    @limit = n
-    self
-  end
-
-  def build
-    parts = ["SELECT #{@select.join(', ')}", "FROM #{@from}"]
-    parts.concat(@joins)
-    parts << "WHERE #{@wheres.join(' AND ')}" unless @wheres.empty?
-    parts << "ORDER BY #{@order}" if @order
-    parts << "LIMIT #{@limit}" if @limit
-    parts.join("\n")
-  end
-end
-
-query = SqlQueryBuilder.new
-  .select("u.name", "u.email", "o.total")
-  .from("users u")
-  .join("orders o", "o.user_id = u.id")
-  .where("u.active = true")
-  .where("o.total > 1000")
-  .order("o.total", "DESC")
-  .limit(10)
-  .build
-
-puts query
-```
-
-### ข้อที่ 7: Retry with Exponential Backoff
-
-```ruby
-# เฉลย
-def with_retry(max_retries: 3, base_delay: 1, max_delay: 60)
-  attempts = 0
-  begin
-    yield
-  rescue => e
-    attempts += 1
-    raise if attempts > max_retries
-    
-    delay = [base_delay * (2 ** (attempts - 1)), max_delay].min
-    puts "Attempt #{attempts} failed: #{e.message}. Retrying in #{delay}s..."
-    sleep(delay)
-    retry
-  end
-end
-
-# ใช้งาน:
-begin
-  result = with_retry(max_retries: 3, base_delay: 1) do
-    raise "Network error" if rand < 0.7   # 70% chance of failure
-    "Success!"
-  end
-  puts result
-rescue => e
-  puts "All retries failed: #{e.message}"
-end
-```
-
-### ข้อที่ 8-30: แบบฝึกหัดเพิ่มเติม
-
-```ruby
-# ข้อ 8: Compose ด้วย Proc#>>
-double = ->(n) { n * 2 }
-square = ->(n) { n ** 2 }
-to_string = ->(n) { "Value: #{n}" }
-
-pipeline = double >> square >> to_string
-puts pipeline.(3)   # => Value: 36
-
-# ข้อ 9: Partial Application
-def partial(lambda_fn, *args)
-  ->(*more_args) { lambda_fn.(*args, *more_args) }
-end
-
-greet = ->(greeting, name) { "#{greeting}, #{name}!" }
-hello = partial(greet, "Hello")
-hi = partial(greet, "Hi")
-
-puts hello.("Alice")   # => Hello, Alice!
-puts hi.("Bob")        # => Hi, Bob!
-
-# ข้อ 10: Curried Validators
-require 'date'
-
-between = ->(min, max, val) { (min..max).include?(val) }
-valid_year = between.curry.(1900).(Date.today.year)
-valid_month = between.curry.(1).(12)
-valid_day = between.curry.(1).(31)
-
-def valid_date?(y, m, d)
-  Date.valid_date?(y, m, d)
-end
-
-puts valid_year.(2000)    # => true
-puts valid_month.(13)     # => false
-
-# ข้อ 11: Observable
 module Observable
   def self.included(base)
-    base.instance_variable_set(:@callbacks, Hash.new { |h, k| h[k] = [] })
+    base.instance_variable_set(:@observers, {})
     base.extend(ClassMethods)
   end
 
   module ClassMethods
-    def on(event, &callback)
-      @callbacks[event] << callback
+    def observers
+      @observers ||= {}
     end
+  end
 
-    def emit(event, *args)
-      @callbacks[event].each { |cb| cb.call(*args) }
-    end
+  def subscribe(event, &observer)
+    self.class.observers[event] ||= []
+    self.class.observers[event] << observer
+    observer  # คืน observer เพื่อ unsubscribe ได้
+  end
+
+  def unsubscribe(event, observer)
+    self.class.observers[event]&.delete(observer)
+  end
+
+  def notify(event, *args)
+    self.class.observers[event]&.each { |obs| obs.call(*args) }
   end
 end
 
-class Order
+class Stock
   include Observable
+  attr_reader :symbol, :price
 
-  attr_reader :status
-
-  def initialize(id)
-    @id = id
-    @status = :pending
+  def initialize(symbol, price)
+    @symbol = symbol
+    @price = price
   end
 
-  def complete!
-    @status = :completed
-    self.class.emit(:order_completed, self)
-  end
-end
-
-Order.on(:order_completed) { |order| puts "Order completed!" }
-Order.on(:order_completed) { |order| puts "Sending confirmation email" }
-
-order = Order.new(1)
-order.complete!
-
-# ข้อ 12: Decorator ด้วย Proc
-def add_logging(func, name = "function")
-  ->(*args) {
-    puts "Calling #{name} with #{args.inspect}"
-    result = func.call(*args)
-    puts "#{name} returned #{result.inspect}"
-    result
-  }
-end
-
-add = ->(a, b) { a + b }
-logged_add = add_logging(add, "add")
-
-logged_add.(3, 4)
-# => Calling add with [3, 4]
-# => add returned 7
-
-# ข้อ 13: Pipeline สำหรับ Data Transformation
-class DataTransformer
-  def initialize(data)
-    @data = data
-    @transforms = []
-  end
-
-  def filter(&predicate)
-    @transforms << [:filter, predicate]
-    self
-  end
-
-  def transform(&mapper)
-    @transforms << [:transform, mapper]
-    self
-  end
-
-  def reduce(initial, &reducer)
-    result = execute
-    result.reduce(initial, &reducer)
-  end
-
-  def to_a
-    execute
-  end
-
-  private
-
-  def execute
-    @transforms.reduce(@data) do |data, (type, func)|
-      case type
-      when :filter then data.select(&func)
-      when :transform then data.map(&func)
-      end
-    end
+  def price=(new_price)
+    old_price = @price
+    @price = new_price
+    notify(:price_changed, symbol, old_price, new_price)
+    notify(:price_up, symbol, new_price - old_price) if new_price > old_price
+    notify(:price_down, symbol, old_price - new_price) if new_price < old_price
   end
 end
 
-result = DataTransformer.new([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-  .filter { |n| n.even? }
-  .transform { |n| n ** 2 }
-  .filter { |n| n > 20 }
-  .to_a
+aapl = Stock.new("AAPL", 150.0)
 
-puts result.inspect   # => [36, 64, 100]
-
-# ข้อ 14: Generator
-def range_generator(from, to, step = 1)
-  Enumerator.new do |y|
-    current = from
-    loop do
-      break if current > to
-      y << current
-      current += step
-    end
-  end
+aapl.subscribe(:price_changed) do |symbol, old, new_price|
+  change = ((new_price - old) / old * 100).round(2)
+  puts "#{symbol}: #{old} → #{new_price} (#{change > 0 ? '+' : ''}#{change}%)"
 end
 
-gen = range_generator(0, 100, 10)
-puts gen.to_a.inspect   # => [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+aapl.subscribe(:price_up) { |symbol, gain| puts "📈 #{symbol} +#{gain}" }
+aapl.subscribe(:price_down) { |symbol, loss| puts "📉 #{symbol} -#{loss}" }
 
-# ข้อ 15: Async Simulation ด้วย Fiber
-class AsyncSimulator
-  def self.run(&block)
-    scheduler = Fiber.new do
-      block.call
-    end
-    scheduler.resume
-  end
+aapl.price = 155.0  # AAPL: 150.0 → 155.0 (+3.33%) 📈 AAPL +5.0
+aapl.price = 148.0  # AAPL: 155.0 → 148.0 (-4.52%) 📉 AAPL -7.0
+```
 
-  def self.sleep_async(seconds)
-    fiber = Fiber.current
-    puts "Sleeping #{seconds}s (simulated)..."
-    # In real async, would register callback
-    fiber.resume
-    Fiber.yield
-  end
-end
+---
 
-# ข้อ 16: State Machine ด้วย Lambda
-class LightSwitch
-  TRANSITIONS = {
-    off: { toggle: :on },
-    on: { toggle: :off }
-  }
+## Step 194–195: Practical Examples
 
-  def initialize
-    @state = :off
-    @enter_callbacks = Hash.new { |h, k| h[k] = [] }
-    @exit_callbacks = Hash.new { |h, k| h[k] = [] }
-  end
+### Step 194: Middleware Pattern
 
-  def on_enter(state, &callback)
-    @enter_callbacks[state] << callback
-    self
-  end
-
-  def toggle
-    transitions = TRANSITIONS[@state]
-    return unless transitions&.key?(:toggle)
-    
-    new_state = transitions[:toggle]
-    @exit_callbacks[@state].each { |cb| cb.call(@state) }
-    @state = new_state
-    @enter_callbacks[@state].each { |cb| cb.call(@state) }
-  end
-
-  def state
-    @state
-  end
-end
-
-light = LightSwitch.new
-  .on_enter(:on) { puts "Light is ON" }
-  .on_enter(:off) { puts "Light is OFF" }
-
-light.toggle   # => Light is ON
-light.toggle   # => Light is OFF
-light.toggle   # => Light is ON
-
-# ข้อ 17: Functional Option Builder
-def build_options(**defaults)
-  lambda do |**overrides|
-    result = defaults.merge(overrides)
-    yield(result) if block_given?
-    result
-  end
-end
-
-configure_server = build_options(
-  host: "localhost",
-  port: 3000,
-  ssl: false,
-  timeout: 30
-)
-
-server1 = configure_server.()
-server2 = configure_server.(port: 8080, ssl: true)
-puts server1.inspect
-puts server2.inspect
-
-# ข้อ 18: Lazy Map + Filter
-def lazy_map_filter(enumerable)
-  Enumerator::Lazy.new(enumerable) do |yielder, *values|
-    yielder << values.first
-  end
-end
-
-result = (1..Float::INFINITY)
-  .lazy
-  .select { |n| n % 7 == 0 }  # divisible by 7
-  .map { |n| n ** 2 }
-  .reject { |n| n > 10000 }
-  .to_a
-
-puts result.inspect   # squares of numbers divisible by 7, up to 100^2
-
-# ข้อ 19: Context Manager
-def with_context(context = {})
-  Thread.current[:context] = context
-  yield
-ensure
-  Thread.current[:context] = nil
-end
-
-def current_user
-  Thread.current[:context]&.fetch(:user, nil)
-end
-
-with_context(user: "Alice") do
-  puts current_user   # => Alice
-  with_context(user: "Bob") do
-    puts current_user   # => Bob
-  end
-  puts current_user   # => nil (context ถูก reset)
-end
-
-# ข้อ 20: Middleware Chain
-class MiddlewareChain
+```ruby
+# Middleware chain ด้วย Proc/Lambda
+class MiddlewareStack
   def initialize
     @middlewares = []
   end
@@ -1900,359 +1299,829 @@ class MiddlewareChain
     self
   end
 
-  def call(request)
-    build_chain.call(request)
+  def call(request, &final_handler)
+    build_chain(final_handler).call(request)
   end
 
   private
 
-  def build_chain
-    final = ->(req) { "Response: #{req}" }
+  def build_chain(final)
     @middlewares.reverse.reduce(final) do |next_handler, middleware|
       ->(req) { middleware.call(req, next_handler) }
     end
   end
 end
 
-chain = MiddlewareChain.new
-  .use do |req, next_handler|
-    puts "Middleware 1: logging #{req}"
-    next_handler.call(req)
-  end
-  .use do |req, next_handler|
-    puts "Middleware 2: auth check"
-    next_handler.call("authenticated: #{req}")
-  end
-  .use do |req, next_handler|
-    puts "Middleware 3: rate limiting"
-    next_handler.call(req)
-  end
+app = MiddlewareStack.new
 
-puts chain.call("GET /api/users")
-
-# ข้อ 21: Function Memoization with TTL
-def memoize_with_ttl(ttl_seconds, &func)
-  cache = {}
-  timestamps = {}
-  
-  lambda do |*args|
-    now = Time.now.to_f
-    if cache.key?(args) && (now - timestamps[args]) < ttl_seconds
-      cache[args]
-    else
-      cache[args] = func.call(*args)
-      timestamps[args] = now
-      cache[args]
-    end
-  end
+# Logger middleware
+app.use do |request, next_handler|
+  puts "[LOG] #{request[:method]} #{request[:path]}"
+  response = next_handler.call(request)
+  puts "[LOG] Response: #{response[:status]}"
+  response
 end
 
-slow_lookup = memoize_with_ttl(5) do |id|
-  puts "Looking up #{id}..."
-  "User #{id}"
-end
-
-puts slow_lookup.(1)   # => Looking up 1... User 1
-puts slow_lookup.(1)   # => User 1 (cached)
-sleep(6)
-puts slow_lookup.(1)   # => Looking up 1... User 1 (expired)
-
-# ข้อ 22: Composition สำหรับ Validation
-validate_presence = ->(field, value) { !value.nil? && !value.to_s.empty? }
-validate_length = ->(min, max, field, value) { (min..max).include?(value.to_s.length) }
-validate_format = ->(regex, field, value) { value.to_s.match?(regex) }
-
-def compose_validators(*validators)
-  ->(field, value) {
-    errors = validators.filter_map { |v| v.call(field, value) }
-    errors.empty? ? { valid: true } : { valid: false, errors: errors }
-  }
-end
-
-# ข้อ 23: Functional Map Reduce
-def map_reduce(data, mapper, reducer, initial)
-  data.map(&mapper).reduce(initial, &reducer)
-end
-
-words = ["hello", "world", "ruby", "programming"]
-total_length = map_reduce(
-  words,
-  ->(w) { w.length },
-  ->(sum, n) { sum + n },
-  0
-)
-puts total_length   # => 25
-
-# ข้อ 24: Trampoline สำหรับ Tail Recursion
-def trampoline(func)
-  result = func
-  while result.is_a?(Proc) || result.is_a?(Method)
-    result = result.call
-  end
-  result
-end
-
-# Tail recursive factorial ด้วย trampoline
-def factorial_tr(n, acc = 1)
-  if n <= 1
-    acc
+# Auth middleware
+app.use do |request, next_handler|
+  if request[:token] == "valid_token"
+    next_handler.call(request)
   else
-    -> { factorial_tr(n - 1, n * acc) }
+    { status: 401, body: "Unauthorized" }
   end
 end
 
-puts trampoline(factorial_tr(100))   # ไม่ stack overflow!
-
-# ข้อ 25: Block-based DSL สำหรับ Configuration
-class AppConfig
-  class DatabaseConfig
-    attr_accessor :host, :port, :name, :username, :password, :pool
-
-    def initialize
-      @host = "localhost"
-      @port = 5432
-      @pool = 5
-    end
-  end
-
-  class CacheConfig
-    attr_accessor :host, :port, :ttl
-
-    def initialize
-      @host = "localhost"
-      @port = 6379
-      @ttl = 3600
-    end
-  end
-
-  attr_reader :database, :cache, :app_name, :environment
-
-  def initialize
-    @database = DatabaseConfig.new
-    @cache = CacheConfig.new
-    @app_name = "App"
-    @environment = :development
-  end
-
-  def self.configure
-    config = new
-    yield config
-    config
-  end
-
-  def database
-    yield @database if block_given?
-    @database
-  end
-
-  def cache
-    yield @cache if block_given?
-    @cache
-  end
-
-  def app_name=(name)
-    @app_name = name
-  end
-
-  def environment=(env)
-    @environment = env.to_sym
-  end
-end
-
-config = AppConfig.configure do |c|
-  c.app_name = "My Awesome App"
-  c.environment = "production"
-
-  c.database do |db|
-    db.host = "db.production.com"
-    db.name = "myapp_prod"
-    db.pool = 20
-  end
-
-  c.cache do |cache|
-    cache.host = "redis.production.com"
-    cache.ttl = 7200
-  end
-end
-
-puts "App: #{config.app_name}"
-puts "Env: #{config.environment}"
-puts "DB host: #{config.database.host}"
-puts "Cache TTL: #{config.cache.ttl}"
-
-# ข้อ 26: Custom each_with_object
-def my_each_with_object(enumerable, initial)
-  obj = initial
-  enumerable.each do |item|
-    yield item, obj
-  end
-  obj
-end
-
-result = my_each_with_object([1, 2, 3, 4, 5], {}) do |n, hash|
-  hash[n] = n ** 2
-end
-puts result.inspect   # => {1=>1, 2=>4, 3=>9, 4=>16, 5=>25}
-
-# ข้อ 27: Timer ด้วย Block
-class Timer
-  def self.measure
-    start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-    result = yield
-    elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start
-    { result: result, time: elapsed }
-  end
-end
-
-timing = Timer.measure do
-  (1..1000000).sum
-end
-
-puts "Result: #{timing[:result]}"
-puts "Time: #{timing[:time].round(4)}s"
-
-# ข้อ 28: Flat Map Chain
-nested_data = [
-  { category: "fruits", items: ["apple", "banana"] },
-  { category: "veggies", items: ["carrot", "broccoli", "spinach"] },
-  { category: "grains", items: ["rice", "wheat"] }
-]
-
-all_items = nested_data.flat_map { |cat| cat[:items].map { |item| "#{cat[:category]}: #{item}" } }
-puts all_items.inspect
-
-# ข้อ 29: Recursive Block
-def recursive_traverse(data, depth = 0, &block)
-  case data
-  when Hash
-    data.each { |k, v| recursive_traverse(v, depth + 1, &block) }
-  when Array
-    data.each { |item| recursive_traverse(item, depth + 1, &block) }
+# Rate limiter
+request_counts = Hash.new(0)
+app.use do |request, next_handler|
+  ip = request[:ip] || "unknown"
+  request_counts[ip] += 1
+  if request_counts[ip] > 100
+    { status: 429, body: "Too Many Requests" }
   else
-    block.call(data, depth)
+    next_handler.call(request)
   end
 end
 
-nested = { a: 1, b: [2, 3, { c: 4 }], d: "hello" }
-recursive_traverse(nested) { |val, depth| puts "#{"  " * depth}#{val}" }
+# Final handler
+final = ->(request) { { status: 200, body: "Hello!" } }
 
-# ข้อ 30: Final - Complete DSL
-class TestFramework
-  @@tests = []
-  @@hooks = { before: [], after: [] }
-  @@stats = { passed: 0, failed: 0 }
+response = app.call({ method: "GET", path: "/api/users", token: "valid_token", ip: "1.2.3.4" }, &final)
+puts response.inspect
 
-  def self.describe(name, &block)
-    puts "\n#{name}"
-    new.instance_eval(&block)
-    puts "\nTotal: #{@@stats[:passed] + @@stats[:failed]} tests, " \
-         "#{@@stats[:passed]} passed, #{@@stats[:failed]} failed"
+response = app.call({ method: "GET", path: "/api/secret", token: "invalid", ip: "5.6.7.8" }, &final)
+puts response.inspect
+```
+
+### Step 195: Functional Composition Library
+
+```ruby
+module Functional
+  # compose: f.compose(g).call(x) == f(g(x))
+  def self.compose(*fns)
+    fns.reduce { |f, g| ->(x) { f.call(g.call(x)) } }
   end
 
-  def it(description, &block)
-    @@hooks[:before].each(&:call)
-    begin
-      instance_eval(&block)
-      @@stats[:passed] += 1
-      puts "  ✓ #{description}"
-    rescue => e
-      @@stats[:failed] += 1
-      puts "  ✗ #{description}: #{e.message}"
-    ensure
-      @@hooks[:after].each(&:call)
-    end
+  # pipe: แบบ compose แต่ลำดับกลับ
+  def self.pipe(*fns)
+    fns.reduce { |f, g| ->(x) { g.call(f.call(x)) } }
   end
 
-  def before(&block)
-    @@hooks[:before] << block
+  # partial: partial application
+  def self.partial(fn, *partial_args)
+    ->(*args) { fn.call(*partial_args, *args) }
   end
 
-  def after(&block)
-    @@hooks[:after] << block
+  # memoize
+  def self.memoize(fn)
+    cache = {}
+    ->(*args) { cache[args] ||= fn.call(*args) }
   end
 
-  def expect(actual)
-    Expectation.new(actual)
+  # once: เรียกได้ครั้งเดียว
+  def self.once(fn)
+    called = false
+    result = nil
+    ->(*args) {
+      unless called
+        result = fn.call(*args)
+        called = true
+      end
+      result
+    }
   end
 
-  class Expectation
-    def initialize(actual)
-      @actual = actual
-    end
-
-    def to_equal(expected)
-      raise "Expected #{expected.inspect}, got #{@actual.inspect}" unless @actual == expected
-    end
-
-    def to_be_truthy
-      raise "Expected truthy, got #{@actual.inspect}" unless @actual
-    end
-
-    def to_include(value)
-      raise "Expected #{@actual.inspect} to include #{value.inspect}" unless @actual.include?(value)
-    end
-  end
-end
-
-TestFramework.describe("Array Operations") do
-  it("adds elements") do
-    arr = [1, 2, 3]
-    arr << 4
-    expect(arr).to_equal([1, 2, 3, 4])
-  end
-
-  it("maps correctly") do
-    result = [1, 2, 3].map { |n| n * 2 }
-    expect(result).to_equal([2, 4, 6])
-  end
-
-  it("selects correctly") do
-    result = [1, 2, 3, 4, 5].select(&:even?)
-    expect(result).to_equal([2, 4])
-  end
-
-  it("intentionally fails") do
-    expect(1 + 1).to_equal(3)   # จะ fail
+  # throttle: จำกัดการเรียก
+  def self.throttle(fn, interval)
+    last_called = nil
+    ->(*args) {
+      now = Time.now
+      if last_called.nil? || now - last_called >= interval
+        last_called = now
+        fn.call(*args)
+      end
+    }
   end
 end
+
+# ทดสอบ
+add = ->(a, b) { a + b }
+add5 = Functional.partial(add, 5)
+puts add5.(10)  # 15
+
+double = ->(n) { n * 2 }
+square = ->(n) { n ** 2 }
+add_one = ->(n) { n + 1 }
+
+# pipe: ทำจากซ้ายไปขวา
+transform = Functional.pipe(add_one, double, square)
+puts transform.(3)  # square(double(3+1)) = square(8) = 64
+
+# memoize
+fib = Functional.memoize(->(n) { n <= 1 ? n : fib.(n-1) + fib.(n-2) })
+puts fib.(40)  # 102334155
+
+# once
+init = Functional.once(-> { puts "เริ่มต้นระบบ!"; 42 })
+puts init.()  # เริ่มต้นระบบ! 42
+puts init.()  # 42 (ไม่พิมพ์ซ้ำ)
+puts init.()  # 42 (ไม่พิมพ์ซ้ำ)
 ```
 
 ---
 
-## สรุปบทที่ 10
+## แบบฝึกหัดตอนที่ 10 (30 ข้อ)
 
-| Concept | คำอธิบาย |
-|---------|----------|
-| Block | Anonymous code, ส่งให้ method, ไม่ใช่ object |
-| yield | Execute block ที่ส่งมา |
-| block_given? | ตรวจสอบว่ามี block หรือไม่ |
-| Proc | Block ที่เก็บใน object |
-| Lambda | Proc ที่เข้มงวดเรื่อง args และ return |
-| Closure | Function ที่ capture surrounding scope |
-| Curry | Partial application |
-| >> / << | Proc composition |
-| Fiber | Cooperative concurrency, generators |
-| Lazy | Lazy evaluation สำหรับ infinite sequences |
+### ข้อ 1-5: Block พื้นฐาน
 
-**Lambda vs Proc ความแตกต่างหลัก:**
+```ruby
+# ข้อ 1: สร้าง custom each_pair
+def each_pair(array)
+  i = 0
+  while i < array.length - 1
+    yield array[i], array[i + 1]
+    i += 2
+  end
+end
 
-| | Lambda | Proc |
-|-|--------|------|
-| Argument checking | Strict | Lenient |
-| return | ออกจาก lambda | ออกจาก enclosing method |
-| lambda? | true | false |
-| ใช้เมื่อ | ส่งผ่านเป็น function | callback, code snippet |
+each_pair([1, 2, 3, 4, 5, 6]) { |a, b| puts "#{a} + #{b} = #{a + b}" }
+# 1 + 2 = 3
+# 3 + 4 = 7
+# 5 + 6 = 11
 
-**Key Takeaways:**
-1. Block ไม่ใช่ object แต่ Proc และ Lambda เป็น
-2. Lambda ปลอดภัยกว่า Proc เมื่อส่งผ่าน methods
-3. Closure capture variables by reference ไม่ใช่ by value
-4. ใช้ `>>` สำหรับ function composition
-5. Curry ช่วยสร้าง specialized functions
-6. Lazy evaluation สำหรับ infinite sequences และ large data
+# ข้อ 2: timing block
+def measure_time
+  start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+  result = yield
+  elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start
+  puts "ใช้เวลา: #{(elapsed * 1000).round(3)} ms"
+  result
+end
+
+result = measure_time do
+  sum = (1..1_000_000).sum
+  sum
+end
+puts "ผลรวม: #{result}"
+
+# ข้อ 3: lazy_map ด้วย Enumerator
+def lazy_transform(array, &transform)
+  Enumerator.new do |yielder|
+    array.each do |item|
+      yielder << transform.call(item)
+    end
+  end.lazy
+end
+
+result = lazy_transform([1, 2, 3, 4, 5]) { |n| n ** 2 }
+          .select { |n| n > 5 }
+          .first(3)
+puts result.inspect  # [9, 16, 25]
+
+# ข้อ 4: สร้าง with_logging
+def with_logging(name, &block)
+  puts "[START] #{name}"
+  begin
+    result = block.call
+    puts "[END] #{name} → #{result.inspect}"
+    result
+  rescue => e
+    puts "[ERROR] #{name}: #{e.message}"
+    raise
+  end
+end
+
+with_logging("calculate") { 2 + 2 }
+# [START] calculate
+# [END] calculate → 4
+
+# ข้อ 5: สร้าง cached block
+def cache_result(key, cache = {}, &block)
+  cache[key] ||= block.call
+end
+
+cache = {}
+3.times do |i|
+  result = cache_result("expensive_#{i % 2}", cache) {
+    puts "Computing #{i % 2}..."
+    i % 2 * 100
+  }
+  puts "Result: #{result}"
+end
+# Computing 0...
+# Result: 0
+# Computing 1...
+# Result: 100
+# Result: 0 (cached)
+```
+
+### ข้อ 6-10: Proc และ Lambda
+
+```ruby
+# ข้อ 6: Function Composition ด้วย >>
+double  = ->(x) { x * 2 }
+add_ten = ->(x) { x + 10 }
+to_str  = ->(x) { "Result: #{x}" }
+
+pipeline = double >> add_ten >> to_str
+puts pipeline.(5)   # Result: 20
+puts pipeline.(15)  # Result: 40
+
+# ข้อ 7: Curried Validators
+validate = {
+  min_length: ->(min) { ->(str) { str.length >= min } },
+  max_length: ->(max) { ->(str) { str.length <= max } },
+  matches:    ->(pattern) { ->(str) { str.match?(pattern) } },
+  not_blank:  ->(_) { ->(str) { !str.strip.empty? } }
+}
+
+# สร้าง validator สำหรับ username
+username_valid = [
+  validate[:not_blank].(:any),
+  validate[:min_length].(3),
+  validate[:max_length].(20),
+  validate[:matches].(/\A[a-z0-9_]+\z/)
+]
+
+def validate_all(value, validators)
+  validators.all? { |v| v.call(value) }
+end
+
+puts validate_all("alice_123", username_valid)  # true
+puts validate_all("ab", username_valid)         # false (too short)
+puts validate_all("Alice 123", username_valid)  # false (has space/capital)
+
+# ข้อ 8: Proc Memoization
+def memoize(&block)
+  cache = {}
+  ->(*args) { cache[args] ||= block.call(*args) }
+end
+
+fib = memoize { |n| n <= 1 ? n : fib.(n-1) + fib.(n-2) }
+puts fib.(35)  # 9227465
+
+# ข้อ 9: Event Queue ด้วย Procs
+class EventQueue
+  def initialize
+    @queue = []
+    @handlers = {}
+  end
+
+  def on(event, &handler)
+    @handlers[event] ||= []
+    @handlers[event] << handler
+  end
+
+  def emit(event, *data)
+    @queue << [event, data]
+    process_queue
+  end
+
+  private
+
+  def process_queue
+    while event_data = @queue.shift
+      event, data = event_data
+      @handlers[event]&.each { |h| h.call(*data) }
+    end
+  end
+end
+
+eq = EventQueue.new
+eq.on(:message) { |msg| puts "Received: #{msg}" }
+eq.on(:message) { |msg| puts "Logged: #{msg}" }
+eq.on(:error) { |err| puts "Error: #{err}" }
+
+eq.emit(:message, "Hello!")
+eq.emit(:error, "Something failed")
+
+# ข้อ 10: Pipeline Builder
+class PipelineBuilder
+  def initialize
+    @stages = []
+  end
+
+  def add_stage(name, &transform)
+    @stages << { name: name, transform: transform }
+    self
+  end
+
+  def build
+    stages = @stages.dup
+    ->(input) {
+      stages.reduce(input) do |data, stage|
+        begin
+          result = stage[:transform].call(data)
+          result
+        rescue => e
+          raise "Pipeline failed at '#{stage[:name]}': #{e.message}"
+        end
+      end
+    }
+  end
+end
+
+text_processor = PipelineBuilder.new
+  .add_stage("strip") { |s| s.strip }
+  .add_stage("downcase") { |s| s.downcase }
+  .add_stage("tokenize") { |s| s.split(/\W+/) }
+  .add_stage("filter") { |tokens| tokens.reject(&:empty?) }
+  .add_stage("sort") { |tokens| tokens.sort.uniq }
+  .build
+
+result = text_processor.("  Hello, World! Hello, Ruby World!  ")
+puts result.inspect  # ["hello", "ruby", "world"]
+```
+
+### ข้อ 11-15: Closure และ State
+
+```ruby
+# ข้อ 11: Functional Queue
+def make_queue
+  items = []
+  {
+    enqueue: ->(item) { items << item; nil },
+    dequeue: -> { items.shift },
+    peek:    -> { items.first },
+    size:    -> { items.length },
+    empty?:  -> { items.empty? },
+    to_a:    -> { items.dup }
+  }
+end
+
+q = make_queue
+q[:enqueue].("apple")
+q[:enqueue].("banana")
+q[:enqueue].("cherry")
+puts q[:size].()      # 3
+puts q[:dequeue].()   # apple
+puts q[:peek].()      # banana
+puts q[:to_a].call.inspect  # ["banana", "cherry"]
+
+# ข้อ 12: State Machine ด้วย Lambda
+def make_traffic_light
+  states = {
+    red:    { next: :green,  timer: 30, action: -> { puts "🔴 หยุด!" } },
+    green:  { next: :yellow, timer: 25, action: -> { puts "🟢 ไปได้!" } },
+    yellow: { next: :red,    timer: 5,  action: -> { puts "🟡 ระวัง!" } }
+  }
+  
+  current = :red
+  
+  {
+    current: -> { current },
+    advance: -> {
+      state = states[current]
+      state[:action].call
+      current = state[:next]
+    },
+    timer: -> { states[current][:timer] }
+  }
+end
+
+light = make_traffic_light
+5.times do
+  puts "สัญญาณ: #{light[:current].call} (#{light[:timer].call} วินาที)"
+  light[:advance].call
+  puts "---"
+end
+
+# ข้อ 13: Retry With Backoff
+def with_retry(max_attempts: 3, base_delay: 1, &operation)
+  attempts = 0
+  delays = (0...max_attempts).map { |i| base_delay * (2 ** i) }
+  
+  loop do
+    attempts += 1
+    begin
+      return yield(attempts)
+    rescue => e
+      if attempts >= max_attempts
+        raise "ล้มเหลวหลังจาก #{max_attempts} ครั้ง: #{e.message}"
+      end
+      delay = delays[attempts - 1]
+      puts "ครั้งที่ #{attempts} ล้มเหลว (#{e.message}), รอ #{delay}s..."
+      sleep(0.01)  # ใช้ 0.01 แทน delay จริงสำหรับ demo
+    end
+  end
+end
+
+result = with_retry(max_attempts: 3) do |attempt|
+  raise "Connection failed" if attempt < 3
+  "สำเร็จในครั้งที่ #{attempt}!"
+end
+puts result
+
+# ข้อ 14: Functional Option Type
+class Option
+  def self.some(value)
+    new(value, true)
+  end
+
+  def self.none
+    new(nil, false)
+  end
+
+  def initialize(value, present)
+    @value = value
+    @present = present
+  end
+
+  def present?; @present; end
+  def empty?; !@present; end
+
+  def map(&block)
+    @present ? Option.some(block.call(@value)) : self
+  end
+
+  def flat_map(&block)
+    @present ? block.call(@value) : self
+  end
+
+  def or_else(default = nil, &block)
+    @present ? @value : (block ? block.call : default)
+  end
+
+  def on_some(&block)
+    block.call(@value) if @present
+    self
+  end
+
+  def on_none(&block)
+    block.call unless @present
+    self
+  end
+end
+
+def find_user(id)
+  users = { 1 => { name: "Alice" }, 2 => { name: "Bob" } }
+  users[id] ? Option.some(users[id]) : Option.none
+end
+
+find_user(1)
+  .map { |u| u[:name].upcase }
+  .on_some { |name| puts "Found: #{name}" }
+  .on_none { puts "Not found" }
+# Found: ALICE
+
+find_user(99)
+  .map { |u| u[:name].upcase }
+  .on_some { |name| puts "Found: #{name}" }
+  .on_none { puts "Not found" }
+# Not found
+
+# ข้อ 15: Lazy Object
+class LazyProxy
+  def initialize(&initializer)
+    @initializer = initializer
+    @target = nil
+    @initialized = false
+  end
+
+  def method_missing(method, *args, &block)
+    unless @initialized
+      @target = @initializer.call
+      @initialized = true
+    end
+    @target.send(method, *args, &block)
+  end
+
+  def respond_to_missing?(method, include_private = false)
+    true
+  end
+end
+
+# สร้าง lazy database connection
+db = LazyProxy.new do
+  puts "เชื่อมต่อ Database..."
+  { connected: true, query_count: 0 }
+end
+
+puts "ยังไม่เชื่อมต่อ"
+# ไม่มีอะไรพิมพ์
+puts db[:connected]  # เชื่อมต่อ Database... true
+puts db[:connected]  # true (ไม่เชื่อมต่อซ้ำ)
+```
+
+### ข้อ 16-20: Advanced Patterns
+
+```ruby
+# ข้อ 16: Y Combinator (สำหรับ anonymous recursion)
+Y = ->(f) { ->(x) { f.call(->(v) { x.(x).(v) }) }.call(->(x) { f.call(->(v) { x.(x).(v) }) }) }
+
+factorial = Y.(->(f) { ->(n) { n <= 1 ? 1 : n * f.(n - 1) } })
+puts factorial.(10)  # 3628800
+
+fib = Y.(->(f) { ->(n) { n <= 1 ? n : f.(n-1) + f.(n-2) } })
+puts fib.(10)  # 55
+
+# ข้อ 17: สร้าง Observable Value
+class Observable
+  def initialize(value)
+    @value = value
+    @watchers = []
+  end
+
+  def value
+    @value
+  end
+
+  def value=(new_val)
+    old_val = @value
+    @value = new_val
+    @watchers.each { |w| w.call(new_val, old_val) } if new_val != old_val
+  end
+
+  def watch(&block)
+    @watchers << block
+    -> { @watchers.delete(block) }  # คืน unwatch function
+  end
+end
+
+counter = Observable.new(0)
+
+unwatch = counter.watch { |new_val, old_val|
+  puts "เปลี่ยนจาก #{old_val} เป็น #{new_val}"
+}
+
+counter.value = 1  # เปลี่ยนจาก 0 เป็น 1
+counter.value = 5  # เปลี่ยนจาก 1 เป็น 5
+unwatch.call       # หยุด watch
+counter.value = 10 # (ไม่มีการแจ้งเตือน)
+
+# ข้อ 18: Template Method Pattern ด้วย Blocks
+class ReportGenerator
+  def generate(data, title:, &formatter)
+    formatter ||= method(:default_format)
+    
+    lines = ["=" * 40, "  #{title}", "=" * 40]
+    data.each { |item| lines << formatter.call(item) }
+    lines << "=" * 40
+    lines.join("\n")
+  end
+
+  private
+
+  def default_format(item)
+    "• #{item}"
+  end
+end
+
+generator = ReportGenerator.new
+report = generator.generate(
+  ["Alice: 92", "Bob: 78", "Charlie: 85"],
+  title: "ผลการสอบ"
+) { |item| "  ✓ #{item}" }
+
+puts report
+
+# ข้อ 19: Promise-like Async Pattern
+class SimplePromise
+  def initialize(&work)
+    @callbacks = []
+    @error_handlers = []
+    @result = nil
+    @error = nil
+    @resolved = false
+    
+    begin
+      @result = work.call
+      @resolved = true
+      @callbacks.each { |cb| cb.call(@result) }
+    rescue => e
+      @error = e
+      @error_handlers.each { |h| h.call(e) }
+    end
+  end
+
+  def then(&callback)
+    if @resolved
+      callback.call(@result)
+    else
+      @callbacks << callback
+    end
+    self
+  end
+
+  def catch(&handler)
+    if @error
+      handler.call(@error)
+    else
+      @error_handlers << handler
+    end
+    self
+  end
+end
+
+SimplePromise.new { 42 }
+  .then { |v| puts "Success: #{v}" }
+  .catch { |e| puts "Error: #{e}" }
+# Success: 42
+
+SimplePromise.new { raise "Something went wrong" }
+  .then { |v| puts "Success: #{v}" }
+  .catch { |e| puts "Caught: #{e.message}" }
+# Caught: Something went wrong
+
+# ข้อ 20: Finite State Machine
+class FSM
+  def initialize(initial_state)
+    @state = initial_state
+    @transitions = {}
+    @entry_actions = {}
+    @exit_actions = {}
+  end
+
+  def on(event, from:, to:, guard: nil, action: nil)
+    key = [from, event]
+    @transitions[key] = {
+      to: to,
+      guard: guard,
+      action: action
+    }
+    self
+  end
+
+  def on_entry(state, &block)
+    @entry_actions[state] = block
+    self
+  end
+
+  def on_exit(state, &block)
+    @exit_actions[state] = block
+    self
+  end
+
+  def trigger(event, **context)
+    key = [@state, event]
+    transition = @transitions[key]
+    
+    return false unless transition
+    return false if transition[:guard] && !transition[:guard].call(context)
+    
+    @exit_actions[@state]&.call
+    transition[:action]&.call(context)
+    @state = transition[:to]
+    @entry_actions[@state]&.call
+    
+    true
+  end
+
+  def state; @state; end
+end
+
+# Traffic Light FSM
+light = FSM.new(:red)
+  .on(:timer, from: :red,    to: :green)
+  .on(:timer, from: :green,  to: :yellow)
+  .on(:timer, from: :yellow, to: :red)
+  .on_entry(:red)    { puts "🔴 หยุด" }
+  .on_entry(:green)  { puts "🟢 ไป" }
+  .on_entry(:yellow) { puts "🟡 ระวัง" }
+
+6.times { light.trigger(:timer) }
+```
+
+### ข้อ 21-30: โจทย์ขั้นสูงพิเศษ
+
+```ruby
+# ข้อ 21: Functional Linked List ด้วย Lambda
+cons = ->(head, tail) { ->(f) { f.(head, tail) } }
+head = ->(list) { list.(->(h, _) { h }) }
+tail = ->(list) { list.(->(_, t) { t }) }
+empty_list = nil
+
+# สร้าง list [1, 2, 3]
+list = cons.(1, cons.(2, cons.(3, empty_list)))
+puts head.(list)          # 1
+puts head.(tail.(list))   # 2
+
+# ข้อ 22: สร้าง Tee operator
+def tee(&side_effect)
+  ->(value) {
+    side_effect.call(value)
+    value  # pass through
+  }
+end
+
+pipeline = 
+  ->(n) { n * 2 } >>
+  tee { |n| puts "หลัง double: #{n}" } >>
+  ->(n) { n + 10 } >>
+  tee { |n| puts "หลัง add: #{n}" }
+
+result = pipeline.(5)
+puts "Final: #{result}"
+# หลัง double: 10
+# หลัง add: 20
+# Final: 20
+
+# ข้อ 23: ทำ Trampoline สำหรับ tail recursion
+def trampoline(f)
+  ->(*args) {
+    result = f.call(*args)
+    result = result.call while result.is_a?(Proc)
+    result
+  }
+end
+
+# Tail-recursive factorial ด้วย trampoline
+factorial_tc = trampoline(->(n, acc = 1) {
+  n <= 1 ? acc : -> { factorial_tc.(n - 1, n * acc) }
+})
+
+puts factorial_tc.(100)  # ใหญ่มาก แต่ไม่ stack overflow
+
+# ข้อ 24: สร้าง Either Monad
+class Either
+  class Right < Either
+    def initialize(value); @value = value; end
+    def map(&f); Right.new(f.call(@value)); end
+    def flat_map(&f); f.call(@value); end
+    def right?; true; end
+    def value_or(_); @value; end
+    def to_s; "Right(#{@value})"; end
+  end
+
+  class Left < Either
+    def initialize(error); @error = error; end
+    def map(&f); self; end
+    def flat_map(&f); self; end
+    def right?; false; end
+    def value_or(default); default; end
+    def to_s; "Left(#{@error})"; end
+  end
+
+  def self.right(v) = Right.new(v)
+  def self.left(e)  = Left.new(e)
+end
+
+def safe_divide(a, b)
+  b == 0 ? Either.left("Division by zero") : Either.right(a.to_f / b)
+end
+
+result = safe_divide(10, 2)
+  .map { |v| v * 2 }
+  .map { |v| "Result: #{v}" }
+
+puts result  # Right(Result: 10.0)
+
+result = safe_divide(10, 0)
+  .map { |v| v * 2 }
+  .map { |v| "Result: #{v}" }
+
+puts result  # Left(Division by zero)
+
+# ข้อ 25-30: ให้ผู้เรียนลองทำเอง
+# ข้อ 25: สร้าง Reader Monad สำหรับ dependency injection
+# ข้อ 26: สร้าง Writer Monad สำหรับ logging
+# ข้อ 27: สร้าง State Monad
+# ข้อ 28: สร้าง continuation-passing style transformer
+# ข้อ 29: สร้าง transducer-based pipeline
+# ข้อ 30: สร้าง Actor model ด้วย Fiber
+```
 
 ---
 
-*จบตอนที่ 10 - Blocks, Procs, Lambdas*
+## สรุป Blocks, Procs, Lambdas ใน Ruby
 
-*ถัดไป: Ruby Intermediate - Object-Oriented Programming*
+### ตารางเปรียบเทียบ
+
+| Feature | Block | Proc | Lambda |
+|---------|-------|------|--------|
+| เป็น Object | ❌ | ✅ | ✅ |
+| เก็บใน Variable | ❌ | ✅ | ✅ |
+| Strict Arity | N/A | ❌ | ✅ |
+| return behavior | ออกจาก method | ออกจาก method | ออกจาก lambda |
+| lambda? | N/A | false | true |
+| สร้างด้วย | `{}` `do..end` | `Proc.new {}` `proc {}` | `lambda {}` `-> {}` |
+
+### เมื่อไหร่ใช้อะไร?
+
+```
+Block:
+├── ใช้กับ iterators (each, map, select)
+├── ใช้กับ resource management (File.open)
+└── ใช้เมื่อ pass inline computation
+
+Proc:
+├── ใช้เมื่อต้องการ store block ใน variable
+├── ใช้เป็น callback ที่ lenient เรื่อง arguments
+└── ใช้กับ closures ที่ต้องการ modify outer variables
+
+Lambda:
+├── ใช้เมื่อต้องการ strict argument checking
+├── ใช้แทน method ที่ portable
+└── ใช้ใน functional composition (>>, <<, curry)
+```
+
+**หลักการสำคัญ:**
+1. Block เป็นหัวใจของ Ruby — ใช้ทุกที่ที่มี iterator
+2. Proc และ Lambda คือ "first-class functions" ใน Ruby
+3. Closure จำตัวแปรจาก scope ที่สร้าง — ทรงพลังมาก
+4. `&:symbol` (Symbol to Proc) เป็น pattern ที่นิยมมากใน Ruby
+5. Lambda เหมาะกับ functional programming มากกว่า Proc
+6. `curry` ทำให้ partial application ง่ายขึ้น
+7. `>>` และ `<<` ทำให้ compose functions ง่ายขึ้น (Ruby 2.6+)
+
+> ⬅️ [ตอนที่ 9: Methods](part-09-methods.md) | ➡️ ตอนที่ 11: Classes และ Objects
