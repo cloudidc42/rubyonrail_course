@@ -1,176 +1,146 @@
-# ตอนที่ 35: Views และ ERB (Steps 756-780)
+# ตอนที่ 35: Views และ ERB Templates (Steps 756-780)
 
 ## บทนำ
 
-Views เป็นชั้น "V" ใน MVC pattern ที่รับผิดชอบการแสดงผลให้กับผู้ใช้ ใน Rails เราใช้ ERB (Embedded Ruby) เป็น template engine หลัก ซึ่งทำให้เราสามารถฝัง Ruby code เข้าไปใน HTML ได้ นอกจาก ERB ยังมี Haml และ Slim แต่ ERB คือ default ของ Rails
+Views เป็นส่วนที่แสดงผลให้ user เห็น ใน Rails Views ใช้ ERB (Embedded Ruby) เป็น template engine หลัก ซึ่งช่วยให้เราฝัง Ruby code ลงใน HTML ได้ นอกจากนี้ยังมี helper methods มากมายที่ช่วยสร้าง HTML elements ต่างๆ
 
 ---
 
-## ขั้นตอนที่ 756: ERB Syntax ทุกรูปแบบ
+## Step 756: ERB Syntax
 
-### ERB คืออะไร?
-
-ERB ย่อมาจาก Embedded Ruby เป็น template language ที่ให้เราใส่ Ruby code ลงใน HTML ไฟล์ที่มีนามสกุล `.html.erb`
-
-### รูปแบบ ERB Tags
+### Syntax พื้นฐาน
 
 ```erb
-<%# 1. Execute tag - รัน Ruby code แต่ไม่แสดงผล %>
-<% ruby_code_here %>
+<%# นี่คือ comment - ไม่แสดงผล %>
 
-<%# 2. Expression tag - รัน Ruby code และแสดงผล (escaped) %>
-<%= ruby_expression %>
+<% # Ruby code - ไม่แสดงผล แต่รัน %>
+<% if user.admin? %>
 
-<%# 3. Comment tag - comment ที่ไม่แสดงใน HTML output %>
-<%# this is a comment %>
+<%= # Ruby expression - แสดงผล %>
+<%= user.name %>
 
-<%# 4. Unescaped output - แสดงผล HTML โดยไม่ escape (ระวัง XSS!) %>
-<%== raw_html_string %>
+<%- # เหมือน <% แต่ลบ whitespace %>
+<%- if user.admin? %>
 
-<%# หรือใช้ raw() helper %>
-<%= raw(html_string) %>
+<%= # แสดงผลพร้อม HTML escape (ป้องกัน XSS) %>
+<%= "<script>alert('xss')</script>" %>
+<!-- แสดง: &lt;script&gt;alert(&#39;xss&#39;)&lt;/script&gt; -->
+
+<%== # แสดงผลโดย raw (ไม่ escape) - ระวัง XSS! %>
+<%== content.html_content %>
 ```
 
-### ตัวอย่างการใช้งาน ERB
+### ตัวอย่างการใช้งาน
 
 ```erb
-<%# app/views/posts/show.html.erb %>
-<!DOCTYPE html>
-<html>
-<head>
-  <title><%= @post.title %></title>
-</head>
-<body>
-  <h1><%= @post.title %></h1>
+<!-- app/views/posts/index.html.erb -->
 
-  <%# แสดงวันที่สร้าง %>
-  <p>สร้างเมื่อ: <%= @post.created_at.strftime("%d/%m/%Y") %></p>
+<%# แสดงรายการ posts %>
+<% @posts.each do |post| %>
+  <article>
+    <h2><%= post.title %></h2>
+    <p><%= post.content.truncate(200) %></p>
+    <small>โพสต์โดย <%= post.user.name %> เมื่อ <%= time_ago_in_words(post.created_at) %> ที่แล้ว</small>
+    <%= link_to "อ่านต่อ", post_path(post), class: "btn btn-primary" %>
+  </article>
+<% end %>
 
-  <%# แสดงเนื้อหา (safe HTML) %>
-  <div class="content">
-    <%= @post.body %>
-  </div>
+<%# แสดงถ้าไม่มี posts %>
+<% if @posts.empty? %>
+  <p>ยังไม่มีบทความ</p>
+<% end %>
 
-  <%# Conditional display %>
-  <% if @post.published? %>
-    <span class="badge bg-success">เผยแพร่แล้ว</span>
-  <% else %>
-    <span class="badge bg-warning">ร่าง</span>
-  <% end %>
+<%# Conditional rendering %>
+<%= "ยืนยันแล้ว" if user.verified? %>
 
-  <%# Loop through comments %>
-  <% @post.comments.each do |comment| %>
-    <div class="comment">
-      <strong><%= comment.author %></strong>
-      <p><%= comment.body %></p>
-    </div>
-  <% end %>
+<%# Ternary operator %>
+<%= user.admin? ? "ผู้ดูแล" : "สมาชิก" %>
 
-  <%# Inline condition %>
-  <%= "มี #{@post.comments.count} ความคิดเห็น" if @post.comments.any? %>
-</body>
-</html>
+<%# Safe navigation operator %>
+<%= current_user&.name || "ผู้เยี่ยมชม" %>
 ```
 
 ### HTML Escaping
 
-ERB จะ escape HTML characters อัตโนมัติเพื่อป้องกัน XSS:
-
 ```erb
-<%# @name = "<script>alert('XSS')</script>" %>
+<!-- Auto escaped (ปลอดภัย) -->
+<%= @post.content %>
 
-<%# Escaped (safe) - default behavior %>
-<%= @name %>
-<%# Output: &lt;script&gt;alert('XSS')&lt;/script&gt; %>
+<!-- Raw HTML (ไม่ escaped - อันตราย) -->
+<%= raw @post.content %>
+<%= @post.content.html_safe %>
 
-<%# Unescaped (dangerous!) %>
-<%= raw(@name) %>
-<%# หรือ %>
-<%== @name %>
-<%# Output: <script>alert('XSS')</script> - อันตราย! %>
+<!-- เช็คว่า string เป็น html_safe หรือเปล่า -->
+<% @post.content.html_safe? %>
 
-<%# ใช้ html_safe เมื่อมั่นใจว่า content ปลอดภัย %>
-<%= "<b>Bold</b>".html_safe %>
+<!-- ใช้ sanitize helper (แนะนำ) -->
+<%= sanitize @post.content, tags: %w[p b i a], attributes: %w[href] %>
 ```
 
 ---
 
-## ขั้นตอนที่ 757: Layouts และการทำงาน
+## Step 757: Layouts
 
-### Layouts คืออะไร?
+Layouts คือ template หลักที่ wrap รอบๆ content ของทุก page
 
-Layout คือ template หลักที่ครอบ view ทั้งหมด ทำให้ไม่ต้องเขียน HTML skeleton ซ้ำในทุก view
-
-### โครงสร้าง Default Layout
-
-```
-app/
-  views/
-    layouts/
-      application.html.erb    <- default layout
-      admin.html.erb          <- layout สำหรับ admin
-      mailer.html.erb         <- layout สำหรับ email
-      mailer.text.erb
-```
-
-### application.html.erb
+### Application Layout
 
 ```erb
-<%# app/views/layouts/application.html.erb %>
+<!-- app/views/layouts/application.html.erb -->
 <!DOCTYPE html>
-<html>
+<html lang="th">
   <head>
-    <title><%= content_for?(:title) ? yield(:title) : "MyApp" %></title>
+    <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <meta name="description" content="<%= yield(:description) %>">
+    <title><%= content_for?(:title) ? yield(:title) : "MyApp" %></title>
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
-
-    <%# Stylesheets %>
+    
+    <!-- Styles -->
     <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
-
-    <%# Extra head content from views %>
     <%= yield :head %>
   </head>
 
   <body class="<%= body_class %>">
-    <%# Navigation partial %>
+    <!-- Navigation -->
     <%= render "shared/navbar" %>
-
-    <%# Flash messages %>
-    <%= render "shared/flash_messages" %>
-
-    <%# Main content area %>
-    <main class="container my-4">
+    
+    <!-- Flash messages -->
+    <% flash.each do |type, msg| %>
+      <div class="alert alert-<%= flash_class(type) %>">
+        <%= msg %>
+      </div>
+    <% end %>
+    
+    <!-- Main content -->
+    <main>
       <%= yield %>
     </main>
-
-    <%# Footer %>
+    
+    <!-- Footer -->
     <%= render "shared/footer" %>
-
-    <%# JavaScript %>
+    
+    <!-- JavaScript -->
     <%= javascript_importmap_tags %>
-
-    <%# Extra scripts from views %>
     <%= yield :scripts %>
   </body>
 </html>
 ```
 
-### กำหนด Layout สำหรับ Controller
+### ใช้ Layout หลาย layout
 
 ```ruby
-# app/controllers/admin/base_controller.rb
-class Admin::BaseController < ApplicationController
-  # ใช้ layout admin สำหรับ controller นี้
+# Controller - กำหนด layout สำหรับทั้ง controller
+class AdminController < ApplicationController
   layout "admin"
+end
 
-  # หรือกำหนดแบบ dynamic
-  layout :resolve_layout
-
+class ApplicationController < ActionController::Base
+  layout :determine_layout
+  
   private
-
-  def resolve_layout
+  
+  def determine_layout
     if current_user&.admin?
       "admin"
     else
@@ -179,1127 +149,1295 @@ class Admin::BaseController < ApplicationController
   end
 end
 
-# app/controllers/posts_controller.rb
-class PostsController < ApplicationController
-  # ใช้ layout ต่างกันตาม action
-  layout "wide", only: [:index]
-  layout "narrow", only: [:show, :edit]
-
-  # ไม่ใช้ layout เลย
-  def print
-    render layout: false
+# Per-action layout
+class PagesController < ApplicationController
+  def landing
+    render layout: "landing"
+  end
+  
+  def home
+    render layout: "application"
   end
 end
 ```
 
-### Custom Layout สำหรับแต่ละ Render
-
-```ruby
-# ใน action
-def show
-  @post = Post.find(params[:id])
-  render layout: "print"
-end
-
-# หรือไม่ใช้ layout
-def export
-  render layout: false
-end
+```erb
+<!-- app/views/layouts/admin.html.erb -->
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Admin - <%= content_for?(:title) ? yield(:title) : "MyApp" %></title>
+    <%= stylesheet_link_tag "admin" %>
+  </head>
+  <body class="admin-layout">
+    <%= render "admin/sidebar" %>
+    <main class="admin-content">
+      <%= yield %>
+    </main>
+  </body>
+</html>
 ```
 
 ---
 
-## ขั้นตอนที่ 758: yield และ content_for
+## Step 758: yield
 
-### yield พื้นฐาน
-
-`yield` ใน layout จะแทนที่ด้วย content ของ view
+### Main Content Yield
 
 ```erb
-<%# Layout %>
-<div class="container">
-  <%= yield %>  <%# แทนที่ด้วย view content %>
-</div>
+<!-- Layout -->
+<main>
+  <%= yield %>
+  <!-- เนื้อหาจาก view จะมาอยู่ตรงนี้ -->
+</main>
 ```
 
-### Named yields ด้วย content_for
+```erb
+<!-- View -->
+<h1>หน้าหลัก</h1>
+<p>เนื้อหาของ view นี้</p>
+<!-- ทั้งหมดนี้จะถูก yield ใน layout -->
+```
+
+---
+
+## Step 759: content_for / yield :section
 
 ```erb
-<%# ใน view - กำหนด content สำหรับ named yield %>
+<!-- Layout -->
+<!DOCTYPE html>
+<html>
+  <head>
+    <title><%= yield :title %></title>
+    <%= yield :meta %>
+    <%= yield :styles %>
+  </head>
+  <body>
+    <%= yield %>
+    <%= yield :scripts %>
+  </body>
+</html>
+```
+
+```erb
+<!-- View -->
 <% content_for :title do %>
-  บทความ: <%= @post.title %>
+  หน้าบทความ - MyApp
 <% end %>
 
-<% content_for :head do %>
+<% content_for :meta do %>
   <meta name="description" content="<%= @post.excerpt %>">
-  <link rel="canonical" href="<%= post_url(@post) %>">
+  <meta property="og:title" content="<%= @post.title %>">
+<% end %>
+
+<% content_for :styles do %>
+  <%= stylesheet_link_tag "posts" %>
 <% end %>
 
 <% content_for :scripts do %>
   <script>
-    console.log("Page loaded: <%= @post.id %>");
+    // JavaScript เฉพาะ page นี้
+    initPostEditor();
   </script>
 <% end %>
 
-<% content_for :sidebar do %>
-  <div class="sidebar">
-    <h3>หมวดหมู่</h3>
-    <%= render "categories/list" %>
-  </div>
-<% end %>
-
-<%# เนื้อหาหลัก (ไม่อยู่ใน content_for block = ส่วน yield หลัก) %>
-<article>
-  <h1><%= @post.title %></h1>
-  <p><%= @post.body %></p>
-</article>
-```
-
-```erb
-<%# ใน layout - ใช้ content ที่กำหนดไว้ %>
-<!DOCTYPE html>
-<html>
-<head>
-  <title><%= yield(:title) || "Default Title" %></title>
-  <%= yield :head %>
-</head>
-<body>
-  <div class="row">
-    <div class="col-md-9">
-      <%= yield %>           <%# main content %>
-    </div>
-    <div class="col-md-3">
-      <%= yield :sidebar %>  <%# sidebar content %>
-    </div>
-  </div>
-  <%= yield :scripts %>
-</body>
-</html>
-```
-
-### content_for? - ตรวจสอบว่ามี content หรือไม่
-
-```erb
-<%# ใน layout %>
-<% if content_for?(:sidebar) %>
-  <div class="col-md-3">
-    <%= yield :sidebar %>
-  </div>
-<% end %>
-
-<%# หรือกำหนด default content %>
-<% unless content_for?(:title) %>
-  <% content_for :title, "My Application" %>
-<% end %>
-```
-
----
-
-## ขั้นตอนที่ 759: Partials (render, locals, collection)
-
-### Partial คืออะไร?
-
-Partial คือ view ย่อยที่แยกออกมาเพื่อ reuse ชื่อไฟล์ขึ้นต้นด้วย underscore `_`
-
-### โครงสร้าง Partials
-
-```
-app/views/
-  posts/
-    _post.html.erb       <- partial สำหรับ post
-    _form.html.erb       <- partial สำหรับ form
-    index.html.erb
-    show.html.erb
-  shared/
-    _navbar.html.erb     <- shared partial
-    _flash_messages.html.erb
-    _footer.html.erb
-  comments/
-    _comment.html.erb
-```
-
-### render Partial พื้นฐาน
-
-```erb
-<%# render partial file (ชื่อ partial ไม่มี underscore) %>
-<%= render "form" %>
-
-<%# render partial จาก path อื่น %>
-<%= render "shared/navbar" %>
-
-<%# render partial พร้อม specify ชัดเจน %>
-<%= render partial: "post" %>
-```
-
-### Passing Variables ด้วย locals
-
-```erb
-<%# ส่ง local variables ไปยัง partial %>
-<%= render "post", post: @post %>
-
-<%# ส่งหลาย variables %>
-<%= render "card", title: "สวัสดี", body: "เนื้อหา", color: "blue" %>
-
-<%# ใน partial _card.html.erb - ใช้ local variables %>
-<div class="card" style="border-color: <%= color %>">
-  <h3><%= title %></h3>
-  <p><%= body %></p>
+<!-- Main content -->
+<h1><%= @post.title %></h1>
+<div class="content">
+  <%= @post.content %>
 </div>
 ```
 
-### render Collection
+### content_for? - ตรวจสอบว่ามี content หรือเปล่า
 
 ```erb
-<%# แทนที่การวน loop %>
-<%# แบบเดิม (ไม่ดี) %>
-<% @posts.each do |post| %>
-  <%= render "post", post: post %>
+<!-- Layout -->
+<% if content_for?(:sidebar) %>
+  <div class="layout-with-sidebar">
+    <main><%= yield %></main>
+    <aside><%= yield :sidebar %></aside>
+  </div>
+<% else %>
+  <main class="full-width"><%= yield %></main>
 <% end %>
-
-<%# แบบที่ดีกว่า - render collection %>
-<%= render @posts %>
-<%# Rails จะหา partial _post.html.erb อัตโนมัติ %>
-<%# และส่ง post: post ให้อัตโนมัติ %>
-
-<%# กำหนด partial ชัดเจน %>
-<%= render partial: "post", collection: @posts %>
-
-<%# ใน _post.html.erb - ใช้ตัวแปร post อัตโนมัติ %>
-<article>
-  <h2><%= post.title %></h2>
-  <p><%= post.excerpt %></p>
-</article>
-```
-
-### Collection Counter
-
-```erb
-<%# Rails ส่ง counter ให้อัตโนมัติ: [partial_name]_counter %>
-<%# ใน _post.html.erb %>
-<article>
-  <small><%# post_counter เริ่มจาก 1 %><%= post_counter %>.</small>
-  <h2><%= post.title %></h2>
-</article>
-
-<%# ใน view %>
-<%= render partial: "post", collection: @posts %>
-```
-
-### Spacer Template
-
-```erb
-<%# เพิ่ม separator ระหว่าง collection items %>
-<%= render partial: "post",
-           collection: @posts,
-           spacer_template: "post_divider" %>
-
-<%# _post_divider.html.erb %>
-<hr class="my-3">
-```
-
-### as option - เปลี่ยนชื่อตัวแปรใน partial
-
-```erb
-<%# ใน view %>
-<%= render partial: "post", collection: @articles, as: :post %>
-
-<%# ใน _post.html.erb - ยังใช้ post ได้ถึงแม้จะวน @articles %>
-<h2><%= post.title %></h2>
-```
-
-### locals ใน Collection
-
-```erb
-<%# ส่ง local variables เพิ่มเติมใน collection %>
-<%= render partial: "post",
-           collection: @posts,
-           locals: { show_author: true, highlight: "ruby" } %>
-
-<%# ใน _post.html.erb %>
-<article>
-  <h2><%= post.title %></h2>
-  <% if show_author %>
-    <p>โดย: <%= post.author %></p>
-  <% end %>
-</article>
-```
-
-### Render กับ Object
-
-```erb
-<%# Rails ค้นหา partial ตาม class ของ object %>
-<%= render @post %>
-<%# ค้นหา posts/_post.html.erb %>
-
-<%# Collection ของ mixed types %>
-<%= render [post, comment, photo] %>
-<%# Rails จะ render partial ที่เหมาะสมสำหรับแต่ละ type %>
 ```
 
 ---
 
-## ขั้นตอนที่ 760: Helpers พื้นฐาน
+## Step 760: Partials
+
+Partials คือ template ย่อยๆ ที่ reuse ได้ ชื่อไฟล์ขึ้นต้นด้วย `_`
+
+### สร้าง Partial
+
+```erb
+<!-- app/views/posts/_post.html.erb -->
+<article class="post" id="<%= dom_id(post) %>">
+  <h2><%= link_to post.title, post_path(post) %></h2>
+  <p class="meta">
+    โดย <%= post.user.name %> | 
+    <%= time_ago_in_words(post.created_at) %> ที่แล้ว |
+    <%= post.comments.count %> ความคิดเห็น
+  </p>
+  <p><%= post.content.truncate(150) %></p>
+  <%= link_to "อ่านต่อ", post_path(post) %>
+</article>
+```
+
+### render partial
+
+```erb
+<!-- app/views/posts/index.html.erb -->
+<% @posts.each do |post| %>
+  <%= render partial: "post", locals: { post: post } %>
+  <!-- หรือ shorthand -->
+  <%= render "post", post: post %>
+  <!-- หรือ สั้นกว่า เมื่อ variable name เหมือนกัน -->
+  <%= render post %>
+<% end %>
+```
+
+---
+
+## Step 761: render collection
+
+```erb
+<!-- Render collection - เร็วกว่า loop -->
+<%= render partial: "post", collection: @posts %>
+
+<!-- Shorthand -->
+<%= render @posts %>
+<!-- Rails จะหา partial ชื่อ _post.html.erb โดยอัตโนมัติ -->
+
+<!-- ด้วย spacer template -->
+<%= render partial: "post", collection: @posts, spacer_template: "post_divider" %>
+<!-- จะ render _post_divider.html.erb ระหว่าง posts แต่ละอัน -->
+
+<!-- ด้วย as option -->
+<%= render partial: "product", collection: @items, as: :item %>
+<!-- ใน partial จะใช้ item แทน product -->
+```
+
+```erb
+<!-- app/views/posts/_post.html.erb -->
+<!-- ตัวแปร post_counter ใช้ได้อัตโนมัติ -->
+<div class="post post-<%= post_counter + 1 %>">
+  <h3><%= post.title %></h3>
+</div>
+```
+
+---
+
+## Step 762: locals ใน Partials
+
+```erb
+<!-- render ด้วย locals -->
+<%= render "form", post: @post, submit_text: "บันทึก" %>
+
+<!-- app/views/posts/_form.html.erb -->
+<% submit_text ||= "บันทึก" %>  <!-- default value -->
+
+<%= form_with model: post do |form| %>
+  <%= form.text_field :title %>
+  <%= form.submit submit_text %>
+<% end %>
+```
+
+### local_assigns
+
+```erb
+<!-- ตรวจสอบว่า local variable ถูกส่งมาหรือเปล่า -->
+<% if local_assigns[:show_author] %>
+  <p>โดย <%= post.user.name %></p>
+<% end %>
+
+<% unless local_assigns.key?(:show_footer) %>
+  <!-- show footer by default -->
+<% end %>
+```
+
+---
+
+## Step 763: Helper Methods Overview
 
 ### link_to
 
 ```erb
-<%# Basic link %>
-<%= link_to "หน้าแรก", root_path %>
+<!-- Basic link -->
+<%= link_to "หน้าหลัก", root_path %>
+<!-- => <a href="/">หน้าหลัก</a> -->
 
-<%# Link ไปยัง resource %>
-<%= link_to "ดูบทความ", post %>
-<%= link_to "ดูบทความ", post_path(@post) %>
+<!-- Link ด้วย model -->
+<%= link_to "ดูบทความ", @post %>
+<!-- => <a href="/posts/1">ดูบทความ</a> -->
 
-<%# Link พร้อม class และ attributes %>
-<%= link_to "สร้างบทความ", new_post_path, class: "btn btn-primary" %>
+<!-- Link ด้วย options -->
+<%= link_to "Google", "https://google.com", target: "_blank", rel: "noopener" %>
 
-<%# Link พร้อม data attributes (สำหรับ Turbo) %>
-<%= link_to "ลบ", post_path(@post),
-    data: { turbo_method: :delete, turbo_confirm: "แน่ใจหรือไม่?" },
-    class: "btn btn-danger" %>
-
-<%# Link แบบ block (เนื้อหาซับซ้อน) %>
+<!-- Link ด้วย block -->
 <%= link_to post_path(@post) do %>
-  <div class="card">
-    <h3><%= @post.title %></h3>
-    <p><%= @post.excerpt %></p>
-  </div>
+  <img src="<%= @post.image_url %>" alt="<%= @post.title %>">
+  <span><%= @post.title %></span>
 <% end %>
 
-<%# Link เปิด tab ใหม่ %>
-<%= link_to "เปิด", @post.url, target: "_blank", rel: "noopener" %>
+<!-- Delete link -->
+<%= link_to "ลบ", post_path(@post), 
+    data: { turbo_method: :delete, turbo_confirm: "แน่ใจ?" },
+    class: "btn btn-danger" %>
 
-<%# Link ไปยัง anchor %>
-<%= link_to "ดูความคิดเห็น", post_path(@post, anchor: "comments") %>
+<!-- Link ด้วย class และ id -->
+<%= link_to "คลิก", root_path, class: "btn btn-primary", id: "main-btn" %>
 
-<%# Link พร้อม query params %>
-<%= link_to "กรอง", posts_path(category: "ruby", sort: "recent") %>
+<!-- Link disabled -->
+<%= link_to "ปิดการใช้งาน", root_path, class: "disabled" %>
 ```
 
 ### image_tag
 
 ```erb
-<%# Basic image %>
 <%= image_tag "logo.png" %>
+<!-- => <img src="/assets/logo.png"> -->
 
-<%# Image พร้อม attributes %>
-<%= image_tag "avatar.jpg",
-    alt: "รูปโปรไฟล์",
-    width: 100,
-    height: 100,
-    class: "rounded-circle" %>
+<%= image_tag "logo.png", alt: "Logo", width: 100, height: 50 %>
+<%= image_tag "logo.png", class: "img-fluid", id: "logo" %>
 
-<%# Image จาก URL %>
-<%= image_tag "https://example.com/image.jpg", alt: "External image" %>
+<!-- Active Storage -->
+<%= image_tag @user.avatar %>
+<%= image_tag @post.image.variant(resize_to_limit: [300, 300]) %>
 
-<%# Lazy loading %>
-<%= image_tag "photo.jpg", loading: "lazy", alt: "Photo" %>
-
-<%# Responsive image %>
-<%= image_tag "hero.jpg",
-    class: "img-fluid",
-    srcset: "hero@2x.jpg 2x" %>
-
-<%# Image จาก Active Storage %>
-<%= image_tag @user.avatar, class: "avatar" if @user.avatar.attached? %>
+<!-- ถ้าไม่มีรูป ใช้ default -->
+<%= image_tag @user.avatar.attached? ? @user.avatar : "default-avatar.png" %>
 ```
 
-### tag helper
+### button_to
 
 ```erb
-<%# สร้าง HTML tag %>
-<%= tag.div "เนื้อหา", class: "container" %>
+<!-- สร้าง form ที่มีปุ่มเดียว -->
+<%= button_to "Publish", publish_post_path(@post), method: :post %>
+<!-- => <form action="/posts/1/publish" method="post"><button>Publish</button></form> -->
 
-<%# สร้าง tag แบบ block %>
-<%= tag.div class: "card" do %>
-  <p>เนื้อหาใน card</p>
-<% end %>
-
-<%# span พร้อม class %>
-<%= tag.span "ใหม่", class: "badge bg-primary" %>
-
-<%# br tag %>
-<%= tag.br %>
-
-<%# hr tag %>
-<%= tag.hr class: "my-3" %>
-
-<%# tag แบบ content_tag (เก่า - ยังใช้ได้) %>
-<%= content_tag :div, "เนื้อหา", class: "container" %>
+<%= button_to "Delete", post_path(@post), 
+    method: :delete,
+    data: { confirm: "แน่ใจ?" },
+    class: "btn btn-danger" %>
 ```
 
 ---
 
-## ขั้นตอนที่ 761: Number Helpers
+## Step 764: Number Helpers
 
 ```ruby
-# config/locales/th.yml
-th:
-  number:
-    currency:
-      format:
-        unit: "฿"
-        separator: "."
-        delimiter: ","
-        precision: 2
+# ต้อง include ใน helper module หรือใช้ใน view โดยตรง
+include ActionView::Helpers::NumberHelper
 ```
 
 ```erb
-<%# number_with_delimiter - เพิ่ม separator %>
+<!-- number_to_currency -->
+<%= number_to_currency(1234.56) %>
+<!-- => $1,234.56 -->
+
+<%= number_to_currency(1234.56, unit: "฿", format: "%u%n") %>
+<!-- => ฿1,234.56 -->
+
+<%= number_to_currency(1234.56, unit: "บาท", separator: ".", delimiter: ",") %>
+<!-- => 1,234.56บาท -->
+
+<!-- number_with_delimiter -->
 <%= number_with_delimiter(1234567) %>
-<%# => "1,234,567" %>
+<!-- => 1,234,567 -->
 
-<%= number_with_delimiter(1234567.89, delimiter: ",", separator: ".") %>
-<%# => "1,234,567.89" %>
+<%= number_with_delimiter(1234567.89) %>
+<!-- => 1,234,567.89 -->
 
-<%# number_with_precision - กำหนดทศนิยม %>
+<!-- number_with_precision -->
 <%= number_with_precision(3.14159, precision: 2) %>
-<%# => "3.14" %>
+<!-- => 3.14 -->
 
-<%= number_with_precision(1234567.891, precision: 2, delimiter: ",") %>
-<%# => "1,234,567.89" %>
+<%= number_with_precision(1234.5678, precision: 2, delimiter: ",") %>
+<!-- => 1,234.57 -->
 
-<%# number_to_currency - แปลงเป็นสกุลเงิน %>
-<%= number_to_currency(1234.50) %>
-<%# => "$1,234.50" (default USD) %>
+<!-- number_to_percentage -->
+<%= number_to_percentage(75.3) %>
+<!-- => 75.300% -->
 
-<%= number_to_currency(1234.50, unit: "฿", format: "%u%n") %>
-<%# => "฿1,234.50" %>
+<%= number_to_percentage(75.3, precision: 1) %>
+<!-- => 75.3% -->
 
-<%= number_to_currency(1234.50, unit: "บาท", separator: ".", delimiter: ",") %>
-<%# => "$1,234.50บาท" %>
+<!-- number_to_phone -->
+<%= number_to_phone(0812345678) %>
+<!-- => 081-234-5678 -->
 
-<%# number_to_percentage - แปลงเป็น % %>
-<%= number_to_percentage(80) %>
-<%# => "80.000%" %>
+<%= number_to_phone("0812345678", area_code: true) %>
 
-<%= number_to_percentage(80.5, precision: 1) %>
-<%# => "80.5%" %>
-
-<%# number_to_human_size - ขนาดไฟล์ %>
-<%= number_to_human_size(1234567) %>
-<%# => "1.18 MB" %>
-
-<%= number_to_human_size(1234567890) %>
-<%# => "1.15 GB" %>
-
-<%# number_to_human - ตัวเลขอ่านง่าย %>
+<!-- number_to_human -->
 <%= number_to_human(1234567) %>
-<%# => "1.23 Million" %>
+<!-- => 1.23 Million -->
 
 <%= number_to_human(1234567, locale: :th) %>
 
-<%# number_to_phone - รูปแบบเบอร์โทร %>
-<%= number_to_phone(0812345678) %>
-<%# => "081-234-5678" %>
-
-<%= number_to_phone(0812345678, delimiter: "-", area_code: false) %>
+<!-- number_to_human_size (file size) -->
+<%= number_to_human_size(1234567) %>
+<!-- => 1.18 MB -->
 ```
 
 ---
 
-## ขั้นตอนที่ 762: Date และ Time Helpers
+## Step 765: Date Helpers
 
 ```erb
-<%# time_ago_in_words - เวลาที่ผ่านไป %>
+<!-- time_ago_in_words -->
 <%= time_ago_in_words(@post.created_at) %>
-<%# => "about 2 hours ago" %>
+<!-- => "about 2 hours" -->
 
-<%# distance_of_time_in_words %>
-<%= distance_of_time_in_words(@post.created_at, Time.now) %>
-<%# => "about 2 hours" %>
+<%= time_ago_in_words(3.days.ago) %>
+<!-- => "3 days" -->
 
-<%# distance_of_time_in_words_to_now (alias) %>
-<%= distance_of_time_in_words_to_now(@post.created_at) %>
+<!-- distance_of_time_in_words -->
+<%= distance_of_time_in_words(Time.now, 1.hour.from_now) %>
+<!-- => "about 1 hour" -->
 
-<%# time_tag - HTML5 time element %>
-<%= time_tag @post.created_at %>
-<%# => <time datetime="2024-01-15T10:30:00+07:00">Mon, 15 Jan 2024 10:30:00 +0700</time> %>
+<%= distance_of_time_in_words(Time.now, 2.weeks.from_now) %>
+<!-- => "14 days" -->
 
-<%= time_tag @post.created_at, class: "timestamp" do %>
-  <%= @post.created_at.strftime("%d %B %Y") %>
-<% end %>
+<!-- strftime - format date/time -->
+<%= @post.created_at.strftime("%d/%m/%Y") %>
+<!-- => "15/01/2024" -->
 
-<%# strftime สำหรับ format เอง %>
-<%= @post.created_at.strftime("%d/%m/%Y %H:%M") %>
-<%# => "15/01/2024 10:30" %>
+<%= @post.created_at.strftime("%d %B %Y เวลา %H:%M น.") %>
+<!-- => "15 มกราคม 2024 เวลา 10:30 น." (ต้องตั้ง locale) -->
 
-<%# Thai date formatting %>
+<!-- l helper (localize) -->
+<%= l @post.created_at %>
 <%= l @post.created_at, format: :long %>
-<%# ต้องตั้งค่า locale ใน config/locales/th.yml %>
-
-<%# ใช้ strftime สำหรับภาษาไทย %>
-<% thai_months = %w[ม.ค. ก.พ. มี.ค. เม.ย. พ.ค. มิ.ย. ก.ค. ส.ค. ก.ย. ต.ค. พ.ย. ธ.ค.] %>
-<%= "#{@post.created_at.day} #{thai_months[@post.created_at.month - 1]} #{@post.created_at.year + 543}" %>
+<%= l @post.created_at, format: :short %>
+<%= l @post.created_at.to_date %>
 ```
 
----
-
-## ขั้นตอนที่ 763: Text Helpers
-
-```erb
-<%# truncate - ตัดข้อความ %>
-<%= truncate(@post.body, length: 100) %>
-<%# => "เนื้อหาบทความ..." %>
-
-<%= truncate(@post.body, length: 100, omission: " [อ่านต่อ]") %>
-
-<%= truncate(@post.body, length: 100, separator: " ") %>
-<%# ตัดที่คำ ไม่ตัดกลางคำ %>
-
-<%# excerpt - ดึงข้อความรอบ keyword %>
-<%= excerpt(@post.body, "Ruby", radius: 100) %>
-<%# => "...เรียนรู้ Ruby on Rails..." %>
-
-<%# pluralize - single/plural %>
-<%= pluralize(@post.comments.count, "comment") %>
-<%# => "0 comments", "1 comment", "2 comments" %>
-
-<%= pluralize(3, "บทความ") %>
-<%# => "3 บทความ" %>
-
-<%# cycle - สลับค่า %>
-<% @posts.each do |post| %>
-  <tr class="<%= cycle("odd", "even") %>">
-    <td><%= post.title %></td>
-  </tr>
-<% end %>
-
-<%# highlight - เน้น keyword %>
-<%= highlight(@post.body, params[:q]) %>
-<%# => ห่อ keyword ด้วย <mark> %>
-
-<%= highlight(@post.body, "Ruby",
-    highlighter: '<span class="highlight">\1</span>') %>
-
-<%# simple_format - แปลง newlines เป็น <p> %>
-<%= simple_format(@post.body) %>
-<%# แปลง "\n\n" เป็น </p><p> %>
-
-<%# word_wrap - ตัดบรรทัดตามความกว้าง %>
-<%= word_wrap(@long_text, line_width: 80) %>
-
-<%# strip_tags - ลบ HTML tags %>
-<%= strip_tags(@post.body_html) %>
-
-<%# strip_links - ลบ links แต่คง text %>
-<%= strip_links(@post.body_html) %>
-
-<%# sanitize - อนุญาต tags บางอย่าง %>
-<%= sanitize(@post.body_html, tags: %w[b i em strong a]) %>
-
-<%# auto_link - แปลง URL เป็น link อัตโนมัติ %>
-<%# ต้องใช้ gem rails_autolink %>
-```
-
----
-
-## ขั้นตอนที่ 764: Asset Helpers
-
-```erb
-<%# stylesheet_link_tag %>
-<%= stylesheet_link_tag "application", media: "all",
-    "data-turbo-track": "reload" %>
-
-<%= stylesheet_link_tag "print", media: "print" %>
-
-<%# javascript_include_tag (ไม่ใช้ใน Rails 7 importmap) %>
-<%= javascript_include_tag "application", defer: true %>
-
-<%# javascript_importmap_tags (Rails 7+) %>
-<%= javascript_importmap_tags %>
-
-<%# image_path - path ไปยัง image asset %>
-<%= image_path("logo.png") %>
-<%# => "/assets/logo-abc123.png" %>
-
-<%# asset_path %>
-<%= asset_path("document.pdf") %>
-
-<%# stylesheet_path %>
-<%= stylesheet_path("custom") %>
-
-<%# javascript_path %>
-<%= javascript_path("app") %>
-
-<%# audio_tag %>
-<%= audio_tag "podcast.mp3", controls: true %>
-
-<%# video_tag %>
-<%= video_tag "intro.mp4",
-    controls: true,
-    width: "100%",
-    poster: image_path("thumbnail.jpg") %>
-
-<%# favicon_link_tag %>
-<%= favicon_link_tag "favicon.ico" %>
-<%= favicon_link_tag "icon.png", rel: "apple-touch-icon", type: "image/png" %>
-```
-
----
-
-## ขั้นตอนที่ 765: Form Helpers Overview
-
-### form_with Helper
-
-```erb
-<%# Form สำหรับ Model (model-backed) %>
-<%= form_with(model: @post) do |form| %>
-  <div class="mb-3">
-    <%= form.label :title, "หัวข้อ" %>
-    <%= form.text_field :title, class: "form-control" %>
-  </div>
-
-  <div class="mb-3">
-    <%= form.label :body, "เนื้อหา" %>
-    <%= form.text_area :body, class: "form-control", rows: 5 %>
-  </div>
-
-  <div class="mb-3">
-    <%= form.label :published, "เผยแพร่" %>
-    <%= form.check_box :published %>
-  </div>
-
-  <%= form.submit "บันทึก", class: "btn btn-primary" %>
-<% end %>
-
-<%# Form ที่ไม่ผูกกับ Model %>
-<%= form_with(url: search_path, method: :get) do |form| %>
-  <%= form.text_field :q, placeholder: "ค้นหา..." %>
-  <%= form.submit "ค้นหา" %>
-<% end %>
-```
-
-### Input Types ทั้งหมด
-
-```erb
-<%= form_with(model: @user) do |f| %>
-  <%# Text inputs %>
-  <%= f.text_field :name %>
-  <%= f.email_field :email %>
-  <%= f.password_field :password %>
-  <%= f.number_field :age %>
-  <%= f.tel_field :phone %>
-  <%= f.url_field :website %>
-  <%= f.search_field :query %>
-
-  <%# Date/Time inputs %>
-  <%= f.date_field :birth_date %>
-  <%= f.time_field :event_time %>
-  <%= f.datetime_local_field :scheduled_at %>
-  <%= f.month_field :month %>
-  <%= f.week_field :week %>
-
-  <%# Other inputs %>
-  <%= f.range_field :rating, min: 1, max: 10 %>
-  <%= f.color_field :theme_color %>
-  <%= f.hidden_field :role, value: "user" %>
-  <%= f.file_field :avatar %>
-
-  <%# Multi-line %>
-  <%= f.text_area :bio, rows: 4 %>
-
-  <%# Boolean %>
-  <%= f.check_box :subscribe_newsletter %>
-  <%= f.radio_button :gender, "male" %>
-  <%= f.radio_button :gender, "female" %>
-
-  <%# Select %>
-  <%= f.select :country, [["ไทย", "TH"], ["USA", "US"]] %>
-<% end %>
-```
-
----
-
-## ขั้นตอนที่ 766: Custom Helpers
-
-### สร้าง Helper Module
-
-```ruby
-# app/helpers/application_helper.rb
-module ApplicationHelper
-  # แปลง boolean เป็นสัญลักษณ์
-  def yes_no(value)
-    value ? "✓ ใช่" : "✗ ไม่"
-  end
-
-  # สร้าง badge
-  def status_badge(status)
-    colors = {
-      active: "success",
-      inactive: "secondary",
-      pending: "warning",
-      blocked: "danger"
-    }
-    color = colors[status.to_sym] || "light"
-    content_tag(:span, status.capitalize,
-                class: "badge bg-#{color}")
-  end
-
-  # Title helper
-  def page_title(title = nil)
-    base_title = "MyApp"
-    if title.present?
-      "#{title} | #{base_title}"
-    else
-      base_title
-    end
-  end
-
-  # Active nav link
-  def nav_link(text, path, **options)
-    active = current_page?(path)
-    options[:class] = [options[:class], "active"].compact.join(" ") if active
-    link_to text, path, **options
-  end
-
-  # Format currency in Thai Baht
-  def baht(amount)
-    number_to_currency(amount, unit: "฿", format: "%u%n",
-                       separator: ".", delimiter: ",",
-                       precision: 2)
-  end
-
-  # Thai date format
-  def thai_date(date)
-    return "-" if date.nil?
-    thai_months = %w[มกราคม กุมภาพันธ์ มีนาคม เมษายน พฤษภาคม มิถุนายน
-                     กรกฎาคม สิงหาคม กันยายน ตุลาคม พฤศจิกายน ธันวาคม]
-    "#{date.day} #{thai_months[date.month - 1]} #{date.year + 543}"
-  end
-
-  # Truncate with link to full content
-  def truncate_with_link(text, path, length: 150)
-    if text.length > length
-      "#{truncate(text, length: length)} #{link_to('อ่านต่อ...', path)}".html_safe
-    else
-      text
-    end
-  end
-
-  # Flash message class
-  def flash_class(type)
-    {
-      notice: "alert-success",
-      alert: "alert-danger",
-      warning: "alert-warning",
-      info: "alert-info"
-    }[type.to_sym] || "alert-info"
-  end
-end
-```
-
-### ใช้ Helper ใน View
-
-```erb
-<%# ใช้ custom helpers %>
-<p>สถานะ: <%= yes_no(@user.active?) %></p>
-<p>สถานะบัญชี: <%= status_badge(@user.status) %></p>
-<title><%= page_title(@post&.title) %></title>
-<p>ราคา: <%= baht(@product.price) %></p>
-<p>วันที่: <%= thai_date(@post.created_at) %></p>
-```
-
-### Helper สำหรับ Specific Controller
-
-```ruby
-# app/helpers/posts_helper.rb
-module PostsHelper
-  # Helper เฉพาะ posts controller
-  def post_meta(post)
-    parts = []
-    parts << "โดย #{post.author.name}"
-    parts << "#{post.comments.count} ความคิดเห็น"
-    parts << time_ago_in_words(post.created_at) + " ที่แล้ว"
-    parts.join(" · ")
-  end
-
-  def category_options
-    Category.all.map { |c| [c.name, c.id] }
-  end
-end
-```
-
----
-
-## ขั้นตอนที่ 767: Testing Views
-
-### View Specs ด้วย RSpec
-
-```ruby
-# spec/views/posts/show.html.erb_spec.rb
-require "rails_helper"
-
-RSpec.describe "posts/show", type: :view do
-  let(:post) do
-    create(:post,
-           title: "Test Post",
-           body: "Test body content",
-           published: true)
-  end
-
-  before do
-    assign(:post, post)
-    render
-  end
-
-  it "displays the post title" do
-    expect(rendered).to include("Test Post")
-  end
-
-  it "displays the post body" do
-    expect(rendered).to include("Test body content")
-  end
-
-  it "shows published badge" do
-    expect(rendered).to have_css(".badge", text: "เผยแพร่แล้ว")
-  end
-
-  it "does not show draft badge" do
-    expect(rendered).not_to have_css(".badge-warning")
-  end
-
-  context "when post is not published" do
-    let(:post) { create(:post, published: false) }
-
-    it "shows draft badge" do
-      expect(rendered).to have_css(".badge", text: "ร่าง")
-    end
-  end
-end
-```
-
-### Request Specs (Controller + View integration)
-
-```ruby
-# spec/requests/posts_spec.rb
-require "rails_helper"
-
-RSpec.describe "Posts", type: :request do
-  describe "GET /posts/:id" do
-    let!(:post) { create(:post, title: "My Post") }
-
-    it "returns success" do
-      get post_path(post)
-      expect(response).to have_http_status(:success)
-    end
-
-    it "displays post title" do
-      get post_path(post)
-      expect(response.body).to include("My Post")
-    end
-
-    it "renders the show template" do
-      get post_path(post)
-      expect(response).to render_template(:show)
-    end
-  end
-end
-```
-
-### System Specs ด้วย Capybara
-
-```ruby
-# spec/system/posts_spec.rb
-require "rails_helper"
-
-RSpec.describe "Posts", type: :system do
-  describe "viewing a post" do
-    let!(:post) { create(:post, title: "Test Post", body: "Test body") }
-
-    it "displays post content" do
-      visit post_path(post)
-      expect(page).to have_content("Test Post")
-      expect(page).to have_content("Test body")
-    end
-
-    it "has working navigation" do
-      visit post_path(post)
-      click_link "กลับ"
-      expect(current_path).to eq(posts_path)
-    end
-  end
-end
-```
-
----
-
-## ขั้นตอนที่ 768: Advanced ERB Techniques
-
-### Capture Helper
-
-```erb
-<%# capture - เก็บ ERB output เป็น variable %>
-<% @post_card = capture do %>
-  <div class="card">
-    <h3><%= @post.title %></h3>
-    <p><%= @post.excerpt %></p>
-  </div>
-<% end %>
-
-<%# ใช้ทีหลัง %>
-<%= @post_card %>
-```
-
-### render กับ block
-
-```erb
-<%# Passing block to partial (Rails 7+) %>
-<%= render("card", title: "My Card") do %>
-  <p>นี่คือเนื้อหาใน card</p>
-<% end %>
-
-<%# ใน _card.html.erb %>
-<div class="card">
-  <h3><%= title %></h3>
-  <div class="card-body">
-    <%= yield %>
-  </div>
-</div>
-```
-
-### Inline Partials ด้วย render inline
-
-```ruby
-# ใน controller (ไม่แนะนำสำหรับ production)
-def show
-  render inline: "<p><%= @post.title %></p>"
-end
-```
-
----
-
-## ขั้นตอนที่ 769: i18n ใน Views
-
-### การใช้ I18n
-
-```erb
-<%# ใช้ t() helper สำหรับ translation %>
-<h1><%= t("posts.index.title") %></h1>
-<%= t("hello", name: @user.name) %>
-
-<%# Lazy lookup (ไม่ต้องพิมพ์ path เต็ม) %>
-<%# ใน views/posts/index.html.erb %>
-<h1><%= t(".title") %></h1>
-<%# ค้นหา: en.views.posts.index.title %>
-
-<%# pluralization %>
-<p><%= t("posts.count", count: @posts.count) %></p>
-```
+### Configure Localization
 
 ```yaml
 # config/locales/th.yml
 th:
-  hello: "สวัสดี %{name}"
-  posts:
-    index:
-      title: "บทความทั้งหมด"
-    count:
-      zero: "ไม่มีบทความ"
-      one: "1 บทความ"
-      other: "%{count} บทความ"
-  activerecord:
-    models:
-      post: "บทความ"
-    attributes:
-      post:
-        title: "หัวข้อ"
-        body: "เนื้อหา"
+  date:
+    formats:
+      default: "%d/%m/%Y"
+      short: "%d %b"
+      long: "%d %B %Y"
+  time:
+    formats:
+      default: "%d/%m/%Y %H:%M"
+      short: "%d %b %H:%M"
+      long: "%d %B %Y เวลา %H:%M น."
 ```
 
 ---
 
-## ขั้นตอนที่ 770: Turbo Frame Views
-
-### Turbo Frame ใน Views
+## Step 766: Text Helpers
 
 ```erb
-<%# app/views/posts/index.html.erb %>
-<%= turbo_frame_tag "posts_list" do %>
-  <% @posts.each do |post| %>
-    <div class="post-item">
-      <h3><%= link_to post.title, post %></h3>
-      <p><%= post.excerpt %></p>
-    </div>
+<!-- truncate -->
+<%= truncate("ข้อความยาวมากๆ ที่ต้องการตัด", length: 30) %>
+<!-- => "ข้อความยาวมากๆ ที่ต้องการตั..." -->
+
+<%= truncate("Long text here...", length: 50, omission: " [...]") %>
+<!-- => "Long text here... [...]" -->
+
+<!-- pluralize -->
+<%= pluralize(1, "comment") %>
+<!-- => "1 comment" -->
+
+<%= pluralize(5, "comment") %>
+<!-- => "5 comments" -->
+
+<%= pluralize(0, "ความคิดเห็น", plural: "ความคิดเห็น") %>
+<!-- => "0 ความคิดเห็น" -->
+
+<!-- simple_format - แปลง \n เป็น <p> tags -->
+<%= simple_format(@post.content) %>
+<!-- "First para\n\nSecond para" => "<p>First para</p>\n\n<p>Second para</p>" -->
+
+<%= simple_format(@post.content, {}, wrapper_tag: "div") %>
+
+<!-- highlight -->
+<%= highlight("Ruby on Rails is great", "Rails") %>
+<!-- => "Ruby on <mark>Rails</mark> is great" -->
+
+<%= highlight(@post.content, params[:q]) %>
+
+<!-- word_wrap -->
+<%= word_wrap("Long text...", line_width: 80) %>
+
+<!-- strip_tags -->
+<%= strip_tags("<p>Hello <b>World</b></p>") %>
+<!-- => "Hello World" -->
+
+<!-- strip_links -->
+<%= strip_links('<a href="http://example.com">Click here</a>') %>
+<!-- => "Click here" -->
+
+<!-- sanitize -->
+<%= sanitize(@post.content, tags: %w[p b i em strong a], 
+             attributes: %w[href class]) %>
+
+<!-- excerpt -->
+<%= excerpt("Hello World, how are you?", "World", radius: 5) %>
+<!-- => "...World, ho..." -->
+```
+
+---
+
+## Step 767: Asset Helpers
+
+```erb
+<!-- stylesheet_link_tag -->
+<%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
+<!-- => <link rel="stylesheet" href="/assets/application.css"> -->
+
+<%= stylesheet_link_tag "admin", media: "all" %>
+<%= stylesheet_link_tag "print", media: "print" %>
+
+<!-- javascript_include_tag -->
+<%= javascript_include_tag "application", "data-turbo-track": "reload", defer: true %>
+<!-- => <script src="/assets/application.js" defer="defer"></script> -->
+
+<!-- javascript_importmap_tags (Rails 7) -->
+<%= javascript_importmap_tags %>
+
+<!-- image_tag -->
+<%= image_tag "logo.png", alt: "Logo" %>
+<%= image_tag "icons/user.svg", width: 24, height: 24 %>
+
+<!-- image_path / image_url -->
+<% src = image_path("logo.png") %>
+<% src = image_url("logo.png") %>  <!-- full URL -->
+
+<!-- asset_path / asset_url -->
+<% path = asset_path("manifest.json") %>
+<% url = asset_url("manifest.json") %>  <!-- full URL -->
+
+<!-- favicon_link_tag -->
+<%= favicon_link_tag "favicon.ico" %>
+<%= favicon_link_tag "icon.png", rel: "apple-touch-icon", type: "image/png" %>
+
+<!-- auto_discovery_link_tag (RSS/Atom) -->
+<%= auto_discovery_link_tag :rss, posts_path(format: :rss), 
+    title: "My Blog RSS Feed" %>
+```
+
+---
+
+## Step 768: DOM Helpers
+
+```erb
+<!-- tag helper (Rails 7) -->
+<%= tag.div "Hello", class: "greeting" %>
+<!-- => <div class="greeting">Hello</div> -->
+
+<%= tag.p %>
+<!-- => <p></p> -->
+
+<%= tag.p "ข้อความ", class: "lead" %>
+<!-- => <p class="lead">ข้อความ</p> -->
+
+<!-- ด้วย block -->
+<%= tag.div class: "container" do %>
+  <p>เนื้อหา</p>
+<% end %>
+
+<!-- content_tag (เก่ากว่า แต่ยังใช้งานได้) -->
+<%= content_tag :div, "Hello", class: "greeting" %>
+
+<!-- dom_id -->
+<%= dom_id(@post) %>
+<!-- => "post_1" -->
+
+<div id="<%= dom_id(@post) %>">...</div>
+<!-- => <div id="post_1">...</div> -->
+
+<!-- dom_class -->
+<div class="<%= dom_class(@post) %>">...</div>
+<!-- => <div class="post">...</div> -->
+
+<!-- tag สำหรับ custom elements -->
+<%= tag.turbo_frame id: "posts-list" do %>
+  <%= render @posts %>
+<% end %>
+```
+
+---
+
+## Step 769: Custom Helpers
+
+### สร้าง Helper
+
+```ruby
+# app/helpers/application_helper.rb
+module ApplicationHelper
+  # Format date ภาษาไทย
+  def thai_date(date)
+    return "" unless date
+    date.strftime("%d %B %Y")
+  end
+  
+  # Flash message CSS class
+  def flash_class(type)
+    {
+      notice: "success",
+      success: "success",
+      alert: "danger",
+      error: "danger",
+      warning: "warning",
+      info: "info"
+    }[type.to_sym] || "secondary"
+  end
+  
+  # Page title
+  def page_title(title = nil)
+    if title
+      content_for(:title) { "#{title} | MyApp" }
+    else
+      content_for?(:title) ? content_for(:title) : "MyApp"
+    end
+  end
+  
+  # Active link
+  def active_link_to(text, path, options = {})
+    options[:class] = "#{options[:class]} active" if current_page?(path)
+    link_to text, path, options
+  end
+  
+  # Bootstrap badge
+  def status_badge(status)
+    classes = {
+      "active" => "badge bg-success",
+      "inactive" => "badge bg-secondary",
+      "pending" => "badge bg-warning",
+      "banned" => "badge bg-danger"
+    }
+    content_tag :span, status.humanize, class: classes[status] || "badge bg-secondary"
+  end
+end
+
+# app/helpers/posts_helper.rb
+module PostsHelper
+  def reading_time(content)
+    words_per_minute = 200
+    words = content.split.size
+    minutes = (words / words_per_minute.to_f).ceil
+    "#{minutes} นาที"
+  end
+  
+  def post_status_color(post)
+    case post.status
+    when "published" then "text-success"
+    when "draft"     then "text-secondary"
+    when "archived"  then "text-muted"
+    else "text-dark"
+    end
+  end
+  
+  def post_card(post, &block)
+    content_tag :div, class: "card post-card" do
+      concat content_tag(:div, class: "card-body") {
+        concat content_tag(:h5, post.title, class: "card-title")
+        concat content_tag(:p, post.content.truncate(100), class: "card-text")
+        concat capture(&block) if block_given?
+      }
+    end
+  end
+end
+```
+
+### ใช้ Custom Helpers ใน Views
+
+```erb
+<!-- ใน views (helpers load อัตโนมัติ) -->
+<p>วันที่: <%= thai_date(@post.created_at) %></p>
+
+<h1><%= page_title(@post.title) %></h1>
+
+<%= active_link_to "หน้าหลัก", root_path, class: "nav-link" %>
+
+<%= status_badge(@post.status) %>
+
+<p>เวลาอ่าน: <%= reading_time(@post.content) %></p>
+```
+
+---
+
+## Step 770: View Testing
+
+### Minitest View Tests
+
+```ruby
+# test/helpers/posts_helper_test.rb
+require "test_helper"
+
+class PostsHelperTest < ActionView::TestCase
+  test "reading_time returns correct estimate" do
+    content = "word " * 400  # 400 words
+    result = reading_time(content)
+    assert_equal "2 นาที", result
+  end
+  
+  test "status_badge returns correct classes" do
+    result = status_badge("active")
+    assert_includes result, "bg-success"
+    assert_includes result, "active"
+  end
+end
+
+# test/views/posts/index_test.rb (View tests)
+require "test_helper"
+
+class PostsIndexViewTest < ActionView::TestCase
+  def setup
+    @posts = [
+      Post.new(id: 1, title: "First Post", content: "Content 1"),
+      Post.new(id: 2, title: "Second Post", content: "Content 2")
+    ]
+  end
+  
+  test "renders all posts" do
+    assign(:posts, @posts)
+    render template: "posts/index"
+    
+    assert_select "h2", text: "First Post"
+    assert_select "h2", text: "Second Post"
+  end
+  
+  test "shows post count" do
+    assign(:posts, @posts)
+    render template: "posts/index"
+    
+    assert_select ".post-count", text: /2/
+  end
+end
+```
+
+### RSpec View Tests
+
+```ruby
+# spec/views/posts/index.html.erb_spec.rb
+require "rails_helper"
+
+RSpec.describe "posts/index", type: :view do
+  before do
+    @posts = [
+      assign(:post1, create(:post, title: "First Post")),
+      assign(:post2, create(:post, title: "Second Post"))
+    ]
+    assign(:posts, @posts)
+  end
+  
+  it "renders a list of posts" do
+    render
+    expect(rendered).to match(/First Post/)
+    expect(rendered).to match(/Second Post/)
+  end
+  
+  it "renders links to each post" do
+    render
+    @posts.each do |post|
+      expect(rendered).to have_selector("a[href='#{post_path(post)}']")
+    end
+  end
+end
+```
+
+---
+
+## ตัวอย่าง View ที่สมบูรณ์
+
+### Blog Post Show Page
+
+```erb
+<!-- app/views/posts/show.html.erb -->
+
+<% content_for :title, @post.title %>
+
+<% content_for :meta do %>
+  <meta name="description" content="<%= @post.excerpt %>">
+  <meta property="og:title" content="<%= @post.title %>">
+  <meta property="og:description" content="<%= @post.excerpt %>">
+  <% if @post.cover_image.attached? %>
+    <meta property="og:image" content="<%= url_for(@post.cover_image) %>">
   <% end %>
 <% end %>
 
-<%# แสดง pagination นอก frame %>
-<%= paginate @posts %>
+<article class="post">
+  <!-- Header -->
+  <header class="post-header">
+    <% if @post.cover_image.attached? %>
+      <%= image_tag @post.cover_image, class: "cover-image", alt: @post.title %>
+    <% end %>
+    
+    <h1 class="post-title"><%= @post.title %></h1>
+    
+    <div class="post-meta">
+      <%= image_tag @post.user.avatar, class: "avatar", width: 32 if @post.user.avatar.attached? %>
+      <span>โดย <strong><%= @post.user.name %></strong></span>
+      <time datetime="<%= @post.published_at.iso8601 %>">
+        <%= l @post.published_at, format: :long %>
+      </time>
+      <span><%= reading_time(@post.content) %></span>
+    </div>
+    
+    <% if @post.tags.any? %>
+      <div class="tags">
+        <% @post.tags.each do |tag| %>
+          <%= link_to tag.name, tag_path(tag), class: "badge bg-secondary" %>
+        <% end %>
+      </div>
+    <% end %>
+  </header>
+  
+  <!-- Content -->
+  <div class="post-content">
+    <%= simple_format(@post.content) %>
+  </div>
+  
+  <!-- Footer -->
+  <footer class="post-footer">
+    <!-- Author info -->
+    <div class="author-card">
+      <h4>เกี่ยวกับผู้เขียน</h4>
+      <p><%= @post.user.bio %></p>
+    </div>
+    
+    <!-- Actions (admin only) -->
+    <% if current_user&.admin? || @post.user == current_user %>
+      <div class="post-actions">
+        <%= link_to "แก้ไข", edit_post_path(@post), class: "btn btn-outline-primary" %>
+        <%= link_to "ลบ", post_path(@post), 
+            data: { turbo_method: :delete, turbo_confirm: "ต้องการลบบทความนี้?" },
+            class: "btn btn-outline-danger" %>
+      </div>
+    <% end %>
+  </footer>
+</article>
 
-<%# View ที่ใช้ Turbo Stream update %>
-<%# app/views/posts/create.turbo_stream.erb %>
-<%= turbo_stream.prepend "posts_list" do %>
-  <%= render @post %>
-<% end %>
+<!-- Comments Section -->
+<section class="comments-section" id="comments">
+  <h3>ความคิดเห็น (<%= @post.comments.count %>)</h3>
+  
+  <% if @comments.any? %>
+    <%= render @comments %>
+  <% else %>
+    <p class="text-muted">ยังไม่มีความคิดเห็น เป็นคนแรกที่แสดงความคิดเห็น!</p>
+  <% end %>
+  
+  <!-- Comment form -->
+  <% if user_signed_in? %>
+    <div class="comment-form-section">
+      <h4>แสดงความคิดเห็น</h4>
+      <%= render "comments/form", post: @post, comment: Comment.new %>
+    </div>
+  <% else %>
+    <p>
+      <%= link_to "เข้าสู่ระบบ", login_path %> เพื่อแสดงความคิดเห็น
+    </p>
+  <% end %>
+</section>
 
-<%= turbo_stream.update "flash" do %>
-  <%= render "shared/flash_messages" %>
+<!-- Related Posts -->
+<% if @related_posts.any? %>
+  <section class="related-posts">
+    <h3>บทความที่เกี่ยวข้อง</h3>
+    <div class="row">
+      <% @related_posts.each do |related| %>
+        <div class="col-md-4">
+          <%= render "posts/card", post: related %>
+        </div>
+      <% end %>
+    </div>
+  </section>
 <% end %>
 ```
 
 ---
 
-## ขั้นตอนที่ 771: View Components
+## แบบฝึกหัด (Steps 771-780)
 
-### ViewComponent (gem)
+### แบบฝึกหัดที่ 1
+เขียน ERB code แสดงชื่อ user ถ้า login อยู่ ถ้าไม่ login แสดง "ผู้เยี่ยมชม"
 
+**เฉลย:**
+```erb
+<%= current_user&.name || "ผู้เยี่ยมชม" %>
+```
+
+### แบบฝึกหัดที่ 2
+สร้าง layout ที่มี navigation, flash messages, main content และ footer
+
+**เฉลย:**
+```erb
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <title><%= yield :title || "MyApp" %></title>
+  <%= stylesheet_link_tag "application" %>
+</head>
+<body>
+  <%= render "shared/navbar" %>
+  
+  <% flash.each do |type, msg| %>
+    <div class="alert alert-<%= flash_class(type) %>"><%= msg %></div>
+  <% end %>
+  
+  <main class="container">
+    <%= yield %>
+  </main>
+  
+  <%= render "shared/footer" %>
+  <%= javascript_importmap_tags %>
+</body>
+</html>
+```
+
+### แบบฝึกหัดที่ 3
+สร้าง partial `_post_card.html.erb` ที่แสดง post title, excerpt, และ link
+
+**เฉลย:**
+```erb
+<!-- app/views/posts/_post_card.html.erb -->
+<div class="card">
+  <div class="card-body">
+    <h5 class="card-title"><%= post.title %></h5>
+    <p class="card-text"><%= post.content.truncate(100) %></p>
+    <%= link_to "อ่านต่อ", post_path(post), class: "btn btn-primary" %>
+  </div>
+</div>
+```
+
+### แบบฝึกหัดที่ 4
+ใช้ render collection แสดง posts ทั้งหมดโดยใช้ partial
+
+**เฉลย:**
+```erb
+<%= render partial: "post_card", collection: @posts, as: :post %>
+<!-- หรือ shorthand -->
+<%= render @posts %>
+```
+
+### แบบฝึกหัดที่ 5
+ใช้ content_for เพิ่ม page-specific JavaScript ใน view
+
+**เฉลย:**
+```erb
+<% content_for :scripts do %>
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      initMap();
+    });
+  </script>
+<% end %>
+```
+
+### แบบฝึกหัดที่ 6
+สร้าง helper method `thai_baht(amount)` ที่แสดงตัวเลขในรูปแบบสกุลเงินบาท
+
+**เฉลย:**
 ```ruby
-# Gemfile
-gem "view_component"
+def thai_baht(amount)
+  number_to_currency(amount, unit: "฿", format: "%u%n", 
+                    delimiter: ",", separator: ".")
+end
+```
 
-# app/components/card_component.rb
-class CardComponent < ViewComponent::Base
-  def initialize(title:, color: "white")
-    @title = title
-    @color = color
+### แบบฝึกหัดที่ 7
+ใช้ time_ago_in_words แสดงเวลาที่โพสต์
+
+**เฉลย:**
+```erb
+<small>โพสต์เมื่อ <%= time_ago_in_words(@post.created_at) %> ที่แล้ว</small>
+```
+
+### แบบฝึกหัดที่ 8
+สร้าง helper `active_nav_link` ที่เพิ่ม class "active" เมื่อ current page
+
+**เฉลย:**
+```ruby
+def active_nav_link(text, path, options = {})
+  options[:class] = [options[:class], ("active" if current_page?(path))].compact.join(" ")
+  link_to text, path, options
+end
+```
+
+### แบบฝึกหัดที่ 9
+แสดงรูปภาพ post ถ้ามี ถ้าไม่มีแสดง placeholder
+
+**เฉลย:**
+```erb
+<% if @post.image.attached? %>
+  <%= image_tag @post.image.variant(resize_to_limit: [800, 400]), 
+      class: "post-image", alt: @post.title %>
+<% else %>
+  <%= image_tag "post-placeholder.jpg", class: "post-image", alt: "No image" %>
+<% end %>
+```
+
+### แบบฝึกหัดที่ 10
+สร้าง partial `_pagination.html.erb` ที่แสดง pagination controls
+
+**เฉลย:**
+```erb
+<!-- app/views/shared/_pagination.html.erb -->
+<% if total_pages > 1 %>
+  <nav aria-label="Page navigation">
+    <ul class="pagination">
+      <% if current_page > 1 %>
+        <li class="page-item">
+          <%= link_to "ก่อนหน้า", url_for(page: current_page - 1), 
+              class: "page-link" %>
+        </li>
+      <% end %>
+      
+      <% (1..total_pages).each do |p| %>
+        <li class="page-item <%= 'active' if p == current_page %>">
+          <%= link_to p, url_for(page: p), class: "page-link" %>
+        </li>
+      <% end %>
+      
+      <% if current_page < total_pages %>
+        <li class="page-item">
+          <%= link_to "ถัดไป", url_for(page: current_page + 1), 
+              class: "page-link" %>
+        </li>
+      <% end %>
+    </ul>
+  </nav>
+<% end %>
+```
+
+### แบบฝึกหัดที่ 11
+แสดง reading time ของ post โดยคำนวณจาก word count
+
+**เฉลย:**
+```ruby
+# app/helpers/posts_helper.rb
+def reading_time(content)
+  words = content.to_s.split.size
+  minutes = [(words / 200.0).ceil, 1].max
+  "ใช้เวลาอ่านประมาณ #{minutes} นาที"
+end
+```
+
+```erb
+<p class="reading-time"><%= reading_time(@post.content) %></p>
+```
+
+### แบบฝึกหัดที่ 12
+ใช้ sanitize helper ที่อนุญาตเฉพาะ p, b, i tags
+
+**เฉลย:**
+```erb
+<div class="content">
+  <%= sanitize @post.content, tags: %w[p b i em strong], 
+      attributes: %w[class] %>
+</div>
+```
+
+### แบบฝึกหัดที่ 13
+สร้าง shared navbar partial ที่มี active state
+
+**เฉลย:**
+```erb
+<!-- app/views/shared/_navbar.html.erb -->
+<nav class="navbar">
+  <ul class="nav">
+    <li class="<%= 'active' if current_page?(root_path) %>">
+      <%= link_to "หน้าหลัก", root_path %>
+    </li>
+    <li class="<%= 'active' if controller_name == 'posts' %>">
+      <%= link_to "บทความ", posts_path %>
+    </li>
+    <% if user_signed_in? %>
+      <li><%= link_to current_user.name, profile_path %></li>
+      <li><%= link_to "ออกจากระบบ", logout_path, data: { turbo_method: :delete } %></li>
+    <% else %>
+      <li><%= link_to "เข้าสู่ระบบ", login_path %></li>
+    <% end %>
+  </ul>
+</nav>
+```
+
+### แบบฝึกหัดที่ 14
+ใช้ number_to_currency สำหรับ product price
+
+**เฉลย:**
+```erb
+<p class="price">
+  <% if @product.on_sale? %>
+    <s class="original-price">
+      <%= number_to_currency(@product.original_price, unit: "฿", format: "%u%n") %>
+    </s>
+    <strong class="sale-price text-danger">
+      <%= number_to_currency(@product.sale_price, unit: "฿", format: "%u%n") %>
+    </strong>
+  <% else %>
+    <%= number_to_currency(@product.price, unit: "฿", format: "%u%n") %>
+  <% end %>
+</p>
+```
+
+### แบบฝึกหัดที่ 15
+สร้าง view ที่แสดงตาราง users พร้อม action links
+
+**เฉลย:**
+```erb
+<!-- app/views/admin/users/index.html.erb -->
+<h1>ผู้ใช้ทั้งหมด</h1>
+
+<table class="table">
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>ชื่อ</th>
+      <th>อีเมล</th>
+      <th>วันที่สมัคร</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% @users.each do |user| %>
+      <tr id="<%= dom_id(user) %>">
+        <td><%= user.id %></td>
+        <td><%= user.name %></td>
+        <td><%= user.email %></td>
+        <td><%= l user.created_at, format: :short %></td>
+        <td>
+          <%= link_to "ดู", admin_user_path(user), class: "btn btn-sm btn-info" %>
+          <%= link_to "แก้ไข", edit_admin_user_path(user), class: "btn btn-sm btn-warning" %>
+          <%= link_to "ลบ", admin_user_path(user), 
+              data: { turbo_method: :delete, turbo_confirm: "ลบผู้ใช้ #{user.name}?" },
+              class: "btn btn-sm btn-danger" %>
+        </td>
+      </tr>
+    <% end %>
+  </tbody>
+</table>
+```
+
+### แบบฝึกหัดที่ 16
+สร้าง helper ที่ generate breadcrumb navigation
+
+**เฉลย:**
+```ruby
+# app/helpers/application_helper.rb
+def breadcrumbs(*items)
+  content_tag :nav, aria: { label: "breadcrumb" } do
+    content_tag :ol, class: "breadcrumb" do
+      items.map.with_index do |(text, path), index|
+        if index == items.length - 1
+          content_tag :li, text, class: "breadcrumb-item active"
+        else
+          content_tag :li, class: "breadcrumb-item" do
+            link_to text, path
+          end
+        end
+      end.join.html_safe
+    end
   end
 end
 ```
 
 ```erb
-<%# app/components/card_component.html.erb %>
-<div class="card" style="background: <%= @color %>">
-  <div class="card-header">
-    <h3><%= @title %></h3>
-  </div>
-  <div class="card-body">
-    <%= content %>
-  </div>
-</div>
+<%= breadcrumbs ["หน้าหลัก", root_path], ["บทความ", posts_path], [@post.title] %>
 ```
 
+### แบบฝึกหัดที่ 17
+render partial ด้วย spacer template
+
+**เฉลย:**
 ```erb
-<%# ใช้ใน view %>
-<%= render(CardComponent.new(title: "My Card", color: "#f0f0f0")) do %>
-  <p>เนื้อหาของ card</p>
-<% end %>
+<!-- app/views/posts/index.html.erb -->
+<%= render partial: "post", collection: @posts, spacer_template: "divider" %>
+
+<!-- app/views/posts/_divider.html.erb -->
+<hr class="post-divider">
 ```
 
----
+### แบบฝึกหัดที่ 18
+สร้าง view ที่ใช้ tag helper สร้าง custom elements
 
-## ขั้นตอนที่ 772: Caching Views
-
-### Fragment Caching
-
+**เฉลย:**
 ```erb
-<%# cache block - cache HTML fragment %>
-<% cache @post do %>
-  <div class="post">
-    <h2><%= @post.title %></h2>
-    <p><%= @post.body %></p>
-    <%= render @post.comments %>
-  </div>
-<% end %>
-
-<%# Cache พร้อม expire time %>
-<% cache @post, expires_in: 1.hour do %>
-  <%= render "post_card", post: @post %>
-<% end %>
-
-<%# Cache Collection %>
-<% cache @posts do %>
-  <%= render @posts %>
-<% end %>
-
-<%# Russian Doll Caching - nested cache %>
-<% cache @post do %>
-  <h2><%= @post.title %></h2>
-  <% @post.comments.each do |comment| %>
-    <% cache comment do %>
-      <p><%= comment.body %></p>
+<%= tag.section class: "posts-grid" do %>
+  <% @posts.each do |post| %>
+    <%= tag.article class: "post-card", id: dom_id(post) do %>
+      <%= tag.h2 post.title %>
+      <%= tag.p post.content.truncate(150) %>
+      <%= link_to "อ่านต่อ", post_path(post) %>
     <% end %>
   <% end %>
 <% end %>
 ```
 
+### แบบฝึกหัดที่ 19
+เขียน view test ที่ตรวจสอบว่า post title แสดงใน template
+
+**เฉลย:**
+```ruby
+# spec/views/posts/show.html.erb_spec.rb
+require "rails_helper"
+
+RSpec.describe "posts/show", type: :view do
+  let(:post) { create(:post, title: "Test Post") }
+  
+  before do
+    assign(:post, post)
+    assign(:comments, [])
+  end
+  
+  it "displays the post title" do
+    render
+    expect(rendered).to have_selector("h1", text: "Test Post")
+  end
+end
+```
+
+### แบบฝึกหัดที่ 20
+สร้าง helper ที่ format phone number ไทย
+
+**เฉลย:**
+```ruby
+def thai_phone(number)
+  cleaned = number.to_s.gsub(/\D/, "")
+  if cleaned.length == 10
+    "#{cleaned[0..2]}-#{cleaned[3..5]}-#{cleaned[6..]}"
+  else
+    number
+  end
+end
+```
+
+### แบบฝึกหัดที่ 21
+ใช้ pluralize แสดงจำนวน comments อย่างถูกต้อง
+
+**เฉลย:**
+```erb
+<p><%= pluralize(@post.comments.count, "comment", locale: :en) %></p>
+<!-- หรือภาษาไทย -->
+<p>มี <%= @post.comments.count %> ความคิดเห็น</p>
+```
+
+### แบบฝึกหัดที่ 22
+สร้าง alert partial ที่ support หลาย types
+
+**เฉลย:**
+```erb
+<!-- app/views/shared/_flash_messages.html.erb -->
+<% flash.each do |type, message| %>
+  <% css_class = { notice: "success", alert: "danger", warning: "warning", info: "info" }[type.to_sym] || "secondary" %>
+  <div class="alert alert-<%= css_class %> alert-dismissible fade show" role="alert">
+    <%= message %>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  </div>
+<% end %>
+```
+
+### แบบฝึกหัดที่ 23
+เขียน layout ที่ condition-based ระหว่าง admin และ user
+
+**เฉลย:**
+```ruby
+# app/controllers/application_controller.rb
+layout :choose_layout
+
+private
+
+def choose_layout
+  if controller_path.start_with?("admin/")
+    "admin"
+  elsif devise_controller?
+    "auth"
+  else
+    "application"
+  end
+end
+```
+
+### แบบฝึกหัดที่ 24
+ใช้ excerpt helper แสดง search result snippet
+
+**เฉลย:**
+```erb
+<!-- Search results -->
+<% @results.each do |post| %>
+  <div class="search-result">
+    <h3><%= link_to post.title, post_path(post) %></h3>
+    <p>...<%= excerpt(post.content, params[:q], radius: 100) %>...</p>
+    <p><%= highlight(post.content.truncate(200), params[:q]) %></p>
+  </div>
+<% end %>
+```
+
+### แบบฝึกหัดที่ 25
+สร้าง complete posts/index view ที่มี search, filter, และ pagination
+
+**เฉลย:**
+```erb
+<!-- app/views/posts/index.html.erb -->
+<% content_for :title, "บทความทั้งหมด" %>
+
+<div class="posts-header">
+  <h1>บทความทั้งหมด</h1>
+  
+  <!-- Search form -->
+  <%= form_with url: posts_path, method: :get, class: "search-form" do |f| %>
+    <%= f.text_field :q, placeholder: "ค้นหา...", value: params[:q], class: "form-control" %>
+    <%= f.submit "ค้นหา", class: "btn btn-primary" %>
+  <% end %>
+  
+  <!-- Category filter -->
+  <div class="category-filter">
+    <%= link_to "ทั้งหมด", posts_path, class: "btn #{params[:category].blank? ? 'btn-primary' : 'btn-outline-primary'}" %>
+    <% Category.all.each do |cat| %>
+      <%= link_to cat.name, posts_path(category: cat.id),
+          class: "btn #{params[:category] == cat.id.to_s ? 'btn-primary' : 'btn-outline-secondary'}" %>
+    <% end %>
+  </div>
+</div>
+
+<!-- Posts list -->
+<% if @posts.any? %>
+  <div class="posts-grid">
+    <%= render @posts %>
+  </div>
+  
+  <!-- Pagination -->
+  <div class="pagination-wrapper">
+    <%= paginate @posts %>
+  </div>
+<% else %>
+  <div class="empty-state">
+    <p>ไม่พบบทความ</p>
+    <% if params[:q].present? %>
+      <p>ลองค้นหาด้วยคำอื่น</p>
+      <%= link_to "ดูบทความทั้งหมด", posts_path, class: "btn btn-secondary" %>
+    <% end %>
+  </div>
+<% end %>
+```
+
 ---
 
-## แบบฝึกหัดตอนที่ 35 (25 ข้อ)
+## สรุป
 
-### ระดับพื้นฐาน
+ใน Views และ ERB เราได้เรียนรู้:
 
-**ข้อ 1:** สร้าง layout `app/views/layouts/blog.html.erb` ที่มี navigation bar, sidebar, และ footer โดยใช้ `yield` สำหรับ content หลัก และ `yield :sidebar` สำหรับ sidebar
-
-**ข้อ 2:** สร้าง view `posts/show.html.erb` ที่:
-- แสดง title, body, created_at
-- ใช้ `content_for :title` เพื่อกำหนด title ของหน้า
-- แสดง status badge (เผยแพร่/ร่าง)
-
-**ข้อ 3:** สร้าง partial `_post_card.html.erb` ที่รับ `post` เป็น local variable แล้ว render collection ของ posts จาก index view
-
-**ข้อ 4:** ใช้ `link_to` สร้าง:
-- Link ไปหน้า show
-- Link ลบ post ด้วย confirm dialog
-- Link ที่เปิด tab ใหม่
-
-**ข้อ 5:** แสดงราคาสินค้าด้วย `number_to_currency` ในรูปแบบ `฿1,234.50`
-
-**ข้อ 6:** แสดงเวลาที่โพสต์ด้วย `time_ago_in_words` และ `time_tag`
-
-**ข้อ 7:** ใช้ `truncate` ตัดเนื้อหา 200 ตัวอักษร พร้อม "อ่านต่อ..." link
-
-**ข้อ 8:** สร้าง flash messages partial ที่แสดง success, error, warning messages ด้วยสีที่เหมาะสม
-
-**ข้อ 9:** สร้าง navigation partial ที่ highlight active menu item
-
-**ข้อ 10:** สร้าง custom helper `format_phone(number)` ที่แสดงเบอร์โทรรูปแบบ `081-234-5678`
-
-### ระดับกลาง
-
-**ข้อ 11:** สร้าง partial `_pagination.html.erb` ที่แสดง pagination links (previous, next, page numbers)
-
-**ข้อ 12:** สร้าง view ที่ใช้ `cycle` สลับสี row ในตาราง posts
-
-**ข้อ 13:** ใช้ `content_for :head` เพิ่ม Open Graph meta tags ใน post show view
-
-**ข้อ 14:** สร้าง `status_badge` helper ที่รับ status (active/inactive/pending/blocked) แล้วแสดง badge ด้วยสีที่เหมาะสม
-
-**ข้อ 15:** สร้าง view สำหรับแสดงรูปภาพ gallery โดยใช้ `image_tag` และ `link_to`
-
-**ข้อ 16:** ใช้ `highlight` helper เพื่อ highlight คำที่ค้นหาใน search results
-
-**ข้อ 17:** สร้าง `nav_link` helper ที่เพิ่ม class "active" เมื่ออยู่ที่หน้านั้น
-
-**ข้อ 18:** สร้าง partial collection rendering สำหรับ comments พร้อม spacer template
-
-**ข้อ 19:** เขียน view spec (RSpec) สำหรับ `posts/show.html.erb` ที่ test การแสดงผลต่างๆ
-
-**ข้อ 20:** สร้าง `thai_date` helper และ `buddhist_year` helper
-
-### ระดับสูง
-
-**ข้อ 21:** Implement fragment caching สำหรับ post index page ด้วย Russian Doll pattern
-
-**ข้อ 22:** สร้าง Layout Inheritance: `layouts/admin.html.erb` extends `layouts/application.html.erb`
-
-**ข้อ 23:** สร้าง view component (ถ้าติดตั้ง gem) สำหรับ `AlertComponent` ที่รับ type และ message
-
-**ข้อ 24:** สร้าง helper ที่ generate breadcrumb navigation จาก nested resources (categories > posts > comments)
-
-**ข้อ 25:** เขียน system spec (Capybara) สำหรับ post creation flow: ไปหน้า new, กรอกข้อมูล, submit, verify ผลลัพธ์
-
----
-
-## สรุปตอนที่ 35
-
-ในตอนนี้เราเรียนรู้เกี่ยวกับ Views และ ERB อย่างละเอียด:
-
-| หัวข้อ | สิ่งที่เรียนรู้ |
-|--------|----------------|
-| ERB Syntax | `<% %>`, `<%= %>`, `<%# %>`, `<%== %>` |
-| Layouts | application.html.erb, named yields, layout selection |
-| yield/content_for | Named slots สำหรับ layout |
-| Partials | render, locals, collection, spacer |
-| Helpers | link_to, image_tag, tag, number, date, text |
-| Custom Helpers | ApplicationHelper, module methods |
-| Testing | View specs, request specs, system specs |
-| Advanced | i18n, caching, Turbo, ViewComponent |
-
-Views เป็นชั้นที่ผู้ใช้มองเห็นโดยตรง การเขียน view ที่ดีควร:
-- **แยก concern** ด้วย partials และ helpers
-- **ไม่ใส่ business logic** ในขั้น view
-- **ใช้ caching** เพื่อ performance
-- **Test** ให้ครอบคลุมทุก scenario
-
-ตอนถัดไป: **ตอนที่ 36** - Models และ Active Record
+1. **ERB Syntax** - `<%= %>`, `<% %>`, `<%# %>` และ HTML escaping
+2. **Layouts** - application.html.erb, multiple layouts
+3. **yield** - main content yield
+4. **content_for** - page-specific content
+5. **Partials** - reusable view fragments
+6. **render collection** - efficient rendering
+7. **locals** - passing data to partials
+8. **Number helpers** - currency, percentage, file size
+9. **Date helpers** - time_ago_in_words, l()
+10. **Text helpers** - truncate, highlight, sanitize
+11. **Asset helpers** - stylesheet, javascript, image tags
+12. **DOM helpers** - tag, content_tag, dom_id
+13. **Custom helpers** - สร้าง helper methods เอง
+14. **View testing** - Minitest และ RSpec
