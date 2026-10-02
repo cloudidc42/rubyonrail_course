@@ -544,3 +544,460 @@ User.pluck(:email)
 4. Cache aggressively
 5. ย้าย heavy work ไป background jobs
 6. Monitor performance ใน production
+
+---
+
+## Step 1206: Query Optimization เชิงลึก
+
+### includes vs preload vs eager_load
+
+```ruby
+# includes - Rails เลือก strategy เอง
+User.includes(:posts).where(posts: { published: true })
+
+# preload - ใช้ separate queries เสมอ
+User.preload(:posts)
+# SQL: SELECT * FROM users
+# SQL: SELECT * FROM posts WHERE user_id IN (1,2,3...)
+
+# eager_load - ใช้ LEFT OUTER JOIN เสมอ
+User.eager_load(:posts)
+# SQL: SELECT users.*, posts.* FROM users LEFT OUTER JOIN posts ON posts.user_id = users.id
+
+# ใช้ eager_load เมื่อต้อง filter ด้วย association
+User.eager_load(:posts).where(posts: { published: true })
+```
+
+### joins สำหรับ filtering ไม่ต้องโหลด data
+
+```ruby
+# เร็วกว่า includes เมื่อไม่ต้องใช้ associated data
+User.joins(:posts).where(posts: { published: true }).distinct
+# SQL: SELECT DISTINCT users.* FROM users INNER JOIN posts ON posts.user_id = users.id WHERE posts.published = true
+
+# Joins กับ conditions
+Post.joins(:comments).where(comments: { approved: true }).group("posts.id")
+```
+
+---
+
+## Step 1207: Database Connection Pooling
+
+```yaml
+# config/database.yml
+production:
+  adapter: postgresql
+  database: myapp_production
+  pool: <%= ENV.fetch("DB_POOL", 10) %>
+  checkout_timeout: 5
+  idle_timeout: 300
+  connect_timeout: 5
+```
+
+```ruby
+# config/puma.rb
+# ปรับ threads ให้สัมพันธ์กับ DB pool
+threads_count = Integer(ENV.fetch("RAILS_MAX_THREADS", 5))
+threads threads_count, threads_count
+workers Integer(ENV.fetch("WEB_CONCURRENCY", 2))
+
+# DB pool = threads * workers
+# ENV["DB_POOL"] = threads_count * workers_count
+```
+
+```ruby
+# ตรวจสอบ connection pool
+ActiveRecord::Base.connection_pool.stat
+# => {size: 10, connections: 3, busy: 1, dead: 0, idle: 2, waiting: 0, checkout_timeout: 5.0}
+
+# ป้องกัน connection leak
+ActiveRecord::Base.connection_pool.with_connection do |conn|
+  # ใช้ connection ที่นี่
+end
+```
+
+---
+
+## Step 1208: Memory Optimization
+
+```ruby
+# ใช้ find_each แทน all สำหรับ large datasets
+# BAD: โหลดทั้งหมดเข้า memory
+User.all.each { |u| process(u) }
+
+# GOOD: โหลดทีละ batch (default 1000)
+User.find_each { |u| process(u) }
+
+# GOOD: custom batch size
+User.find_each(batch_size: 500) { |u| process(u) }
+
+# GOOD: find_in_batches สำหรับ batch processing
+User.find_in_batches(batch_size: 1000) do |batch|
+  batch.each { |u| process(u) }
+end
+```
+
+```ruby
+# Select only needed columns
+User.select(:id, :name, :email).find_each do |user|
+  # user จะมีแค่ id, name, email - ประหยัด memory
+  send_email(user.email)
+end
+
+# pluck สำหรับ single/multiple columns
+User.pluck(:email)
+# => ["user1@example.com", "user2@example.com"]
+
+User.pluck(:id, :name)
+# => [[1, "Alice"], [2, "Bob"]]
+```
+
+---
+
+## Step 1209: Database Indexes เชิงลึก
+
+```ruby
+# Composite index
+add_index :orders, [:user_id, :status, :created_at]
+# เหมาะสำหรับ: User.joins(:orders).where(orders: { status: 'pending' }).order(:created_at)
+
+# Partial index - index เฉพาะ subset
+add_index :users, :email, where: "deleted_at IS NULL", unique: true
+add_index :orders, :created_at, where: "status = 'pending'"
+
+# Covering index - index ครอบคลุม columns ที่ SELECT
+add_index :products, [:category_id, :price, :name]
+# Query จะใช้ index only scan เมื่อ SELECT id, category_id, price, name
+
+# Expression index
+add_index :users, "lower(email)", unique: true, name: "idx_users_lower_email"
+# User.where("lower(email) = lower(?)", params[:email])
+```
+
+```sql
+-- ตรวจสอบ index usage ใน PostgreSQL
+EXPLAIN ANALYZE SELECT * FROM users WHERE email = 'test@example.com';
+
+-- ดู indexes ที่ไม่ได้ใช้
+SELECT schemaname, tablename, indexname, idx_scan
+FROM pg_stat_user_indexes
+WHERE idx_scan = 0
+ORDER BY schemaname, tablename;
+```
+
+---
+
+## Step 1210: Caching Strategies
+
+```ruby
+# Russian Doll Caching
+# app/views/posts/index.html.erb
+<% cache ["posts-list", @posts.maximum(:updated_at)] do %>
+  <% @posts.each do |post| %>
+    <% cache post do %>  <%# cache_key = "posts/#{id}-#{updated_at}" %>
+      <%= render post %>
+    <% end %>
+  <% end %>
+<% end %>
+
+# Low-level caching
+def popular_products
+  Rails.cache.fetch("popular_products", expires_in: 15.minutes) do
+    Product.popular.includes(:category).limit(10).to_a
+  end
+end
+
+# Fragment caching manual invalidation
+def invalidate_product_cache(product)
+  Rails.cache.delete("product_#{product.id}_details")
+  Rails.cache.delete_matched("products_category_#{product.category_id}*")
+end
+```
+
+---
+
+## Step 1211: Rack Mini Profiler
+
+```ruby
+# Gemfile
+gem 'rack-mini-profiler', require: false
+gem 'stackprof'  # CPU profiling
+gem 'memory_profiler'  # Memory profiling
+
+# config/initializers/rack_mini_profiler.rb
+if defined?(Rack::MiniProfiler)
+  Rack::MiniProfiler.config.position = 'bottom-right'
+  Rack::MiniProfiler.config.start_hidden = false
+  
+  # ดู SQL queries
+  Rack::MiniProfiler.config.enable_advanced_debugging_tools = true
+  
+  # ใช้ Redis สำหรับ storage
+  Rack::MiniProfiler.config.storage = Rack::MiniProfiler::RedisStore
+  Rack::MiniProfiler.config.storage_options = { url: ENV["REDIS_URL"] }
+  
+  # Allow only admins
+  Rack::MiniProfiler.config.authorization_mode = :allow_authorized
+end
+```
+
+```ruby
+# Manual profiling
+Rack::MiniProfiler.step("Expensive operation") do
+  # code to profile
+end
+
+# Flamegraph: เพิ่ม ?pp=flamegraph ใน URL
+# Memory profiling: เพิ่ม ?pp=profile-memory
+# GC profiling: เพิ่ม ?pp=profile-gc
+```
+
+---
+
+## Step 1212: Background Processing สำหรับ Heavy Tasks
+
+```ruby
+# แทนที่การทำงานใน request-response cycle
+# BAD: ทำงานใน controller (ช้า)
+def generate_report
+  @report = Reports::Generator.new(params).generate  # ใช้เวลา 30 วินาที
+  send_data @report, filename: "report.csv"
+end
+
+# GOOD: สร้าง background job
+def generate_report
+  job = ReportGenerationJob.perform_later(current_user.id, params.to_h)
+  redirect_to reports_path, notice: "กำลังสร้างรายงาน จะแจ้งเมื่อเสร็จ"
+end
+
+# app/jobs/report_generation_job.rb
+class ReportGenerationJob < ApplicationJob
+  queue_as :reports
+  
+  def perform(user_id, params)
+    user = User.find(user_id)
+    report = Reports::Generator.new(params).generate
+    
+    # บันทึก report
+    file = user.reports.create!(
+      name: "Report #{Time.current.strftime('%Y%m%d_%H%M%S')}",
+      status: :completed
+    )
+    file.file.attach(io: StringIO.new(report), filename: "report.csv")
+    
+    # แจ้งเตือน user
+    UserMailer.with(user: user, report: file).report_ready.deliver_later
+    ActionCable.server.broadcast("notifications_#{user_id}", {
+      type: 'report_ready',
+      report_id: file.id,
+      message: 'รายงานพร้อมแล้ว'
+    })
+  end
+end
+```
+
+---
+
+## Step 1213: HTTP Caching
+
+```ruby
+# app/controllers/products_controller.rb
+def show
+  @product = Product.find(params[:id])
+  
+  # ETag-based caching
+  fresh_when(@product, public: true)
+  
+  # หรือ manual
+  if stale?(@product, public: true)
+    render :show
+  end
+end
+
+def index
+  @products = Product.order(updated_at: :desc)
+  
+  # Cache-Control header
+  expires_in 10.minutes, public: true
+  
+  # Last-Modified
+  fresh_when(last_modified: @products.maximum(:updated_at), public: true)
+end
+```
+
+---
+
+## Step 1214: Performance Testing
+
+```ruby
+# spec/support/performance_helpers.rb
+module PerformanceHelpers
+  def measure_time(&block)
+    start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    result = block.call
+    elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start
+    [result, elapsed]
+  end
+  
+  def expect_query_count(count, &block)
+    queries = []
+    subscriber = ActiveSupport::Notifications.subscribe("sql.active_record") do |_name, _start, _finish, _id, payload|
+      queries << payload[:sql] unless payload[:name] == 'SCHEMA'
+    end
+    
+    block.call
+    ActiveSupport::Notifications.unsubscribe(subscriber)
+    
+    expect(queries.length).to eq(count),
+      "Expected #{count} queries but got #{queries.length}:\n#{queries.join("\n")}"
+  end
+end
+
+# spec/requests/products_spec.rb
+RSpec.describe "Products", type: :request do
+  include PerformanceHelpers
+  
+  describe "GET /products" do
+    it "renders in under 200ms" do
+      create_list(:product, 10, :with_category)
+      
+      _, elapsed = measure_time { get products_path }
+      
+      expect(elapsed).to be < 0.2
+    end
+    
+    it "uses N+1 safe queries" do
+      create_list(:product, 5, :with_category)
+      
+      expect_query_count(2) { get products_path }  # 1 products + 1 categories
+    end
+  end
+end
+```
+
+---
+
+## Step 1215: Monitoring และ APM
+
+```ruby
+# Gemfile
+gem 'scout_apm'  # หรือ
+gem 'newrelic_rpm'  # หรือ
+gem 'datadog'
+
+# config/initializers/scout.rb
+ScoutApm::Agent.config(
+  name: 'MyApp',
+  key: ENV['SCOUT_KEY'],
+  monitor: Rails.env.production?
+)
+
+# Custom instrumentation
+class ProductService
+  include ScoutApm::Tracer
+  
+  def complex_calculation
+    instrument("ProductService", "complex_calculation") do
+      # code here
+    end
+  end
+end
+
+# Custom metrics
+StatsD.gauge("cache.hit_rate", cache_hit_rate)
+StatsD.timing("db.query.time", query_time)
+StatsD.increment("api.requests", tags: ["endpoint:products"])
+```
+
+---
+
+## แบบฝึกหัดเพิ่มเติม: Performance
+
+### ข้อ 1: Optimize N+1 Query
+
+```ruby
+# มี N+1 - แก้ไข
+class Order < ApplicationRecord
+  belongs_to :user
+  has_many :order_items
+  has_many :products, through: :order_items
+end
+
+# BAD
+Order.all.each do |order|
+  puts "#{order.user.name}: #{order.order_items.sum(:total)}"
+end
+
+# GOOD
+Order.includes(:user).each do |order|
+  puts "#{order.user.name}: #{order.order_items.sum(:total)}"
+end
+
+# BETTER - precompute sum
+Order.includes(:user, :order_items)
+     .select("orders.*, SUM(order_items.total) as items_total")
+     .joins(:order_items)
+     .group("orders.id")
+     .each do |order|
+  puts "#{order.user.name}: #{order.items_total}"
+end
+```
+
+### ข้อ 2: Database Index สำหรับ Common Queries
+
+```ruby
+# เพิ่ม indexes สำหรับ queries เหล่านี้
+# User.where(email: x)  
+# Order.where(user_id: x).order(:created_at)
+# Product.where(category_id: x, active: true).order(:price)
+
+class AddPerformanceIndexes < ActiveRecord::Migration[7.0]
+  def change
+    add_index :users, :email, unique: true
+    add_index :orders, [:user_id, :created_at]
+    add_index :products, [:category_id, :active, :price]
+  end
+end
+```
+
+### ข้อ 3: Counter Cache
+
+```ruby
+class Post < ApplicationRecord
+  belongs_to :user, counter_cache: true
+end
+
+# Migration
+add_column :users, :posts_count, :integer, default: 0
+User.find_each { |u| User.reset_counters(u.id, :posts) }
+
+# ใช้งาน - ไม่ต้องนับ COUNT query
+user.posts_count  # ดึงจาก column โดยตรง
+```
+
+---
+
+## สรุป Performance Optimization
+
+| เทคนิค | Impact | Difficulty |
+|--------|--------|-----------|
+| แก้ N+1 queries | สูง | ต่ำ |
+| เพิ่ม indexes | สูง | ต่ำ |
+| Fragment caching | กลาง | ต่ำ |
+| Background jobs | สูง | กลาง |
+| Counter cache | กลาง | ต่ำ |
+| find_each | กลาง | ต่ำ |
+| HTTP caching | กลาง | กลาง |
+| Connection pooling | กลาง | กลาง |
+| CDN for assets | สูง | ต่ำ |
+| Query optimization | สูง | สูง |
+
+**Performance Checklist:**
+1. ติดตั้ง Bullet gem ใน development
+2. ตรวจสอบ query count ใน specs
+3. เพิ่ม indexes สำหรับทุก foreign key และ query columns
+4. ใช้ find_each สำหรับ large datasets
+5. Cache ผลลัพธ์ที่ compute แพง
+6. ใช้ background jobs สำหรับงานที่ใช้เวลานาน
+7. Monitor ด้วย APM tool ใน production
+8. Profile ด้วย Rack Mini Profiler ก่อน optimize

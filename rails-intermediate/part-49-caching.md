@@ -973,3 +973,83 @@ end
 3. ใช้ Redis สำหรับ production
 4. Cache key ต้องรวม version/timestamp
 5. ทดสอบ cache behavior เสมอ
+
+---
+
+## เพิ่มเติม: Cache Warming และ Preloading
+
+```ruby
+# lib/tasks/cache.rake
+namespace :cache do
+  desc "Warm up application caches"
+  task warm: :environment do
+    puts "Warming caches..."
+    
+    # Warm popular products
+    Product.popular.limit(50).each do |product|
+      Rails.cache.fetch("product_#{product.id}", expires_in: 1.hour) do
+        product.as_json(include: :category)
+      end
+    end
+    
+    # Warm homepage data
+    Rails.cache.fetch("homepage_featured", expires_in: 30.minutes) do
+      {
+        featured: Product.featured.limit(6).to_a,
+        categories: Category.active.to_a,
+        banners: Banner.active.to_a
+      }
+    end
+    
+    puts "Cache warming complete!"
+  end
+  
+  desc "Clear all caches"
+  task clear: :environment do
+    Rails.cache.clear
+    puts "All caches cleared"
+  end
+end
+
+# เรียกใช้: bundle exec rake cache:warm
+# หรือในหลังจาก deployment
+```
+
+```ruby
+# app/jobs/cache_warm_job.rb
+class CacheWarmJob < ApplicationJob
+  queue_as :low
+  
+  def perform(resource_type, resource_id)
+    case resource_type
+    when 'product'
+      product = Product.find(resource_id)
+      Rails.cache.write(
+        "product_#{product.id}",
+        product.as_json(include: [:category, :images]),
+        expires_in: 2.hours
+      )
+    when 'category'
+      category = Category.find(resource_id)
+      Rails.cache.write(
+        "category_#{category.id}_products",
+        category.products.active.to_a,
+        expires_in: 1.hour
+      )
+    end
+  end
+end
+```
+
+---
+
+## สรุปเพิ่มเติม: Cache Strategies
+
+| Strategy | เมื่อไรใช้ | TTL แนะนำ |
+|----------|-----------|----------|
+| Fragment cache | View partials | 15-60 นาที |
+| Russian Doll | Nested views | ตาม updated_at |
+| Low-level cache | Computed values | 5-30 นาที |
+| HTTP cache | Public pages | 1-24 ชั่วโมง |
+| Counter cache | Aggregate counts | ไม่มี TTL |
+| Query cache | Same request | ต่อ request |
