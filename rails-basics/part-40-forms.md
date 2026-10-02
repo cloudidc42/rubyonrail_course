@@ -1,284 +1,368 @@
-# Part 40: Forms (ขั้นตอนที่ 881-905)
+# ตอนที่ 40: Forms (Steps 881-905)
 
 ## บทนำ
 
-Forms เป็นส่วนสำคัญของ web applications Rails มี form helpers ที่ช่วยสร้าง forms ที่ผูกกับ models อัตโนมัติ รองรับ CSRF protection, nested forms, file uploads และ Turbo (Rails 7)
+Forms เป็นส่วนสำคัญในการรับข้อมูลจาก user ใน Rails มี Form Helpers ที่ช่วยสร้าง HTML forms ที่ integrate กับ Active Record models และมี CSRF protection อัตโนมัติ
 
 ---
 
-## ขั้นตอนที่ 881: form_with พื้นฐาน
+## Step 881: form_with (Rails 7 way)
 
-```ruby
-# form_with เป็น helper หลักใน Rails 5.1+
-# รวม form_for และ form_tag เข้าด้วยกัน
+`form_with` เป็น form helper หลักใน Rails 7 ที่รวมความสามารถของ `form_for` และ `form_tag` เข้าด้วยกัน
 
-# Form กับ model:
-<%= form_with model: @article do |f| %>
-  <%= f.text_field :title %>
-  <%= f.submit %>
-<% end %>
-# สร้าง:
-# <form action="/articles" method="post" data-remote="true">
-#   <input type="hidden" name="_method" value="post">
-#   <input type="hidden" name="authenticity_token" value="...">
-#   <input type="text" name="article[title]" id="article_title">
-#   <input type="submit" value="Create Article">
-# </form>
-
-# Form กับ URL:
-<%= form_with url: search_path, method: :get do |f| %>
-  <%= f.text_field :query, placeholder: "ค้นหา..." %>
-  <%= f.submit "ค้นหา" %>
+```erb
+<!-- Form สำหรับ model (create/update) -->
+<%= form_with model: @post do |form| %>
+  <%= form.text_field :title %>
+  <%= form.submit %>
 <% end %>
 
-# Form สำหรับ new record:
-@article = Article.new
-<%= form_with model: @article do |f| %>
-  <%# action: /articles, method: POST %>
-<% end %>
+<!-- HTML ที่สร้าง -->
+<form action="/posts" method="post">
+  <input type="hidden" name="authenticity_token" value="...">
+  <input type="text" name="post[title]" id="post_title">
+  <input type="submit" value="Create Post">
+</form>
 
-# Form สำหรับ existing record:
-@article = Article.find(1)
-<%= form_with model: @article do |f| %>
-  <%# action: /articles/1, method: PATCH %>
+<!-- สำหรับ edit (auto detect จาก model) -->
+<% @post = Post.find(1) %>
+<%= form_with model: @post do |form| %>
+  <!-- action="/posts/1" method="post" (hidden input _method=patch) -->
 <% end %>
+```
 
-# Nested resources:
-<%= form_with model: [@user, @article] do |f| %>
-  <%# action: /users/1/articles, method: POST %>
-<% end %>
+### form_with options
+
+```erb
+<!-- URL แบบ explicit -->
+<%= form_with url: posts_path do |form| %>
+<%= form_with url: "/posts" do |form| %>
+
+<!-- Method -->
+<%= form_with model: @post, method: :post do |form| %>
+<%= form_with url: posts_path, method: :delete do |form| %>
+
+<!-- HTML attributes -->
+<%= form_with model: @post, 
+    class: "post-form needs-validation",
+    id: "new-post-form",
+    data: { controller: "form" } do |form| %>
+
+<!-- Scope - เปลี่ยน prefix ของ params -->
+<%= form_with model: @user, scope: :registration do |form| %>
+<!-- สร้าง params[:registration][:name] แทน params[:user][:name] -->
+
+<!-- Local: true - ไม่ใช้ Turbo (Rails 7) -->
+<%= form_with model: @post, local: true do |form| %>
+
+<!-- Multipart (file upload) -->
+<%= form_with model: @post, multipart: true do |form| %>
 ```
 
 ---
 
-## ขั้นตอนที่ 882: Text Fields
+## Step 882: text_field, email_field, password_field, number_field, url_field
 
-```ruby
-<%= form_with model: @user do |f| %>
-  <!-- Text field -->
-  <%= f.text_field :name,
-    placeholder: "ชื่อ-นามสกุล",
+### text_field
+
+```erb
+<%= form_with model: @user do |form| %>
+  <!-- Basic text field -->
+  <%= form.text_field :name %>
+  <!-- => <input type="text" name="user[name]" id="user_name"> -->
+  
+  <!-- ด้วย options -->
+  <%= form.text_field :name, 
+      placeholder: "กรอกชื่อ",
+      class: "form-control",
+      id: "user_name_field",
+      maxlength: 100,
+      autofocus: true,
+      autocomplete: "name",
+      required: true %>
+  
+  <!-- ด้วย value -->
+  <%= form.text_field :name, value: @user.name %>
+  
+  <!-- Disabled -->
+  <%= form.text_field :name, disabled: true %>
+  
+  <!-- Readonly -->
+  <%= form.text_field :username, readonly: true %>
+<% end %>
+```
+
+### email_field
+
+```erb
+<%= form.email_field :email,
+    placeholder: "your@email.com",
     class: "form-control",
-    maxlength: 100 %>
+    autocomplete: "email",
+    required: true %>
+<!-- => <input type="email" name="user[email]"> -->
+```
 
-  <!-- Email field -->
-  <%= f.email_field :email,
-    placeholder: "email@example.com",
-    autocomplete: "email" %>
+### password_field
 
-  <!-- Password field -->
-  <%= f.password_field :password,
-    placeholder: "รหัสผ่านอย่างน้อย 8 ตัว",
-    minlength: 8 %>
+```erb
+<%= form.password_field :password,
+    placeholder: "รหัสผ่าน (อย่างน้อย 8 ตัวอักษร)",
+    class: "form-control",
+    minlength: 8,
+    autocomplete: "new-password" %>
+<!-- => <input type="password" name="user[password]"> -->
 
-  <!-- Search field -->
-  <%= f.search_field :query, placeholder: "ค้นหา..." %>
+<%= form.password_field :password_confirmation,
+    placeholder: "ยืนยันรหัสผ่าน" %>
+```
 
-  <!-- Tel field -->
-  <%= f.telephone_field :phone, placeholder: "0812345678" %>
+### number_field
 
-  <!-- URL field -->
-  <%= f.url_field :website, placeholder: "https://example.com" %>
-
-  <!-- Number field -->
-  <%= f.number_field :age, min: 18, max: 99, step: 1 %>
-
-  <!-- Range field -->
-  <%= f.range_field :rating, min: 1, max: 5, step: 0.5 %>
-
-  <!-- Hidden field -->
-  <%= f.hidden_field :status, value: "pending" %>
-
-  <!-- Textarea -->
-  <%= f.text_area :bio,
-    rows: 5,
-    placeholder: "เล่าเกี่ยวกับตัวเอง...",
+```erb
+<%= form.number_field :age,
+    min: 0,
+    max: 150,
+    step: 1,
+    placeholder: "อายุ",
     class: "form-control" %>
+<!-- => <input type="number" min="0" max="150" step="1"> -->
 
-  <%= f.submit "บันทึก", class: "btn btn-primary" %>
+<%= form.number_field :price,
+    min: 0,
+    max: 9999999,
+    step: 0.01,
+    placeholder: "0.00" %>
+```
+
+### url_field
+
+```erb
+<%= form.url_field :website,
+    placeholder: "https://example.com",
+    class: "form-control" %>
+<!-- => <input type="url" name="user[website]"> -->
+```
+
+### อื่นๆ
+
+```erb
+<!-- Tel -->
+<%= form.telephone_field :phone, placeholder: "0812345678" %>
+
+<!-- Search -->
+<%= form.search_field :q, placeholder: "ค้นหา..." %>
+
+<!-- Color picker -->
+<%= form.color_field :theme_color %>
+<!-- => <input type="color"> -->
+
+<!-- Range slider -->
+<%= form.range_field :priority, min: 1, max: 10, step: 1 %>
+
+<!-- Date/Time -->
+<%= form.date_field :birthday %>
+<%= form.time_field :start_time %>
+<%= form.datetime_local_field :published_at %>
+<%= form.month_field :birth_month %>
+<%= form.week_field :target_week %>
+```
+
+---
+
+## Step 883: text_area
+
+```erb
+<%= form_with model: @post do |form| %>
+  <!-- Basic textarea -->
+  <%= form.text_area :content %>
+  <!-- => <textarea name="post[content]">...</textarea> -->
+  
+  <!-- ด้วย options -->
+  <%= form.text_area :content,
+      rows: 10,
+      cols: 80,
+      placeholder: "เขียนเนื้อหาที่นี่...",
+      class: "form-control",
+      maxlength: 10000,
+      required: true %>
+  
+  <!-- ด้วย size shorthand -->
+  <%= form.text_area :bio, size: "50x15" %>
+  <!-- rows=15, cols=50 -->
 <% end %>
 ```
 
 ---
 
-## ขั้นตอนที่ 883: Checkboxes และ Radio Buttons
+## Step 884: check_box, radio_button
 
-```ruby
-<%= form_with model: @article do |f| %>
-  <!-- Single checkbox -->
-  <%= f.check_box :featured %>
-  <%= f.label :featured, "บทความแนะนำ" %>
+### check_box
 
-  <!-- Checkbox กับ custom values -->
-  <%= f.check_box :agree, { checked: false }, "yes", "no" %>
+```erb
+<%= form_with model: @post do |form| %>
+  <!-- Basic checkbox -->
+  <%= form.check_box :published %>
+  <!-- => hidden field + checkbox -->
+  
+  <!-- ด้วย label -->
+  <div class="form-check">
+    <%= form.check_box :published, class: "form-check-input", id: "post_published" %>
+    <%= form.label :published, "เผยแพร่", class: "form-check-label" %>
+  </div>
+  
+  <!-- Checked by default -->
+  <%= form.check_box :newsletter, checked: true %>
+  
+  <!-- Custom on/off values -->
+  <%= form.check_box :active, { checked: @user.active? }, "1", "0" %>
+  <!-- value=1 เมื่อ checked, value=0 เมื่อ unchecked -->
+  
+  <!-- Multiple checkboxes -->
+  <% @categories.each do |category| %>
+    <div class="form-check">
+      <%= check_box_tag "post[category_ids][]", category.id,
+          @post.category_ids.include?(category.id),
+          class: "form-check-input",
+          id: "category_#{category.id}" %>
+      <%= label_tag "category_#{category.id}", category.name, class: "form-check-label" %>
+    </div>
+  <% end %>
+<% end %>
+```
 
+### radio_button
+
+```erb
+<%= form_with model: @post do |form| %>
   <!-- Radio buttons -->
-  <%= f.radio_button :status, "draft" %>
-  <%= f.label :status_draft, "Draft" %>
-
-  <%= f.radio_button :status, "published" %>
-  <%= f.label :status_published, "Published" %>
-
-  <%= f.radio_button :status, "archived" %>
-  <%= f.label :status_archived, "Archived" %>
-<% end %>
-
-<!-- Collection of checkboxes -->
-<%= form_with model: @article do |f| %>
-  <%= f.collection_check_boxes :tag_ids, Tag.all, :id, :name do |b| %>
-    <div class="flex items-center gap-2">
-      <%= b.check_box(class: "form-checkbox") %>
-      <%= b.label(class: "cursor-pointer") %>
+  <% %w[draft published archived].each do |status| %>
+    <div class="form-check">
+      <%= form.radio_button :status, status, class: "form-check-input" %>
+      <%= form.label :"status_#{status}", status.humanize, class: "form-check-label" %>
     </div>
   <% end %>
-<% end %>
-
-<!-- Collection of radio buttons -->
-<%= form_with model: @article do |f| %>
-  <%= f.collection_radio_buttons :category_id, Category.all, :id, :name do |b| %>
-    <div class="flex items-center gap-2">
-      <%= b.radio_button(class: "form-radio") %>
-      <%= b.label(class: "cursor-pointer") %>
-    </div>
-  <% end %>
+  
+  <!-- Radio ด้วย checked state -->
+  <%= form.radio_button :role, "admin", checked: @user.admin? %>
+  <%= form.radio_button :role, "member", checked: @user.member? %>
 <% end %>
 ```
 
 ---
 
-## ขั้นตอนที่ 884: Select Fields
+## Step 885: select, collection_select, grouped_collection_select
 
-```ruby
-<%= form_with model: @article do |f| %>
-  <!-- Select จาก array -->
-  <%= f.select :status,
-    [["Draft", "draft"], ["Published", "published"], ["Archived", "archived"]],
-    { prompt: "-- เลือกสถานะ --" },
-    { class: "form-select" } %>
+### select
 
-  <!-- Select จาก hash -->
-  <%= f.select :country,
-    { "Thailand" => "TH", "USA" => "US", "Japan" => "JP" },
-    { include_blank: "เลือกประเทศ" } %>
-
-  <!-- Select จาก range -->
-  <%= f.select :year,
-    (Date.today.year - 5)..(Date.today.year + 5),
-    { selected: Date.today.year } %>
-
-  <!-- collection_select -->
-  <%= f.collection_select :category_id,
-    Category.all,
-    :id,            # value
-    :name,          # display text
-    { prompt: "เลือกหมวดหมู่" },
-    { class: "form-select" } %>
-
-  <!-- grouped_collection_select -->
-  <%= f.grouped_collection_select :subcategory_id,
-    Category.root.includes(:children),  # groups
-    :children,     # method สำหรับ group items
-    :name,         # group label method
-    :id,           # option value method
-    :name,         # option text method
-    { prompt: "เลือกหมวดหมู่ย่อย" } %>
-
-  <!-- time_zone_select -->
-  <%= f.time_zone_select :timezone,
-    ActiveSupport::TimeZone.all,
-    { default: "Bangkok" },
-    { class: "form-select" } %>
-
-  <!-- select_tag (not model-bound) -->
-  <%= select_tag :sort_by,
-    options_for_select([
-      ["ล่าสุด", "newest"],
-      ["เก่าสุด", "oldest"],
-      ["ยอดนิยม", "popular"]
-    ], params[:sort_by]),
-    class: "form-select" %>
+```erb
+<%= form_with model: @post do |form| %>
+  <!-- select ด้วย array of strings -->
+  <%= form.select :status, %w[draft published archived] %>
+  
+  <!-- select ด้วย array of [label, value] pairs -->
+  <%= form.select :status, 
+      [["ร่าง", "draft"], ["เผยแพร่", "published"], ["เก็บถาวร", "archived"]] %>
+  
+  <!-- ด้วย prompt -->
+  <%= form.select :category_id, @categories.map { |c| [c.name, c.id] },
+      { prompt: "-- เลือกหมวดหมู่ --" },
+      class: "form-select" %>
+  
+  <!-- ด้วย include_blank -->
+  <%= form.select :status, options_for_select([...]), include_blank: "เลือก..." %>
+  
+  <!-- Multiple select -->
+  <%= form.select :tag_ids, @tags.map { |t| [t.name, t.id] },
+      {},
+      multiple: true, size: 5 %>
+  
+  <!-- Grouped options -->
+  <%= form.select :city,
+      grouped_options_for_select([
+        ["ภาคกลาง", [["กรุงเทพฯ", "bkk"], ["นนทบุรี", "nbi"]]],
+        ["ภาคเหนือ", [["เชียงใหม่", "cnx"], ["เชียงราย", "cri"]]]
+      ]),
+      prompt: "เลือกจังหวัด" %>
+  
+  <!-- ด้วย selected value -->
+  <%= form.select :status, 
+      options_for_select(Post::STATUSES.map { |s| [s.humanize, s] }, @post.status) %>
 <% end %>
+```
+
+### collection_select
+
+```erb
+<%= form_with model: @post do |form| %>
+  <!-- collection_select(method, collection, value_method, text_method, options, html_options) -->
+  <%= form.collection_select :category_id, 
+      Category.all, 
+      :id, :name,
+      { prompt: "เลือกหมวดหมู่" },
+      { class: "form-select" } %>
+  
+  <!-- Multiple selection -->
+  <%= form.collection_select :tag_ids,
+      Tag.all,
+      :id, :name,
+      {},
+      { multiple: true, class: "form-select" } %>
+  
+  <!-- ด้วย scope -->
+  <%= form.collection_select :category_id,
+      Category.active.order(:name),
+      :id, :name,
+      { include_blank: "-- ไม่ระบุ --" } %>
+<% end %>
+```
+
+### grouped_collection_select
+
+```erb
+<%= form.grouped_collection_select :city_id,
+    Country.all, :cities, :name,  # collection, group_method, group_label_method
+    :id, :name,                   # option_value_method, option_key_method
+    { prompt: "เลือกเมือง" } %>
 ```
 
 ---
 
-## ขั้นตอนที่ 885: Date และ Time Fields
+## Step 886: file_field
 
-```ruby
-<%= form_with model: @event do |f| %>
-  <!-- Date field (HTML5) -->
-  <%= f.date_field :event_date %>
-
-  <!-- Time field (HTML5) -->
-  <%= f.time_field :start_time %>
-
-  <!-- Datetime local field -->
-  <%= f.datetime_local_field :starts_at %>
-
-  <!-- Month field -->
-  <%= f.month_field :birth_month %>
-
-  <!-- Week field -->
-  <%= f.week_field :week %>
-
-  <!-- date_select - dropdown selects -->
-  <%= f.date_select :birthday,
-    order: [:day, :month, :year],
-    start_year: 1950,
-    end_year: Date.today.year,
-    include_blank: true %>
-
-  <!-- time_select -->
-  <%= f.time_select :meeting_time,
-    minute_step: 15,
-    include_blank: true %>
-
-  <!-- datetime_select -->
-  <%= f.datetime_select :published_at,
-    include_blank: true,
-    minute_step: 30 %>
-<% end %>
-```
-
----
-
-## ขั้นตอนที่ 886: File Upload
-
-```ruby
-# Model:
-class Article < ApplicationRecord
-  has_one_attached :featured_image
-  has_many_attached :attachments
-
-  validates :featured_image,
-    content_type: { in: ["image/png", "image/jpg", "image/jpeg", "image/gif"],
-                    message: "ต้องเป็นไฟล์รูปภาพ" },
-    size: { less_than: 5.megabytes, message: "ต้องไม่เกิน 5MB" }
-end
-
-# Form:
-<%= form_with model: @article, html: { enctype: "multipart/form-data" } do |f| %>
-  <!-- Single file -->
-  <%= f.file_field :featured_image,
-    accept: "image/*",
-    class: "form-file" %>
-
+```erb
+<%= form_with model: @user, multipart: true do |form| %>
+  <!-- Basic file upload -->
+  <%= form.file_field :avatar %>
+  
+  <!-- ด้วย accept types -->
+  <%= form.file_field :avatar,
+      accept: "image/*",
+      class: "form-control" %>
+  
+  <!-- เฉพาะ images ที่กำหนด -->
+  <%= form.file_field :document,
+      accept: ".pdf,.doc,.docx",
+      class: "form-control" %>
+  
   <!-- Multiple files -->
-  <%= f.file_field :attachments,
-    multiple: true,
-    accept: ".pdf,.doc,.docx" %>
-
-  <!-- File กับ preview (JavaScript) -->
-  <%= f.file_field :featured_image,
-    accept: "image/*",
-    data: { controller: "image-preview" } %>
+  <%= form.file_field :photos,
+      multiple: true,
+      accept: "image/*" %>
+  
+  <!-- ด้วย Active Storage -->
+  <%= form.file_field :cover_image,
+      accept: "image/jpeg,image/png,image/gif",
+      data: { controller: "file-preview" } %>
 <% end %>
+```
 
-# Controller:
+```ruby
+# Controller
 def create
-  @article = Article.new(article_params)
-  if @article.save
-    redirect_to @article
+  @user = User.new(user_params)
+  if @user.save
+    redirect_to @user
   else
     render :new, status: :unprocessable_entity
   end
@@ -286,951 +370,1213 @@ end
 
 private
 
-def article_params
-  params.require(:article).permit(:title, :body, :featured_image,
-                                    attachments: [])
-end
-
-# View แสดงไฟล์:
-<% if @article.featured_image.attached? %>
-  <%= image_tag @article.featured_image, class: "w-full h-64 object-cover" %>
-  <%= link_to "ลบรูปภาพ",
-    rails_storage_proxy_path(@article.featured_image),
-    method: :delete,
-    data: { confirm: "ต้องการลบรูปภาพ?" } %>
-<% end %>
-
-# Image variant:
-<%= image_tag @article.featured_image.variant(resize_to_fill: [800, 400]) %>
-<%= image_tag @article.featured_image.variant(resize_to_limit: [400, 400]) %>
-```
-
----
-
-## ขั้นตอนที่ 887: Nested Forms
-
-```ruby
-# Model:
-class Order < ApplicationRecord
-  has_many :order_items, dependent: :destroy
-  accepts_nested_attributes_for :order_items,
-    allow_destroy: true,
-    reject_if: :all_blank
-
-  validates :customer_name, presence: true
-end
-
-class OrderItem < ApplicationRecord
-  belongs_to :order
-  belongs_to :product
-  validates :quantity, numericality: { greater_than: 0 }
-  validates :unit_price, numericality: { greater_than: 0 }
-end
-
-# View:
-<%= form_with model: @order do |f| %>
-  <%= f.text_field :customer_name, placeholder: "ชื่อลูกค้า" %>
-
-  <div id="order-items">
-    <%= f.fields_for :order_items do |item_form| %>
-      <%= render "order_item_fields", f: item_form %>
-    <% end %>
-  </div>
-
-  <button type="button" id="add-item">เพิ่มรายการ</button>
-
-  <%= f.submit "สั่งซื้อ" %>
-<% end %>
-
-# app/views/orders/_order_item_fields.html.erb
-<div class="order-item-fields">
-  <%= f.hidden_field :_destroy, class: "destroy-field" %>
-
-  <%= f.collection_select :product_id, Product.all, :id, :name %>
-  <%= f.number_field :quantity, min: 1, value: 1 %>
-  <%= f.number_field :unit_price, min: 0, step: "0.01" %>
-
-  <button type="button" class="remove-item">ลบ</button>
-</div>
-
-# Dynamic nested forms ด้วย Stimulus (Rails 7):
-# app/javascript/controllers/nested_form_controller.js
-import { Controller } from "@hotwired/stimulus"
-
-export default class extends Controller {
-  static targets = ["template", "container"]
-
-  addItem() {
-    const content = this.templateTarget.innerHTML.replace(
-      /NEW_RECORD/g,
-      new Date().getTime()
-    )
-    this.containerTarget.insertAdjacentHTML("beforeend", content)
-  }
-
-  removeItem(event) {
-    const item = event.target.closest(".nested-fields")
-    const destroyField = item.querySelector("[data-destroy]")
-    if (destroyField) {
-      destroyField.value = "1"
-      item.style.display = "none"
-    } else {
-      item.remove()
-    }
-  }
-}
-
-# Controller:
-def order_params
-  params.require(:order).permit(
-    :customer_name, :notes,
-    order_items_attributes: [:id, :product_id, :quantity, :unit_price, :_destroy]
-  )
+def user_params
+  params.require(:user).permit(:name, :email, :avatar)  # avatar เป็น Active Storage
 end
 ```
 
 ---
 
-## ขั้นตอนที่ 888: CSRF Protection
-
-```ruby
-# Rails รวม CSRF protection อัตโนมัติ
-# form_with สร้าง authenticity_token ให้เสมอ
-
-# Application Controller:
-class ApplicationController < ActionController::Base
-  protect_from_forgery with: :exception  # default: raise InvalidAuthenticityToken
-
-  # หรือ:
-  protect_from_forgery with: :null_session  # สำหรับ API
-  protect_from_forgery with: :reset_session
-
-  # ข้าม CSRF สำหรับ specific actions:
-  skip_forgery_protection only: [:webhook_callback]
-  skip_before_action :verify_authenticity_token, only: [:webhook_callback]
-end
-
-# สำหรับ AJAX requests:
-# Rails ส่ง X-CSRF-Token header อัตโนมัติถ้าใช้ Rails UJS
-# สำหรับ Fetch API ต้องส่ง manually:
-
-// JavaScript:
-const token = document.querySelector('meta[name="csrf-token"]').content
-fetch("/articles", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "X-CSRF-Token": token
-  },
-  body: JSON.stringify({ article: { title: "Test" } })
-})
-
-# Meta tag ใน layout:
-# application.html.erb มี:
-# <%= csrf_meta_tags %>
-# สร้าง: <meta name="csrf-param" content="authenticity_token">
-#         <meta name="csrf-token" content="xyz...">
-```
-
----
-
-## ขั้นตอนที่ 889: Form Error Handling
-
-```ruby
-# Model:
-class Article < ApplicationRecord
-  validates :title, presence: true, length: { minimum: 5 }
-  validates :body, presence: true
-end
-
-# Controller:
-class ArticlesController < ApplicationController
-  def new
-    @article = Article.new
-  end
-
-  def create
-    @article = Article.new(article_params)
-    if @article.save
-      redirect_to @article, notice: "สร้างบทความสำเร็จ"
-    else
-      render :new, status: :unprocessable_entity
-    end
-  end
-
-  private
-
-  def article_params
-    params.require(:article).permit(:title, :body, :status)
-  end
-end
-
-# View - แสดง field-specific errors:
-<%= form_with model: @article do |f| %>
-  <div class="field <%= "field_with_errors" if @article.errors[:title].any? %>">
-    <%= f.label :title, "หัวข้อ" %>
-    <%= f.text_field :title, class: "form-control #{"is-invalid" if @article.errors[:title].any?}" %>
-    <% @article.errors[:title].each do |error| %>
-      <div class="invalid-feedback"><%= error %></div>
-    <% end %>
-  </div>
-
-  <div class="field">
-    <%= f.label :body, "เนื้อหา" %>
-    <%= f.text_area :body, class: "form-control #{"is-invalid" if @article.errors[:body].any?}" %>
-    <% @article.errors[:body].each do |error| %>
-      <div class="invalid-feedback"><%= error %></div>
-    <% end %>
-  </div>
-
-  <%= f.submit %>
-<% end %>
-
-# Reusable error helper:
-# app/helpers/form_helper.rb
-module FormHelper
-  def field_with_error(form, field, &block)
-    content_tag(:div, class: "form-field #{form.object.errors[field].any? ? "has-error" : ""}") do
-      concat(capture(&block))
-      if form.object.errors[field].any?
-        concat(content_tag(:ul, class: "errors") {
-          form.object.errors[field].map { |e|
-            content_tag(:li, e)
-          }.join.html_safe
-        })
-      end
-    end
-  end
-end
-```
-
----
-
-## ขั้นตอนที่ 890: Turbo และ Forms (Rails 7)
-
-```ruby
-# Rails 7 ใช้ Turbo แทน Rails UJS
-# form_with ทำงานร่วมกับ Turbo อัตโนมัติ
-
-# Turbo Drive - navigate without full page reload
-<%= form_with model: @article do |f| %>
-  <%# Turbo จัดการ form submission อัตโนมัติ %>
-<% end %>
-
-# Controller สำหรับ Turbo:
-def create
-  @article = Article.new(article_params)
-  if @article.save
-    redirect_to @article  # Turbo จัดการ redirect
-  else
-    render :new, status: :unprocessable_entity  # สำคัญ! ต้องส่ง 422
-  end
-end
-
-# Turbo Stream response:
-def create
-  @article = Article.new(article_params)
-  respond_to do |format|
-    if @article.save
-      format.turbo_stream {
-        render turbo_stream: [
-          turbo_stream.prepend("articles", partial: "articles/article",
-            locals: { article: @article }),
-          turbo_stream.replace("article-form", partial: "articles/form",
-            locals: { article: Article.new })
-        ]
-      }
-      format.html { redirect_to articles_path }
-    else
-      format.turbo_stream {
-        render turbo_stream: turbo_stream.replace(
-          "article-form",
-          partial: "articles/form",
-          locals: { article: @article }
-        )
-      }
-      format.html { render :new, status: :unprocessable_entity }
-    end
-  end
-end
-
-# View กับ Turbo Frame:
-<%= turbo_frame_tag "article-form" do %>
-  <%= form_with model: @article do |f| %>
-    <%= f.text_field :title %>
-    <%= f.text_area :body %>
-    <%= f.submit %>
-  <% end %>
-<% end %>
-
-<div id="articles">
-  <%= render @articles %>
-</div>
-
-# Disable Turbo สำหรับ form:
-<%= form_with model: @article, data: { turbo: false } do |f| %>
-  <%# Full page reload %>
-<% end %>
-```
-
----
-
-## ขั้นตอนที่ 891: Custom FormBuilder
-
-```ruby
-# app/helpers/form_builder_helper.rb
-class ApplicationFormBuilder < ActionView::Helpers::FormBuilder
-  def text_field_with_label(method, options = {})
-    label_text = options.delete(:label) || method.to_s.humanize
-    error_class = object.errors[method].any? ? "border-red-500" : ""
-    
-    @template.content_tag(:div, class: "form-group mb-4") do
-      concat label(method, label_text, class: "block text-sm font-medium text-gray-700 mb-1")
-      concat text_field(method, {
-        class: "w-full px-3 py-2 border rounded-md #{error_class}",
-        **options
-      })
-      
-      if object.errors[method].any?
-        concat @template.content_tag(:p, 
-          object.errors[method].first,
-          class: "text-red-500 text-sm mt-1"
-        )
-      end
-    end
-  end
-
-  def submit_button(text = "บันทึก", options = {})
-    @template.content_tag(:div, class: "form-actions mt-6") do
-      submit(text, {
-        class: "bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700",
-        **options
-      })
-    end
-  end
-end
-
-# config/application.rb หรือ initializer:
-ActionView::Base.default_form_builder = ApplicationFormBuilder
-
-# ใช้งาน:
-<%= form_with model: @user, builder: ApplicationFormBuilder do |f| %>
-  <%= f.text_field_with_label :name, placeholder: "ชื่อของคุณ" %>
-  <%= f.text_field_with_label :email, label: "อีเมล", type: "email" %>
-  <%= f.submit_button "สร้างบัญชี" %>
-<% end %>
-```
-
----
-
-## แบบฝึกหัด Part 40 (ขั้นตอนที่ 881-905)
-
-**ข้อ 1:** สร้าง form สำหรับ Article พร้อม error handling
+## Step 887: hidden_field
 
 ```erb
-<%# คำตอบ: app/views/articles/_form.html.erb %>
-<%= form_with model: article, class: "space-y-4" do |f| %>
-  <% if article.errors.any? %>
-    <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-      <ul>
-        <% article.errors.full_messages.each do |msg| %>
-          <li><%= msg %></li>
+<%= form_with model: @comment do |form| %>
+  <!-- Hidden field สำหรับ post_id -->
+  <%= form.hidden_field :post_id, value: @post.id %>
+  
+  <!-- Hidden field สำหรับ return URL -->
+  <%= form.hidden_field :return_to, value: request.fullpath %>
+  
+  <!-- Hidden field สำหรับ session token -->
+  <%= form.hidden_field :token, value: current_user.session_token %>
+  
+  <%= form.text_area :content, required: true %>
+  <%= form.submit "ส่งความคิดเห็น" %>
+<% end %>
+
+<!-- ใช้ hidden_field_tag สำหรับ non-model -->
+<%= form_tag search_path do %>
+  <%= hidden_field_tag :sort, "created_at" %>
+  <%= hidden_field_tag :direction, "desc" %>
+  <%= text_field_tag :q, params[:q] %>
+  <%= submit_tag "ค้นหา" %>
+<% end %>
+```
+
+---
+
+## Step 888: submit, button
+
+### submit
+
+```erb
+<%= form_with model: @post do |form| %>
+  <!-- Auto label: "Create Post" หรือ "Update Post" -->
+  <%= form.submit %>
+  
+  <!-- Custom label -->
+  <%= form.submit "บันทึก" %>
+  
+  <!-- ด้วย options -->
+  <%= form.submit "บันทึก",
+      class: "btn btn-primary",
+      id: "submit-btn",
+      data: { loading_text: "กำลังบันทึก..." },
+      disabled: !@post.valid? %>
+<% end %>
+```
+
+### button
+
+```erb
+<%= form_with model: @post do |form| %>
+  <!-- Button ด้วย icon -->
+  <%= form.button class: "btn btn-primary" do %>
+    <i class="icon-save"></i> บันทึก
+  <% end %>
+  
+  <!-- Button ด้วย type -->
+  <%= form.button "ยกเลิก", type: :button, 
+      onclick: "history.back()", 
+      class: "btn btn-secondary" %>
+  
+  <!-- Reset button -->
+  <%= form.button "รีเซ็ต", type: :reset, class: "btn btn-outline-secondary" %>
+<% end %>
+```
+
+---
+
+## Step 889: Displaying Validation Errors in Form
+
+```erb
+<!-- app/views/posts/new.html.erb -->
+<h1>สร้างบทความใหม่</h1>
+
+<%= form_with model: @post do |form| %>
+  <!-- แสดง errors รวม -->
+  <% if @post.errors.any? %>
+    <div class="alert alert-danger">
+      <h5>พบ <%= pluralize(@post.errors.count, "ข้อผิดพลาด") %>:</h5>
+      <ul class="mb-0">
+        <% @post.errors.full_messages.each do |message| %>
+          <li><%= message %></li>
         <% end %>
       </ul>
     </div>
   <% end %>
 
-  <div>
-    <%= f.label :title, "หัวข้อ", class: "block font-medium" %>
-    <%= f.text_field :title, class: "w-full border rounded px-3 py-2" %>
-  </div>
-
-  <div>
-    <%= f.label :body, "เนื้อหา", class: "block font-medium" %>
-    <%= f.text_area :body, rows: 8, class: "w-full border rounded px-3 py-2" %>
-  </div>
-
-  <div>
-    <%= f.label :status, "สถานะ", class: "block font-medium" %>
-    <%= f.select :status,
-      [["Draft", "draft"], ["Published", "published"]],
-      { prompt: "เลือกสถานะ" },
-      { class: "w-full border rounded px-3 py-2" } %>
-  </div>
-
-  <%= f.submit article.new_record? ? "สร้างบทความ" : "บันทึกการแก้ไข",
-    class: "bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700" %>
-<% end %>
-```
-
-**ข้อ 2:** สร้าง file upload form
-
-```erb
-<%# คำตอบ %>
-<%= form_with model: @product do |f| %>
-  <%= f.text_field :name %>
-
-  <div>
-    <%= f.label :images, "รูปภาพ (เลือกได้หลายรูป)" %>
-    <%= f.file_field :images, multiple: true, accept: "image/*" %>
-  </div>
-
-  <%= f.submit %>
-<% end %>
-```
-
-**ข้อ 3:** Turbo Stream form response
-
-```ruby
-# คำตอบ:
-# controller:
-def create
-  @comment = @article.comments.new(comment_params.merge(user: current_user))
-  if @comment.save
-    respond_to do |format|
-      format.turbo_stream {
-        render turbo_stream: [
-          turbo_stream.prepend("comments", partial: "comments/comment",
-            locals: { comment: @comment }),
-          turbo_stream.replace("comment-form",
-            partial: "comments/form",
-            locals: { article: @article, comment: Comment.new })
-        ]
-      }
-      format.html { redirect_to @article }
-    end
-  else
-    render :new, status: :unprocessable_entity
-  end
-end
-```
-
-**ข้อ 4:** สร้าง nested form สำหรับ Survey และ Questions
-
-```erb
-<%# คำตอบ: app/views/surveys/_form.html.erb %>
-<%= form_with model: @survey do |f| %>
-  <%= f.text_field :title, placeholder: "ชื่อแบบสอบถาม" %>
-
-  <div id="questions-container">
-    <%= f.fields_for :questions do |qf| %>
-      <div class="question-fields border p-4 rounded mb-2">
-        <%= qf.hidden_field :_destroy, class: "destroy-hidden" %>
-        <%= qf.text_field :text, placeholder: "คำถาม" %>
-        <%= qf.select :question_type,
-          [["ข้อความ", "text"], ["เลือก", "choice"], ["คะแนน", "rating"]] %>
-        <button type="button" onclick="removeQuestion(this)">ลบ</button>
+  <!-- Title field ด้วย error display -->
+  <div class="mb-3">
+    <%= form.label :title, "หัวข้อ", class: "form-label" %>
+    <%= form.text_field :title, 
+        class: "form-control #{'is-invalid' if @post.errors[:title].any?}",
+        placeholder: "กรอกหัวข้อบทความ" %>
+    <% if @post.errors[:title].any? %>
+      <div class="invalid-feedback">
+        <%= @post.errors[:title].join(", ") %>
       </div>
     <% end %>
   </div>
 
-  <button type="button" id="add-question">+ เพิ่มคำถาม</button>
+  <!-- Content field -->
+  <div class="mb-3">
+    <%= form.label :content, "เนื้อหา", class: "form-label" %>
+    <%= form.text_area :content,
+        rows: 10,
+        class: "form-control #{'is-invalid' if @post.errors[:content].any?}" %>
+    <% if @post.errors[:content].any? %>
+      <div class="invalid-feedback">
+        <%= @post.errors[:content].join(", ") %>
+      </div>
+    <% end %>
+  </div>
 
-  <%= f.submit "บันทึกแบบสอบถาม" %>
+  <%= form.submit "บันทึก", class: "btn btn-primary" %>
 <% end %>
 ```
 
-**ข้อ 5:** CSRF ใน AJAX request
+### Helper สำหรับ field error
+
+```ruby
+# app/helpers/form_helper.rb
+module FormHelper
+  def field_with_error(form, attribute, label_text, &block)
+    has_error = form.object.errors[attribute].any?
+    
+    content_tag :div, class: "mb-3" do
+      concat form.label(attribute, label_text, class: "form-label")
+      concat capture(&block)
+      if has_error
+        concat content_tag(:div, form.object.errors[attribute].join(", "), 
+                           class: "invalid-feedback d-block")
+      end
+    end
+  end
+end
+```
+
+---
+
+## Step 890: form_with without model (search forms)
+
+```erb
+<!-- Search form - ไม่ใช้ model -->
+<%= form_with url: search_path, method: :get do |form| %>
+  <div class="input-group">
+    <%= form.search_field :q,
+        placeholder: "ค้นหา...",
+        value: params[:q],
+        class: "form-control" %>
+    <%= form.submit "ค้นหา", class: "btn btn-primary" %>
+  </div>
+<% end %>
+
+<!-- Filter form -->
+<%= form_with url: posts_path, method: :get, class: "filter-form" do |form| %>
+  <!-- Select status -->
+  <div class="mb-2">
+    <%= form.label :status, "สถานะ" %>
+    <%= form.select :status, 
+        [["ทั้งหมด", ""], ["ร่าง", "draft"], ["เผยแพร่", "published"]],
+        { selected: params[:status] },
+        class: "form-select" %>
+  </div>
+  
+  <!-- Date range -->
+  <div class="row">
+    <div class="col">
+      <%= form.date_field :from_date, value: params[:from_date], class: "form-control" %>
+    </div>
+    <div class="col">
+      <%= form.date_field :to_date, value: params[:to_date], class: "form-control" %>
+    </div>
+  </div>
+  
+  <%= form.submit "กรอง", class: "btn btn-secondary" %>
+  <%= link_to "ล้างตัวกรอง", posts_path, class: "btn btn-outline-secondary" %>
+<% end %>
+```
+
+---
+
+## Step 891: Nested Forms
+
+### accepts_nested_attributes_for
+
+```ruby
+# Model
+class User < ApplicationRecord
+  has_one :profile
+  has_many :addresses
+  
+  accepts_nested_attributes_for :profile
+  accepts_nested_attributes_for :addresses,
+    allow_destroy: true,
+    reject_if: :all_blank
+end
+```
+
+### Nested form ใน view
+
+```erb
+<!-- app/views/users/new.html.erb -->
+<%= form_with model: @user do |form| %>
+  <!-- User fields -->
+  <div class="mb-3">
+    <%= form.label :name %>
+    <%= form.text_field :name, class: "form-control" %>
+  </div>
+  
+  <!-- Profile nested -->
+  <%= form.fields_for :profile do |profile_form| %>
+    <div class="mb-3">
+      <%= profile_form.label :bio, "ประวัติ" %>
+      <%= profile_form.text_area :bio, rows: 4, class: "form-control" %>
+    </div>
+    <div class="mb-3">
+      <%= profile_form.label :website, "เว็บไซต์" %>
+      <%= profile_form.url_field :website, class: "form-control" %>
+    </div>
+  <% end %>
+  
+  <!-- Addresses nested (has_many) -->
+  <h4>ที่อยู่</h4>
+  
+  <%= form.fields_for :addresses do |address_form| %>
+    <div class="address-fields border p-3 mb-2" id="<%= dom_id(address_form.object) %>">
+      <!-- Hidden id for update -->
+      <%= address_form.hidden_field :id %>
+      
+      <div class="mb-2">
+        <%= address_form.label :street, "ที่อยู่" %>
+        <%= address_form.text_field :street, class: "form-control" %>
+      </div>
+      
+      <div class="row">
+        <div class="col">
+          <%= address_form.label :city, "เมือง" %>
+          <%= address_form.text_field :city, class: "form-control" %>
+        </div>
+        <div class="col">
+          <%= address_form.label :postal_code, "รหัสไปรษณีย์" %>
+          <%= address_form.text_field :postal_code, class: "form-control" %>
+        </div>
+      </div>
+      
+      <!-- Destroy checkbox -->
+      <div class="form-check">
+        <%= address_form.check_box :_destroy, class: "form-check-input" %>
+        <%= address_form.label :_destroy, "ลบที่อยู่นี้", class: "form-check-label text-danger" %>
+      </div>
+    </div>
+  <% end %>
+  
+  <%= form.submit "บันทึก", class: "btn btn-primary" %>
+<% end %>
+```
+
+### Controller สำหรับ nested forms
+
+```ruby
+class UsersController < ApplicationController
+  def new
+    @user = User.new
+    @user.build_profile
+    3.times { @user.addresses.build }
+  end
+  
+  def create
+    @user = User.new(user_params)
+    if @user.save
+      redirect_to @user
+    else
+      render :new, status: :unprocessable_entity
+    end
+  end
+  
+  private
+  
+  def user_params
+    params.require(:user).permit(
+      :name, :email, :password,
+      profile_attributes: [:id, :bio, :website],
+      addresses_attributes: [:id, :street, :city, :postal_code, :_destroy]
+    )
+  end
+end
+```
+
+---
+
+## Step 892: CSRF Protection
+
+### CSRF Token
+
+```erb
+<!-- Layout auto includes this -->
+<%= csrf_meta_tags %>
+<!-- => <meta name="csrf-param" content="authenticity_token">
+        <meta name="csrf-token" content="xxxx"> -->
+
+<!-- form_with auto includes hidden field -->
+<%= form_with model: @post do |form| %>
+  <!-- hidden field: <input type="hidden" name="authenticity_token" value="xxxx"> -->
+<% end %>
+```
+
+### CSRF ใน API/AJAX
+
+```ruby
+# สำหรับ API controllers
+class Api::ApplicationController < ActionController::API
+  # ActionController::API ไม่มี CSRF protection โดย default
+end
+
+# สำหรับ ActionController::Base ที่ต้องการ skip
+class WebhooksController < ApplicationController
+  skip_before_action :verify_authenticity_token
+  
+  def receive
+    # Process webhook
+  end
+end
+```
 
 ```javascript
-// คำตอบ:
-// ใช้ใน Stimulus controller หรือ vanilla JS
-const csrfToken = document.querySelector('meta[name="csrf-token"]').content
+// JavaScript - ส่ง CSRF token ใน AJAX request
+const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
-async function createArticle(data) {
-  const response = await fetch("/articles", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-CSRF-Token": csrfToken,
-      "Accept": "application/json"
-    },
-    body: JSON.stringify({ article: data })
-  })
-  return response.json()
-}
+fetch('/posts', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-CSRF-Token': csrfToken
+  },
+  body: JSON.stringify({ post: { title: 'New Post' } })
+});
 ```
 
 ---
 
-## ขั้นตอนที่ 891: Custom Form Builder
+## Step 893: Turbo และ Forms (Rails 7)
 
-### สร้าง Custom FormBuilder
-
-```ruby
-# app/form_builders/bootstrap_form_builder.rb
-class BootstrapFormBuilder < ActionView::Helpers::FormBuilder
-  def text_field(attribute, options = {})
-    with_label_and_error(attribute) do
-      options[:class] = ["form-control", error_class(attribute), options[:class]].compact.join(" ")
-      super(attribute, options)
-    end
-  end
-
-  def email_field(attribute, options = {})
-    with_label_and_error(attribute) do
-      options[:class] = ["form-control", error_class(attribute), options[:class]].compact.join(" ")
-      super(attribute, options)
-    end
-  end
-
-  def password_field(attribute, options = {})
-    with_label_and_error(attribute) do
-      options[:class] = ["form-control", error_class(attribute), options[:class]].compact.join(" ")
-      super(attribute, options)
-    end
-  end
-
-  def text_area(attribute, options = {})
-    with_label_and_error(attribute) do
-      options[:class] = ["form-control", error_class(attribute), options[:class]].compact.join(" ")
-      super(attribute, options)
-    end
-  end
-
-  def select(attribute, choices, options = {}, html_options = {})
-    with_label_and_error(attribute) do
-      html_options[:class] = ["form-select", error_class(attribute), html_options[:class]].compact.join(" ")
-      super(attribute, choices, options, html_options)
-    end
-  end
-
-  def check_box(attribute, options = {}, checked_value = "1", unchecked_value = "0")
-    @template.content_tag(:div, class: "mb-3 form-check") do
-      super_result = super(attribute, options.merge(class: "form-check-input"), checked_value, unchecked_value)
-      label_result = label(attribute, options[:label], class: "form-check-label")
-      error_result = error_message(attribute)
-      super_result + label_result + error_result
-    end
-  end
-
-  def submit(value = nil, options = {})
-    options[:class] = ["btn btn-primary", options[:class]].compact.join(" ")
-    super(value, options)
-  end
-
-  private
-
-  def with_label_and_error(attribute, &block)
-    @template.content_tag(:div, class: "mb-3") do
-      label_result = label(attribute, class: "form-label")
-      input_result = yield
-      error_result = error_message(attribute)
-      label_result + input_result + error_result
-    end
-  end
-
-  def error_message(attribute)
-    errors = object.errors[attribute]
-    if errors.any?
-      @template.content_tag(:div, errors.first, class: "invalid-feedback d-block text-danger")
-    else
-      "".html_safe
-    end
-  end
-
-  def error_class(attribute)
-    object.errors[attribute].any? ? "is-invalid" : nil
-  end
-end
-
-# ใช้ใน view
-<%= form_with(model: @post, builder: BootstrapFormBuilder) do |f| %>
-  <%= f.text_field :title %>
-  <%= f.email_field :email %>
-  <%= f.text_area :body %>
-  <%= f.submit "บันทึก" %>
-<% end %>
-
-# กำหนด default builder ทั่ว application
-# config/application.rb
-config.action_view.default_form_builder = "BootstrapFormBuilder"
-```
-
----
-
-## ขั้นตอนที่ 892: Form Accessibility
-
-### HTML5 Accessibility Attributes
+Rails 7 ใช้ Hotwire Turbo ซึ่งเปลี่ยนวิธีที่ forms ทำงาน
 
 ```erb
-<%= form_with(model: @user) do |f| %>
-  <%# aria-label สำหรับ screen readers %>
-  <div class="mb-3">
-    <%= f.label :email, "อีเมล", for: "user_email" %>
-    <%= f.email_field :email,
-        id: "user_email",
-        aria: { describedby: "email-help", required: true },
-        required: true,
-        autocomplete: "email" %>
-    <div id="email-help" class="form-text">
-      เราจะไม่เผยแพร่อีเมลของคุณ
-    </div>
-    <% if @user.errors[:email].any? %>
-      <div class="invalid-feedback" role="alert">
-        <%= @user.errors[:email].first %>
-      </div>
-    <% end %>
-  </div>
+<!-- Form ที่ใช้ Turbo Stream response -->
+<%= form_with model: @comment do |form| %>
+  <%= form.text_area :content, class: "form-control" %>
+  <%= form.submit "ส่ง", class: "btn btn-primary" %>
+<% end %>
 
-  <%# fieldset สำหรับ related inputs %>
-  <fieldset>
-    <legend>ที่อยู่จัดส่ง</legend>
-    <div class="mb-3">
-      <%= f.label :address_line1, "บ้านเลขที่/อาคาร" %>
-      <%= f.text_field :address_line1, required: true %>
-    </div>
-    <div class="mb-3">
-      <%= f.label :city, "เมือง" %>
-      <%= f.text_field :city %>
-    </div>
-  </fieldset>
+<!-- Frame สำหรับ partial updates -->
+<%= turbo_frame_tag "comment-form" do %>
+  <%= form_with model: @comment do |form| %>
+    <%= form.text_area :content %>
+    <%= form.submit %>
+  <% end %>
+<% end %>
 
-  <%# ปุ่ม submit พร้อม loading state %>
-  <%= f.submit "บันทึก",
-      data: { disable_with: "กำลังบันทึก..." },
-      aria: { label: "บันทึกข้อมูลผู้ใช้" } %>
+<!-- Turbo Stream ใน response -->
+<!-- app/views/comments/create.turbo_stream.erb -->
+<%= turbo_stream.append "comments-list" do %>
+  <%= render @comment %>
+<% end %>
+
+<%= turbo_stream.replace "comment-form" do %>
+  <%= render "form", comment: Comment.new %>
 <% end %>
 ```
 
----
-
-## ขั้นตอนที่ 893: Multi-step Form (Wizard)
-
-### Implement Wizard Form
+### Controller สำหรับ Turbo
 
 ```ruby
-# app/models/registration_wizard.rb
-class RegistrationWizard
-  include ActiveModel::Model
-
-  STEPS = %w[account profile preferences confirmation].freeze
-
-  attr_accessor :current_step, :user_data
-
-  def initialize(params = {})
-    @current_step = params[:step] || STEPS.first
-    @user_data = params[:user_data] || {}
-  end
-
-  def next_step
-    current_index = STEPS.index(current_step)
-    STEPS[current_index + 1]
-  end
-
-  def previous_step
-    current_index = STEPS.index(current_step)
-    current_index > 0 ? STEPS[current_index - 1] : nil
-  end
-
-  def first_step?
-    current_step == STEPS.first
-  end
-
-  def last_step?
-    current_step == STEPS.last
-  end
-
-  def valid_for_step?
-    case current_step
-    when "account"
-      user_data[:email].present? && user_data[:password].present?
-    when "profile"
-      user_data[:name].present?
-    else
-      true
-    end
-  end
-end
-
-# app/controllers/registrations_controller.rb
-class RegistrationsController < ApplicationController
-  def new
-    @wizard = RegistrationWizard.new
-    session[:registration_data] = {}
-  end
-
+class CommentsController < ApplicationController
   def create
-    step = params[:step]
-    @wizard = RegistrationWizard.new(
-      step: step,
-      user_data: session[:registration_data].merge(registration_params)
-    )
-
-    session[:registration_data] = @wizard.user_data
-
-    if @wizard.valid_for_step?
-      if @wizard.last_step?
-        complete_registration
+    @post = Post.find(params[:post_id])
+    @comment = @post.comments.new(comment_params)
+    @comment.user = current_user
+    
+    respond_to do |format|
+      if @comment.save
+        format.turbo_stream
+        format.html { redirect_to @post }
       else
-        redirect_to new_registration_path(step: @wizard.next_step)
+        format.turbo_stream do
+          render turbo_stream: turbo_stream.replace("comment-form",
+            partial: "comments/form",
+            locals: { comment: @comment }
+          )
+        end
+        format.html { render "posts/show", status: :unprocessable_entity }
       end
-    else
-      render "registrations/steps/#{step}"
     end
-  end
-
-  private
-
-  def complete_registration
-    user = User.create!(session[:registration_data])
-    session.delete(:registration_data)
-    sign_in user
-    redirect_to root_path, notice: "ลงทะเบียนสำเร็จ!"
   end
 end
 ```
 
+---
+
+## Step 894: Form Helpers ใน Views
+
+### link_to
+
 ```erb
-<%# app/views/registrations/steps/account.html.erb %>
-<div class="wizard-steps">
-  <div class="step active">1. บัญชี</div>
-  <div class="step">2. โปรไฟล์</div>
-  <div class="step">3. ความชอบ</div>
-  <div class="step">4. ยืนยัน</div>
+<!-- Basic link -->
+<%= link_to "ดูบทความ", post_path(@post) %>
+
+<!-- Link ด้วย class -->
+<%= link_to "แก้ไข", edit_post_path(@post), class: "btn btn-sm btn-warning" %>
+
+<!-- Delete link -->
+<%= link_to "ลบ", post_path(@post),
+    data: { turbo_method: :delete, turbo_confirm: "ต้องการลบ?" },
+    class: "btn btn-sm btn-danger" %>
+
+<!-- Link ด้วย block -->
+<%= link_to post_path(@post) do %>
+  <img src="<%= @post.thumbnail_url %>" alt="<%= @post.title %>">
+  <span><%= @post.title %></span>
+<% end %>
+
+<!-- Link ที่เปิด tab ใหม่ -->
+<%= link_to "เปิดในแท็บใหม่", @post, target: "_blank", rel: "noopener noreferrer" %>
+```
+
+### button_to
+
+```erb
+<!-- สร้าง mini form ที่มีปุ่มเดียว -->
+<%= button_to "Like", like_post_path(@post), method: :post %>
+
+<%= button_to "Follow", follow_user_path(@user),
+    method: :post,
+    class: "btn btn-sm btn-primary",
+    data: { turbo_confirm: "Follow #{@user.name}?" } %>
+
+<!-- DELETE button -->
+<%= button_to "Unfollow", follow_user_path(@follow),
+    method: :delete,
+    class: "btn btn-sm btn-outline-danger" %>
+
+<!-- ด้วย block -->
+<%= button_to post_path(@post), method: :delete do %>
+  <i class="icon-trash"></i> ลบ
+<% end %>
+```
+
+---
+
+## ตัวอย่าง Form ที่สมบูรณ์
+
+### Registration Form
+
+```erb
+<!-- app/views/users/new.html.erb -->
+<% content_for :title, "สมัครสมาชิก" %>
+
+<div class="container">
+  <div class="row justify-content-center">
+    <div class="col-md-6">
+      <h1 class="mb-4">สมัครสมาชิก</h1>
+      
+      <%= form_with model: @user, class: "needs-validation" do |form| %>
+        <!-- Errors -->
+        <% if @user.errors.any? %>
+          <div class="alert alert-danger">
+            <% @user.errors.full_messages.each do |msg| %>
+              <p class="mb-0"><%= msg %></p>
+            <% end %>
+          </div>
+        <% end %>
+        
+        <!-- Name -->
+        <div class="mb-3">
+          <%= form.label :name, "ชื่อ-นามสกุล", class: "form-label" %>
+          <%= form.text_field :name,
+              class: "form-control #{'is-invalid' if @user.errors[:name].any?}",
+              placeholder: "กรอกชื่อ-นามสกุล",
+              autocomplete: "name",
+              required: true %>
+          <% if @user.errors[:name].any? %>
+            <div class="invalid-feedback"><%= @user.errors[:name].first %></div>
+          <% end %>
+        </div>
+        
+        <!-- Email -->
+        <div class="mb-3">
+          <%= form.label :email, "อีเมล", class: "form-label" %>
+          <%= form.email_field :email,
+              class: "form-control #{'is-invalid' if @user.errors[:email].any?}",
+              placeholder: "your@email.com",
+              autocomplete: "email",
+              required: true %>
+          <% if @user.errors[:email].any? %>
+            <div class="invalid-feedback"><%= @user.errors[:email].first %></div>
+          <% end %>
+        </div>
+        
+        <!-- Password -->
+        <div class="mb-3">
+          <%= form.label :password, "รหัสผ่าน", class: "form-label" %>
+          <%= form.password_field :password,
+              class: "form-control #{'is-invalid' if @user.errors[:password].any?}",
+              placeholder: "อย่างน้อย 8 ตัวอักษร",
+              minlength: 8,
+              autocomplete: "new-password",
+              required: true %>
+          <% if @user.errors[:password].any? %>
+            <div class="invalid-feedback"><%= @user.errors[:password].first %></div>
+          <% else %>
+            <div class="form-text">ต้องมีอย่างน้อย 8 ตัวอักษร</div>
+          <% end %>
+        </div>
+        
+        <!-- Password Confirmation -->
+        <div class="mb-3">
+          <%= form.label :password_confirmation, "ยืนยันรหัสผ่าน", class: "form-label" %>
+          <%= form.password_field :password_confirmation,
+              class: "form-control",
+              placeholder: "กรอกรหัสผ่านอีกครั้ง",
+              autocomplete: "new-password",
+              required: true %>
+        </div>
+        
+        <!-- Role -->
+        <div class="mb-3">
+          <%= form.label :role, "บทบาท", class: "form-label" %>
+          <%= form.select :role,
+              [["สมาชิก", "member"], ["ผู้ดูแล", "moderator"]],
+              { selected: "member" },
+              class: "form-select" %>
+        </div>
+        
+        <!-- Phone -->
+        <div class="mb-3">
+          <%= form.label :phone, "เบอร์โทรศัพท์ (ไม่บังคับ)", class: "form-label" %>
+          <%= form.telephone_field :phone,
+              class: "form-control",
+              placeholder: "0812345678" %>
+        </div>
+        
+        <!-- Avatar -->
+        <div class="mb-3">
+          <%= form.label :avatar, "รูปโปรไฟล์ (ไม่บังคับ)", class: "form-label" %>
+          <%= form.file_field :avatar,
+              accept: "image/jpeg,image/png,image/gif",
+              class: "form-control" %>
+        </div>
+        
+        <!-- Terms -->
+        <div class="mb-3 form-check">
+          <%= form.check_box :terms_accepted,
+              class: "form-check-input #{'is-invalid' if @user.errors[:terms_accepted].any?}",
+              required: true %>
+          <%= form.label :terms_accepted, class: "form-check-label" do %>
+            ฉันยอมรับ <%= link_to "ข้อตกลงการใช้งาน", terms_path, target: "_blank" %>
+            และ <%= link_to "นโยบายความเป็นส่วนตัว", privacy_path, target: "_blank" %>
+          <% end %>
+          <% if @user.errors[:terms_accepted].any? %>
+            <div class="invalid-feedback"><%= @user.errors[:terms_accepted].first %></div>
+          <% end %>
+        </div>
+        
+        <!-- Submit -->
+        <div class="d-grid">
+          <%= form.submit "สมัครสมาชิก", class: "btn btn-primary btn-lg" %>
+        </div>
+        
+      <% end %>
+      
+      <p class="text-center mt-3">
+        มีบัญชีแล้ว? <%= link_to "เข้าสู่ระบบ", login_path %>
+      </p>
+    </div>
+  </div>
+</div>
+```
+
+---
+
+## แบบฝึกหัด (Steps 895-905)
+
+### แบบฝึกหัดที่ 1
+สร้าง basic form สำหรับ Post model ด้วย form_with
+
+**เฉลย:**
+```erb
+<%= form_with model: @post do |form| %>
+  <%= form.label :title %>
+  <%= form.text_field :title, class: "form-control" %>
+  
+  <%= form.label :content %>
+  <%= form.text_area :content, rows: 5, class: "form-control" %>
+  
+  <%= form.submit class: "btn btn-primary" %>
+<% end %>
+```
+
+### แบบฝึกหัดที่ 2
+สร้าง search form ที่ไม่ใช้ model
+
+**เฉลย:**
+```erb
+<%= form_with url: search_path, method: :get do |form| %>
+  <%= form.text_field :q, placeholder: "ค้นหา...", value: params[:q] %>
+  <%= form.submit "ค้นหา" %>
+<% end %>
+```
+
+### แบบฝึกหัดที่ 3
+เพิ่ม validation error display ใน form field
+
+**เฉลย:**
+```erb
+<div class="mb-3">
+  <%= form.label :email %>
+  <%= form.email_field :email,
+      class: "form-control #{'is-invalid' if @user.errors[:email].any?}" %>
+  <% if @user.errors[:email].any? %>
+    <div class="invalid-feedback">
+      <%= @user.errors[:email].first %>
+    </div>
+  <% end %>
+</div>
+```
+
+### แบบฝึกหัดที่ 4
+สร้าง file upload form สำหรับ avatar
+
+**เฉลย:**
+```erb
+<%= form_with model: @user, multipart: true do |form| %>
+  <%= form.file_field :avatar, 
+      accept: "image/*",
+      class: "form-control" %>
+  <%= form.submit "อัปโหลด" %>
+<% end %>
+```
+
+### แบบฝึกหัดที่ 5
+สร้าง select dropdown สำหรับ category
+
+**เฉลย:**
+```erb
+<%= form.collection_select :category_id,
+    Category.order(:name),
+    :id, :name,
+    { prompt: "เลือกหมวดหมู่" },
+    class: "form-select" %>
+```
+
+### แบบฝึกหัดที่ 6
+สร้าง multiple checkboxes สำหรับ tags
+
+**เฉลย:**
+```erb
+<% Tag.all.each do |tag| %>
+  <div class="form-check form-check-inline">
+    <%= check_box_tag "post[tag_ids][]", tag.id,
+        @post.tag_ids.include?(tag.id),
+        class: "form-check-input",
+        id: "tag_#{tag.id}" %>
+    <%= label_tag "tag_#{tag.id}", tag.name, class: "form-check-label" %>
+  </div>
+<% end %>
+```
+
+### แบบฝึกหัดที่ 7
+สร้าง radio buttons สำหรับ status
+
+**เฉลย:**
+```erb
+<% %w[draft published archived].each do |status| %>
+  <div class="form-check">
+    <%= form.radio_button :status, status, class: "form-check-input" %>
+    <%= form.label :"status_#{status}", status.humanize, class: "form-check-label" %>
+  </div>
+<% end %>
+```
+
+### แบบฝึกหัดที่ 8
+implement nested form สำหรับ User และ Profile
+
+**เฉลย:**
+```ruby
+# Model
+class User < ApplicationRecord
+  has_one :profile
+  accepts_nested_attributes_for :profile
+end
+
+# Controller
+def new
+  @user = User.new
+  @user.build_profile
+end
+
+def user_params
+  params.require(:user).permit(:name, :email,
+    profile_attributes: [:id, :bio, :website])
+end
+```
+
+```erb
+<!-- View -->
+<%= form_with model: @user do |form| %>
+  <%= form.text_field :name %>
+  
+  <%= form.fields_for :profile do |profile_form| %>
+    <%= profile_form.text_area :bio %>
+    <%= profile_form.url_field :website %>
+  <% end %>
+  
+  <%= form.submit %>
+<% end %>
+```
+
+### แบบฝึกหัดที่ 9
+สร้าง form ที่มี password และ password_confirmation fields
+
+**เฉลย:**
+```erb
+<div class="mb-3">
+  <%= form.label :password, "รหัสผ่าน" %>
+  <%= form.password_field :password, 
+      class: "form-control",
+      minlength: 8,
+      autocomplete: "new-password" %>
 </div>
 
-<%= form_with(url: registrations_path, method: :post) do |f| %>
-  <%= hidden_field_tag :step, "account" %>
+<div class="mb-3">
+  <%= form.label :password_confirmation, "ยืนยันรหัสผ่าน" %>
+  <%= form.password_field :password_confirmation,
+      class: "form-control",
+      autocomplete: "new-password" %>
+</div>
+```
 
-  <div class="mb-3">
-    <%= label_tag :email, "อีเมล" %>
-    <%= email_field_tag :email, session[:registration_data][:email],
-        class: "form-control", required: true %>
-  </div>
+### แบบฝึกหัดที่ 10
+ใช้ button_to สำหรับ delete action
 
-  <div class="mb-3">
-    <%= label_tag :password, "รหัสผ่าน" %>
-    <%= password_field_tag :password, nil, class: "form-control", required: true %>
-  </div>
+**เฉลย:**
+```erb
+<%= button_to "ลบ", post_path(@post),
+    method: :delete,
+    data: { confirm: "ต้องการลบบทความนี้?" },
+    class: "btn btn-danger" %>
+```
 
-  <%= submit_tag "ถัดไป →", class: "btn btn-primary" %>
+### แบบฝึกหัดที่ 11
+สร้าง form ที่ใช้ hidden_field สำหรับ parent id
+
+**เฉลย:**
+```erb
+<%= form_with model: @comment, url: post_comments_path(@post) do |form| %>
+  <%= form.hidden_field :post_id, value: @post.id %>
+  <%= form.text_area :content, rows: 3, class: "form-control" %>
+  <%= form.submit "ส่ง", class: "btn btn-primary" %>
 <% end %>
 ```
 
----
+### แบบฝึกหัดที่ 12
+สร้าง date picker form field
 
-## ขั้นตอนที่ 894: Form Testing
-
-### Request Spec สำหรับ Form
-
-```ruby
-# spec/requests/posts_spec.rb
-require "rails_helper"
-
-RSpec.describe "Post Forms", type: :request do
-  let(:user) { create(:user) }
-
-  describe "POST /posts (create)" do
-    before { sign_in user }
-
-    context "with valid parameters" do
-      let(:valid_params) do
-        {
-          post: {
-            title: "My Test Post",
-            body: "This is the body of my test post with enough content.",
-            published: true,
-            category_id: create(:category).id
-          }
-        }
-      end
-
-      it "creates a new post" do
-        expect {
-          post posts_path, params: valid_params
-        }.to change(Post, :count).by(1)
-      end
-
-      it "redirects to the new post" do
-        post posts_path, params: valid_params
-        expect(response).to redirect_to(post_path(Post.last))
-      end
-
-      it "sets the correct attributes" do
-        post posts_path, params: valid_params
-        created_post = Post.last
-        expect(created_post.title).to eq("My Test Post")
-        expect(created_post.published).to be true
-      end
-    end
-
-    context "with invalid parameters" do
-      let(:invalid_params) do
-        { post: { title: "", body: "" } }
-      end
-
-      it "does not create a post" do
-        expect {
-          post posts_path, params: invalid_params
-        }.not_to change(Post, :count)
-      end
-
-      it "renders new template with errors" do
-        post posts_path, params: invalid_params
-        expect(response).to have_http_status(:unprocessable_entity)
-        expect(response.body).to include("ไม่สามารถบันทึกได้")
-      end
-    end
-  end
-
-  describe "PATCH /posts/:id (update)" do
-    let(:post_record) { create(:post, user: user, title: "Original Title") }
-
-    before { sign_in user }
-
-    it "updates the post" do
-      patch post_path(post_record), params: {
-        post: { title: "Updated Title" }
-      }
-      expect(post_record.reload.title).to eq("Updated Title")
-    end
-
-    it "handles nested attributes" do
-      tag = create(:tag, name: "ruby")
-      patch post_path(post_record), params: {
-        post: {
-          title: "Updated",
-          tags_attributes: [{ name: "new-tag" }]
-        }
-      }
-      expect(post_record.reload.tags.map(&:name)).to include("new-tag")
-    end
-  end
-end
-```
-
-### System Spec สำหรับ Form UI
-
-```ruby
-# spec/system/post_creation_spec.rb
-require "rails_helper"
-
-RSpec.describe "Post Creation", type: :system do
-  let(:user) { create(:user) }
-  let!(:category) { create(:category, name: "Ruby") }
-
-  before { sign_in user }
-
-  it "can create a post with all fields" do
-    visit new_post_path
-
-    fill_in "หัวข้อ", with: "My New Post"
-    fill_in "เนื้อหา", with: "This is detailed content for my post."
-    select "Ruby", from: "หมวดหมู่"
-    check "เผยแพร่บทความ"
-
-    expect {
-      click_button "สร้างบทความ"
-    }.to change(Post, :count).by(1)
-
-    expect(page).to have_content("บทความถูกสร้างแล้ว")
-    expect(page).to have_content("My New Post")
-  end
-
-  it "shows validation errors on blank submission" do
-    visit new_post_path
-    click_button "สร้างบทความ"
-
-    expect(page).to have_content("กรุณากรอกหัวข้อ")
-    expect(current_path).to eq(posts_path)  # stay on form page
-  end
-
-  it "can upload an image", js: true do
-    visit new_post_path
-    fill_in "หัวข้อ", with: "Post with Image"
-    fill_in "เนื้อหา", with: "Content here"
-    attach_file "รูปภาพหลัก", Rails.root.join("spec/fixtures/test_image.jpg")
-    click_button "สร้างบทความ"
-
-    expect(page).to have_css("img[src*='test_image']")
-  end
-end
-```
-
----
-
-## ขั้นตอนที่ 895: Select กับ Dynamic Options
-
-### Dependent Selects
-
+**เฉลย:**
 ```erb
-<%# Country → State → City via Turbo %>
-<%= form_with(model: @user) do |f| %>
-  <div class="mb-3">
-    <%= f.label :country_id, "ประเทศ" %>
-    <%= f.collection_select :country_id,
-        Country.all, :id, :name,
-        { include_blank: "เลือกประเทศ" },
-        { class: "form-select",
-          data: {
-            action: "change->dependent-select#loadStates",
-            turbo_frame: "states_frame"
-          } } %>
-  </div>
+<div class="mb-3">
+  <%= form.label :published_at, "วันที่เผยแพร่" %>
+  <%= form.datetime_local_field :published_at,
+      class: "form-control",
+      value: @post.published_at&.strftime("%Y-%m-%dT%H:%M") %>
+</div>
+```
 
-  <%= turbo_frame_tag "states_frame" do %>
+### แบบฝึกหัดที่ 13
+Implement form ที่รับ array values
+
+**เฉลย:**
+```erb
+<!-- Controller -->
+def post_params
+  params.require(:post).permit(:title, tag_ids: [], category_ids: [])
+end
+
+<!-- View -->
+<% Tag.all.each do |tag| %>
+  <%= check_box_tag "post[tag_ids][]", tag.id, @post.tag_ids.include?(tag.id) %>
+  <%= label_tag "tag_#{tag.id}", tag.name %>
+<% end %>
+```
+
+### แบบฝึกหัดที่ 14
+สร้าง Turbo Stream form สำหรับ comment
+
+**เฉลย:**
+```erb
+<!-- Form -->
+<%= turbo_frame_tag "comment-form" do %>
+  <%= form_with model: @comment, url: post_comments_path(@post) do |form| %>
+    <%= form.text_area :content, rows: 3, class: "form-control" %>
+    <%= form.submit "ส่ง", class: "btn btn-primary" %>
+  <% end %>
+<% end %>
+
+<turbo-frame id="comments-list">
+  <%= render @post.comments %>
+</turbo-frame>
+```
+
+```ruby
+# Controller
+def create
+  @comment = @post.comments.new(comment_params)
+  
+  respond_to do |format|
+    if @comment.save
+      format.turbo_stream do
+        render turbo_stream: [
+          turbo_stream.append("comments-list", partial: "comment", locals: { comment: @comment }),
+          turbo_stream.replace("comment-form", partial: "form", locals: { comment: Comment.new, post: @post })
+        ]
+      end
+      format.html { redirect_to @post }
+    end
+  end
+end
+```
+
+### แบบฝึกหัดที่ 15
+สร้าง grouped select สำหรับ country/city
+
+**เฉลย:**
+```erb
+<%= form.select :city,
+    grouped_options_for_select([
+      ["ภาคกลาง", [["กรุงเทพฯ", "BKK"], ["นนทบุรี", "NBI"], ["ปทุมธานี", "PTN"]]],
+      ["ภาคเหนือ", [["เชียงใหม่", "CNX"], ["เชียงราย", "CRI"]]],
+      ["ภาคใต้", [["สงขลา", "SGK"], ["ภูเก็ต", "HKT"]]]
+    ]),
+    prompt: "เลือกจังหวัด",
+    selected: params[:city] %>
+```
+
+### แบบฝึกหัดที่ 16
+implement form ที่ handle AJAX submission
+
+**เฉลย:**
+```erb
+<!-- Rails 7 ใช้ Turbo โดย default (AJAX) -->
+<%= form_with model: @post do |form| %>
+  <%= form.text_field :title %>
+  <%= form.submit %>
+<% end %>
+
+<!-- ปิด Turbo ถ้าต้องการ regular form -->
+<%= form_with model: @post, data: { turbo: false } do |form| %>
+  ...
+<% end %>
+```
+
+### แบบฝึกหัดที่ 17
+สร้าง form ที่แสดง inline errors ทุก field
+
+**เฉลย:**
+```erb
+<%= form_with model: @user do |form| %>
+  <% [:name, :email, :password].each do |attr| %>
     <div class="mb-3">
-      <%= f.label :state_id, "จังหวัด" %>
-      <% if @user.country_id.present? %>
-        <%= f.collection_select :state_id,
-            State.where(country_id: @user.country_id),
-            :id, :name,
-            { include_blank: "เลือกจังหวัด" },
-            { class: "form-select" } %>
-      <% else %>
-        <select class="form-select" disabled>
-          <option>กรุณาเลือกประเทศก่อน</option>
-        </select>
+      <%= form.label attr %>
+      <%= form.send("#{attr}_field", attr,
+          class: "form-control #{'is-invalid' if @user.errors[attr].any?}") %>
+      <% if @user.errors[attr].any? %>
+        <div class="invalid-feedback">
+          <%= @user.errors[attr].join(", ") %>
+        </div>
       <% end %>
     </div>
   <% end %>
-
-  <%= f.submit "บันทึก" %>
+  
+  <%= form.submit "บันทึก", class: "btn btn-primary" %>
 <% end %>
 ```
 
-```ruby
-# app/controllers/states_controller.rb
-class StatesController < ApplicationController
-  def index
-    @states = State.where(country_id: params[:country_id])
+### แบบฝึกหัดที่ 18
+สร้าง filter form ที่ maintain state หลัง submit
 
-    render partial: "states/select_options",
-           locals: { states: @states }
+**เฉลย:**
+```erb
+<%= form_with url: posts_path, method: :get, class: "row g-2 align-items-end" do |form| %>
+  <div class="col-auto">
+    <%= form.text_field :q, 
+        value: params[:q], 
+        placeholder: "ค้นหา...",
+        class: "form-control" %>
+  </div>
+  
+  <div class="col-auto">
+    <%= form.select :status,
+        [["ทั้งหมด", ""], ["ร่าง", "draft"], ["เผยแพร่", "published"]],
+        { selected: params[:status] },
+        class: "form-select" %>
+  </div>
+  
+  <div class="col-auto">
+    <%= form.select :sort,
+        [["ใหม่สุด", "desc"], ["เก่าสุด", "asc"]],
+        { selected: params[:sort] || "desc" },
+        class: "form-select" %>
+  </div>
+  
+  <div class="col-auto">
+    <%= form.submit "กรอง", class: "btn btn-secondary" %>
+    <%= link_to "ล้าง", posts_path, class: "btn btn-outline-secondary" %>
+  </div>
+<% end %>
+```
+
+### แบบฝึกหัดที่ 19
+implement range slider สำหรับ price filter
+
+**เฉลย:**
+```erb
+<%= form_with url: products_path, method: :get do |form| %>
+  <div class="mb-3">
+    <%= form.label :min_price, "ราคาขั้นต่ำ: " %>
+    <span id="min-price-display"><%= params[:min_price] || 0 %></span> บาท
+    <%= form.range_field :min_price,
+        min: 0, max: 10000, step: 100,
+        value: params[:min_price] || 0,
+        class: "form-range",
+        oninput: "document.getElementById('min-price-display').textContent = this.value" %>
+  </div>
+  
+  <div class="mb-3">
+    <%= form.label :max_price, "ราคาสูงสุด: " %>
+    <span id="max-price-display"><%= params[:max_price] || 10000 %></span> บาท
+    <%= form.range_field :max_price,
+        min: 0, max: 10000, step: 100,
+        value: params[:max_price] || 10000,
+        class: "form-range",
+        oninput: "document.getElementById('max-price-display').textContent = this.value" %>
+  </div>
+  
+  <%= form.submit "กรอง", class: "btn btn-primary" %>
+<% end %>
+```
+
+### แบบฝึกหัดที่ 20
+สร้าง multi-step form ด้วย session
+
+**เฉลย:**
+```ruby
+# Controller
+class RegistrationsController < ApplicationController
+  def step1
+    @user = User.new(session[:registration_data])
+  end
+  
+  def save_step1
+    user_data = params.require(:user).permit(:name, :email)
+    session[:registration_data] = user_data
+    redirect_to registration_step2_path
+  end
+  
+  def step2
+    @user = User.new(session[:registration_data])
+  end
+  
+  def create
+    @user = User.new(session[:registration_data])
+    additional = params.require(:user).permit(:password, :terms_accepted)
+    @user.assign_attributes(additional)
+    
+    if @user.save
+      session.delete(:registration_data)
+      redirect_to root_path, notice: "สมัครสมาชิกสำเร็จ"
+    else
+      render :step2, status: :unprocessable_entity
+    end
   end
 end
 ```
 
+### แบบฝึกหัดที่ 21
+สร้าง accepts_nested_attributes_for สำหรับ has_many
+
+**เฉลย:**
+```ruby
+class Invoice < ApplicationRecord
+  has_many :line_items
+  accepts_nested_attributes_for :line_items,
+    allow_destroy: true,
+    reject_if: :all_blank
+end
+```
+
+```erb
+<%= form_with model: @invoice do |form| %>
+  <%= form.text_field :invoice_number %>
+  
+  <h4>รายการสินค้า</h4>
+  <%= form.fields_for :line_items do |item_form| %>
+    <div class="line-item">
+      <%= item_form.hidden_field :id %>
+      <%= item_form.text_field :product_name, placeholder: "ชื่อสินค้า" %>
+      <%= item_form.number_field :quantity, min: 1 %>
+      <%= item_form.number_field :unit_price, min: 0, step: 0.01 %>
+      <div class="form-check">
+        <%= item_form.check_box :_destroy %>
+        <%= item_form.label :_destroy, "ลบ" %>
+      </div>
+    </div>
+  <% end %>
+  
+  <%= form.submit "บันทึก" %>
+<% end %>
+```
+
+### แบบฝึกหัดที่ 22
+สร้าง form พร้อม Ajax validation
+
+**เฉลย:**
+```erb
+<%= form_with model: @user, data: { controller: "form-validation" } do |form| %>
+  <%= form.email_field :email,
+      data: { 
+        action: "blur->form-validation#validateEmail",
+        form_validation_url_value: validate_email_path
+      } %>
+  <div id="email-validation-result"></div>
+  <%= form.submit %>
+<% end %>
+```
+
+```ruby
+# Controller
+def validate_email
+  exists = User.exists?(email: params[:email])
+  render json: { valid: !exists, message: exists ? "อีเมลนี้ถูกใช้งานแล้ว" : "OK" }
+end
+```
+
+### แบบฝึกหัดที่ 23
+implement form ด้วย character counter
+
+**เฉลย:**
+```erb
+<div class="mb-3">
+  <%= form.label :bio, "ประวัติ" %>
+  <%= form.text_area :bio,
+      rows: 4,
+      class: "form-control",
+      maxlength: 500,
+      data: { 
+        controller: "char-counter",
+        char_counter_max_value: 500
+      } %>
+  <div class="text-muted">
+    <span data-char-counter-target="count">0</span>/500 ตัวอักษร
+  </div>
+</div>
+```
+
+### แบบฝึกหัดที่ 24
+สร้าง autocomplete text field
+
+**เฉลย:**
+```erb
+<div class="mb-3" data-controller="autocomplete" 
+     data-autocomplete-url-value="<%= search_users_path %>">
+  <%= form.text_field :recipient,
+      class: "form-control",
+      autocomplete: "off",
+      data: { 
+        autocomplete_target: "input",
+        action: "input->autocomplete#search"
+      } %>
+  <ul class="dropdown-menu" data-autocomplete-target="results">
+  </ul>
+</div>
+```
+
+### แบบฝึกหัดที่ 25
+สร้าง complete Post form ด้วย features ครบถ้วน
+
+**เฉลย:**
+```erb
+<%= form_with model: @post, class: "post-form" do |form| %>
+  <!-- Errors -->
+  <%= render "shared/errors", object: @post %>
+  
+  <!-- Title -->
+  <div class="mb-3">
+    <%= form.label :title, "หัวข้อบทความ *", class: "form-label fw-bold" %>
+    <%= form.text_field :title,
+        class: "form-control form-control-lg #{'is-invalid' if @post.errors[:title].any?}",
+        placeholder: "กรอกหัวข้อที่น่าสนใจ",
+        autofocus: true, required: true %>
+    <% if @post.errors[:title].any? %>
+      <div class="invalid-feedback"><%= @post.errors[:title].first %></div>
+    <% else %>
+      <div class="form-text">หัวข้อควรสั้น กระชับ และน่าสนใจ</div>
+    <% end %>
+  </div>
+  
+  <!-- Category -->
+  <div class="mb-3">
+    <%= form.label :category_id, "หมวดหมู่", class: "form-label" %>
+    <%= form.collection_select :category_id, Category.active, :id, :name,
+        { prompt: "-- เลือกหมวดหมู่ --" },
+        class: "form-select #{'is-invalid' if @post.errors[:category_id].any?}" %>
+  </div>
+  
+  <!-- Content -->
+  <div class="mb-3">
+    <%= form.label :content, "เนื้อหา *", class: "form-label fw-bold" %>
+    <%= form.text_area :content,
+        rows: 15,
+        class: "form-control #{'is-invalid' if @post.errors[:content].any?}",
+        placeholder: "เขียนเนื้อหาที่นี่...",
+        required: true %>
+    <% if @post.errors[:content].any? %>
+      <div class="invalid-feedback"><%= @post.errors[:content].first %></div>
+    <% end %>
+  </div>
+  
+  <!-- Tags -->
+  <div class="mb-3">
+    <%= form.label :tag_ids, "แท็ก", class: "form-label" %>
+    <div class="d-flex flex-wrap gap-2">
+      <% Tag.all.each do |tag| %>
+        <div class="form-check form-check-inline">
+          <%= check_box_tag "post[tag_ids][]", tag.id,
+              @post.tag_ids.include?(tag.id),
+              class: "btn-check",
+              id: "tag_#{tag.id}" %>
+          <%= label_tag "tag_#{tag.id}", tag.name, class: "btn btn-outline-secondary btn-sm" %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+  
+  <!-- Cover Image -->
+  <div class="mb-3">
+    <%= form.label :cover_image, "ภาพปก", class: "form-label" %>
+    <% if @post.cover_image.attached? %>
+      <%= image_tag @post.cover_image.variant(resize_to_limit: [200, 100]), class: "mb-2 d-block" %>
+    <% end %>
+    <%= form.file_field :cover_image, accept: "image/*", class: "form-control" %>
+  </div>
+  
+  <!-- Status -->
+  <div class="mb-3">
+    <%= form.label :status, "สถานะ", class: "form-label" %>
+    <div>
+      <% { "draft" => "บันทึกร่าง", "published" => "เผยแพร่" }.each do |value, label| %>
+        <div class="form-check form-check-inline">
+          <%= form.radio_button :status, value, class: "form-check-input" %>
+          <%= form.label :"status_#{value}", label, class: "form-check-label" %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+  
+  <!-- Published at (conditional) -->
+  <div class="mb-3" id="published-at-field">
+    <%= form.label :published_at, "วันที่เผยแพร่", class: "form-label" %>
+    <%= form.datetime_local_field :published_at, class: "form-control" %>
+  </div>
+  
+  <!-- Submit -->
+  <div class="d-flex gap-2">
+    <%= form.submit @post.new_record? ? "สร้างบทความ" : "อัปเดตบทความ",
+        class: "btn btn-primary" %>
+    <%= link_to "ยกเลิก",
+        @post.new_record? ? posts_path : post_path(@post),
+        class: "btn btn-outline-secondary" %>
+  </div>
+<% end %>
+```
+
 ---
 
-## สรุปตอนที่ 40
+## สรุป
 
-ในตอนนี้เราเรียนรู้ Forms อย่างครบถ้วน:
+ใน Forms เราได้เรียนรู้:
 
-| หัวข้อ | สิ่งสำคัญ |
-|--------|-----------|
-| form_with | model-backed vs URL, options |
-| Input Types | text, email, password, number, date, file, check_box, radio |
-| Select Helpers | select, collection_select, grouped, multiple |
-| File Upload | file_field + Active Storage + validation |
-| Nested Forms | accepts_nested_attributes_for + fields_for |
-| CSRF | authenticity_token, protect_from_forgery |
-| Turbo | Turbo Stream responses, Turbo Frame |
-| Error Display | Bootstrap integration, inline errors |
-| Form Object | สำหรับ complex multi-model forms |
-| Custom Builder | BootstrapFormBuilder |
-| Accessibility | aria attributes, fieldset, legend |
-| Wizard Forms | Multi-step form pattern |
-| Testing | Request specs + System specs |
-
-**Rails 7 Form Best Practices:**
-1. ใช้ `form_with` เสมอ (ไม่ใช้ `form_for` หรือ `form_tag`)
-2. ใช้ Strong Parameters ใน controller เสมอ
-3. CSRF protection เปิดใช้ default ไม่ต้องตั้งค่าเพิ่ม
-4. Turbo ทำ AJAX อัตโนมัติ ไม่ต้องเขียน JS เพิ่ม
-5. ใช้ `data: { disable_with: "..." }` ป้องกัน double submit
-6. ใช้ Form Object สำหรับ registration, checkout และ forms ที่ซับซ้อน
-7. เขียน system spec ครอบคลุม happy path และ error cases
-
-ตอนถัดไป: **ตอนที่ 41** - Sessions and Cookies
+1. **form_with** - Rails 7 form builder
+2. **text_field, email_field, password_field** - input types ต่างๆ
+3. **text_area** - multi-line input
+4. **check_box, radio_button** - boolean selections
+5. **select, collection_select** - dropdown menus
+6. **file_field** - file uploads
+7. **hidden_field** - hidden data
+8. **submit, button** - form submission
+9. **Validation errors** - แสดง errors ใน form
+10. **search forms** - forms ที่ไม่ใช้ model
+11. **Nested forms** - fields_for + accepts_nested_attributes_for
+12. **CSRF protection** - security
+13. **Turbo forms** - Rails 7 Hotwire integration
+14. **Form helpers** - link_to, button_to
