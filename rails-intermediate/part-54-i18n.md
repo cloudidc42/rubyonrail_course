@@ -1,380 +1,124 @@
-# ตอนที่ 54: Internationalization/i18n (Steps 1181-1200)
+# Part 54: Internationalization (I18n) ใน Rails
 
-## บทนำ
-
-i18n (Internationalization) คือกระบวนการทำให้ application รองรับหลายภาษาและ locales Rails มี built-in i18n support ที่แข็งแกร่งด้วย `I18n` module ทำให้แปลข้อความ, วันที่, ตัวเลข และ currencies ได้ง่าย
+## ขั้นตอนที่ 1181-1200: รองรับหลายภาษา
 
 ---
 
-## Step 1181: I18n คืออะไร?
+## ขั้นตอนที่ 1181: I18n Overview
 
-### Internationalization vs Localization
+```ruby
+# Rails รองรับ I18n ตั้งแต่ต้น
+I18n.locale         # => :en (default)
+I18n.default_locale # => :en
 
-- **i18n (Internationalization)** - กระบวนการออกแบบ app ให้รองรับหลายภาษา
-- **l10n (Localization)** - การปรับ app สำหรับ locale เฉพาะ (ภาษา, รูปแบบ, วัฒนธรรม)
-
-```
-App (English) → i18n → App (English, Thai, Japanese, ...)
-                l10n → "Hello" → "สวัสดี" (Thai)
-                        "$1,234.56" → "฿1,234.56" (Thai currency)
-                        "Jan 1, 2024" → "1 ม.ค. 2567" (Thai calendar)
+I18n.t("hello")     # translate
+I18n.l(Date.today)  # localize date/time
 ```
 
----
-
-## Step 1182: Setup และ config/locales/
-
-### Initial Setup
+## ขั้นตอนที่ 1182: Setup
 
 ```ruby
 # config/application.rb
-module MyApp
-  class Application < Rails::Application
-    # ภาษา default
-    config.i18n.default_locale = :th
-    
-    # Load path สำหรับ locale files
-    config.i18n.load_path += Dir[Rails.root.join('config', 'locales', '**', '*.{rb,yml}')]
-    
-    # Locales ที่รองรับ
-    config.i18n.available_locales = [:th, :en]
-    
-    # Fallback locale ถ้าไม่มี translation
-    config.i18n.fallbacks = true
-  end
-end
+config.i18n.default_locale = :th        # ภาษาเริ่มต้น
+config.i18n.available_locales = [:th, :en]
+config.i18n.load_path += Dir[Rails.root.join('config', 'locales', '**', '*.yml').to_s]
+config.i18n.fallbacks = [I18n.default_locale]
 ```
-
-### โครงสร้าง Locale Files
-
-```
-config/locales/
-├── th.yml                    # Thai translations
-├── en.yml                    # English translations
-├── models/
-│   ├── th.yml                # Model names (Thai)
-│   └── en.yml                # Model names (English)
-├── views/
-│   ├── th.yml                # View translations (Thai)
-│   └── en.yml                # View translations (English)
-├── activerecord/
-│   ├── th.yml                # AR error messages (Thai)
-│   └── en.yml                # AR error messages (English)
-└── devise/
-    ├── th.yml                # Devise messages (Thai)
-    └── en.yml
-```
-
----
-
-## Step 1183: YAML Translation Files
-
-### Thai Translation (th.yml)
 
 ```yaml
 # config/locales/th.yml
 th:
-  # App Name
-  app_name: "My Application"
+  hello: "สวัสดี"
+  goodbye: "ลาก่อน"
   
-  # Navigation
-  nav:
-    home: "หน้าแรก"
-    articles: "บทความ"
-    about: "เกี่ยวกับ"
-    contact: "ติดต่อ"
-    login: "เข้าสู่ระบบ"
-    logout: "ออกจากระบบ"
-    register: "สมัครสมาชิก"
-    profile: "โปรไฟล์"
-    settings: "การตั้งค่า"
-  
-  # Common actions
-  actions:
-    create: "สร้าง"
-    edit: "แก้ไข"
-    update: "อัปเดต"
-    delete: "ลบ"
-    save: "บันทึก"
-    cancel: "ยกเลิก"
-    back: "กลับ"
-    submit: "ส่ง"
-    search: "ค้นหา"
-    confirm: "ยืนยัน"
-    yes: "ใช่"
-    no: "ไม่"
+  # Nested keys
+  users:
+    title: "รายการผู้ใช้"
+    new: "เพิ่มผู้ใช้ใหม่"
+    edit: "แก้ไขผู้ใช้"
     
-  # Common messages
-  messages:
-    success: "ดำเนินการสำเร็จ"
-    error: "เกิดข้อผิดพลาด"
-    not_found: "ไม่พบข้อมูลที่ต้องการ"
-    unauthorized: "คุณไม่มีสิทธิ์เข้าถึง"
+  posts:
+    title: "บทความ"
+    published: "เผยแพร่แล้ว"
+    draft: "แบบร่าง"
     
-  # Flash messages
-  flash:
-    article:
-      created: "สร้างบทความสำเร็จ"
-      updated: "อัปเดตบทความสำเร็จ"
-      deleted: "ลบบทความสำเร็จ"
-    user:
-      created: "สมัครสมาชิกสำเร็จ"
-      updated: "อัปเดตข้อมูลสำเร็จ"
-      logged_in: "เข้าสู่ระบบสำเร็จ"
-      logged_out: "ออกจากระบบสำเร็จ"
-  
-  # Pagination
-  pagination:
-    previous: "← ก่อนหน้า"
-    next: "ถัดไป →"
-    first: "หน้าแรก"
-    last: "หน้าสุดท้าย"
-    page: "หน้าที่"
-    of: "จาก"
-    total: "รวมทั้งหมด %{count} รายการ"
-  
-  # Time
-  time:
-    formats:
-      short: "%d %b %y %H:%M น."
-      long: "%d %B %Y เวลา %H:%M น."
-      date_only: "%d %B %Y"
-      time_only: "%H:%M น."
-  
+  # Interpolation
+  greetings:
+    welcome: "ยินดีต้อนรับ %{name}!"
+    count: "มีบทความทั้งหมด %{count} บทความ"
+    
   # Pluralization
-  items:
-    zero: "ไม่มีรายการ"
-    one: "%{count} รายการ"
-    other: "%{count} รายการ"
+  messages:
+    one: "1 ข้อความ"
+    other: "%{count} ข้อความ"
 ```
-
-### English Translation (en.yml)
 
 ```yaml
 # config/locales/en.yml
 en:
-  app_name: "My Application"
+  hello: "Hello"
+  goodbye: "Goodbye"
   
-  nav:
-    home: "Home"
-    articles: "Articles"
-    about: "About"
-    contact: "Contact"
-    login: "Login"
-    logout: "Logout"
-    register: "Register"
-    profile: "Profile"
-    settings: "Settings"
-  
-  actions:
-    create: "Create"
-    edit: "Edit"
-    update: "Update"
-    delete: "Delete"
-    save: "Save"
-    cancel: "Cancel"
-    back: "Back"
-    submit: "Submit"
-    search: "Search"
-    confirm: "Confirm"
-    yes: "Yes"
-    no: "No"
-  
-  flash:
-    article:
-      created: "Article was successfully created."
-      updated: "Article was successfully updated."
-      deleted: "Article was successfully deleted."
-  
-  items:
-    zero: "no items"
-    one: "%{count} item"
-    other: "%{count} items"
+  users:
+    title: "Users"
+    new: "New User"
+    edit: "Edit User"
+    
+  posts:
+    title: "Posts"
+    published: "Published"
+    draft: "Draft"
+    
+  greetings:
+    welcome: "Welcome, %{name}!"
+    count: "Total %{count} posts"
+    
+  messages:
+    one: "1 message"
+    other: "%{count} messages"
 ```
 
-### Model Translations
-
-```yaml
-# config/locales/models/th.yml
-th:
-  activerecord:
-    models:
-      user:
-        one: "ผู้ใช้"
-        other: "ผู้ใช้"
-      article:
-        one: "บทความ"
-        other: "บทความ"
-      comment:
-        one: "ความคิดเห็น"
-        other: "ความคิดเห็น"
-    
-    attributes:
-      user:
-        name: "ชื่อ"
-        email: "อีเมล"
-        password: "รหัสผ่าน"
-        password_confirmation: "ยืนยันรหัสผ่าน"
-        role: "บทบาท"
-        created_at: "วันที่สมัคร"
-      
-      article:
-        title: "หัวข้อ"
-        body: "เนื้อหา"
-        published: "เผยแพร่"
-        views_count: "ยอดวิว"
-        created_at: "วันที่สร้าง"
-        updated_at: "วันที่แก้ไขล่าสุด"
-      
-      comment:
-        body: "ความคิดเห็น"
-        created_at: "วันที่แสดงความคิดเห็น"
-    
-    errors:
-      models:
-        user:
-          attributes:
-            email:
-              taken: "อีเมลนี้ถูกใช้แล้ว"
-              invalid: "รูปแบบอีเมลไม่ถูกต้อง"
-            password:
-              too_short: "รหัสผ่านต้องมีอย่างน้อย %{count} ตัวอักษร"
-```
-
----
-
-## Step 1184: t() Helper ใน Views และ Controllers
-
-### ใน Views
+## ขั้นตอนที่ 1183: Translation ใน Views
 
 ```erb
-<%# app/views/layouts/application.html.erb %>
-<!DOCTYPE html>
-<html lang="<%= I18n.locale %>">
-<head>
-  <title><%= t('app_name') %></title>
-</head>
-<body>
-  <nav>
-    <%= link_to t('nav.home'), root_path %>
-    <%= link_to t('nav.articles'), articles_path %>
-    
-    <% if user_signed_in? %>
-      <%= link_to t('nav.profile'), profile_path %>
-      <%= link_to t('nav.logout'), logout_path, method: :delete %>
-    <% else %>
-      <%= link_to t('nav.login'), login_path %>
-      <%= link_to t('nav.register'), register_path %>
-    <% end %>
-  </nav>
-  
-  <main>
-    <% flash.each do |type, message| %>
-      <div class="flash flash-<%= type %>">
-        <%= message %>
-      </div>
-    <% end %>
-    
-    <%= yield %>
-  </main>
-</body>
-</html>
-```
+<%# ใช้ t() helper %>
+<h1><%= t('posts.title') %></h1>
 
-```erb
-<%# app/views/articles/index.html.erb %>
-<h1><%= t('nav.articles') %></h1>
-<p><%= t('items', count: @articles.total_count) %></p>
-
-<% @articles.each do |article| %>
-  <article>
-    <h2><%= article.title %></h2>
-    <p><%= t('activerecord.attributes.article.created_at') %>:
-       <%= l(article.created_at, format: :long) %></p>
-  </article>
-<% end %>
-```
-
-### Lazy Lookup (relative paths)
-
-```erb
-<%# app/views/articles/show.html.erb %>
-<%# Rails จะมองหา th.articles.show.title %>
+<%# Short form (ใช้ relative key) %>
+<%# ใน app/views/posts/index.html.erb %>
 <h1><%= t('.title') %></h1>
-<p><%= t('.published_by', name: @article.user.name) %></p>
+<%# จะ translate 'posts.index.title' %>
+
+<%# Interpolation %>
+<p><%= t('greetings.welcome', name: current_user.name) %></p>
+
+<%# Pluralization %>
+<p><%= t('messages', count: @user.messages.count) %></p>
+
+<%# HTML safe translation %>
+<%# Translation key ที่ลงท้ายด้วย _html จะไม่ escape %>
+<p><%= t('disclaimer_html') %></p>
+
+<%# Default value %>
+<p><%= t('unknown_key', default: 'ไม่พบข้อความ') %></p>
+
+<%# Localize date/time %>
+<p><%= l(@post.created_at, format: :short) %></p>
+<p><%= l(Date.today, format: :long) %></p>
 ```
 
-```yaml
-# config/locales/th.yml
-th:
-  articles:
-    show:
-      title: "รายละเอียดบทความ"
-      published_by: "เขียนโดย %{name}"
-    index:
-      title: "บทความทั้งหมด"
-      new_article: "เขียนบทความใหม่"
-    form:
-      title_label: "หัวข้อ"
-      body_label: "เนื้อหา"
-      submit: "บันทึกบทความ"
-```
-
-### ใน Controllers
+## ขั้นตอนที่ 1184: Locale Switching
 
 ```ruby
-# app/controllers/articles_controller.rb
-def create
-  @article = current_user.articles.build(article_params)
-  
-  if @article.save
-    redirect_to @article, notice: t('flash.article.created')
-  else
-    render :new, status: :unprocessable_entity
-  end
+# routes.rb - locale ใน URL
+scope "/:locale" do
+  resources :posts
+  resources :pages
 end
 
-def destroy
-  @article.destroy
-  redirect_to articles_path, notice: t('flash.article.deleted')
-end
-```
-
-### t() กับ Interpolation
-
-```yaml
-th:
-  welcome: "ยินดีต้อนรับ, %{name}!"
-  articles_count: "คุณมี %{count} บทความ"
-  last_login: "เข้าสู่ระบบครั้งล่าสุด: %{time}"
-```
-
-```erb
-<%= t('welcome', name: current_user.name) %>
-<%= t('articles_count', count: current_user.articles.count) %>
-<%= t('last_login', time: l(current_user.last_sign_in_at, format: :short)) %>
-```
-
----
-
-## Step 1185: Locale Switching
-
-### URL-based Switching
-
-```ruby
-# config/routes.rb
-scope "/:locale", locale: /en|th/ do
-  resources :articles
-  root 'home#index'
-end
-
-# หรือ prefix ทุก routes
-Rails.application.routes.draw do
-  scope '/:locale', locale: /th|en/, defaults: { locale: 'th' } do
-    resources :articles
-    resources :users
-    root 'home#index'
-  end
+# หรือ optional locale
+scope "(:locale)", locale: /th|en/ do
+  resources :posts
 end
 ```
 
@@ -383,163 +127,118 @@ end
 class ApplicationController < ActionController::Base
   before_action :set_locale
   
+  private
+  
   def set_locale
     I18n.locale = extract_locale || I18n.default_locale
   end
   
   def extract_locale
-    # 1. จาก URL params (สูงสุด)
-    parsed_locale = params[:locale]
-    return parsed_locale if I18n.available_locales.map(&:to_s).include?(parsed_locale)
+    # 1. จาก URL params
+    if params[:locale] && I18n.available_locales.include?(params[:locale].to_sym)
+      return params[:locale].to_sym
+    end
     
-    # 2. จาก user preferences (ถ้า login)
-    return current_user.locale if user_signed_in? && current_user.locale.present?
+    # 2. จาก user preference
+    if user_signed_in? && current_user.locale.present?
+      return current_user.locale.to_sym
+    end
     
-    # 3. จาก cookie
-    return cookies[:locale] if cookies[:locale].present?
+    # 3. จาก session
+    if session[:locale]
+      return session[:locale].to_sym
+    end
     
     # 4. จาก Accept-Language header
-    extract_locale_from_accept_language_header
+    http_accept_language = request.env['HTTP_ACCEPT_LANGUAGE']
+    if http_accept_language
+      locale = http_accept_language.scan(/[a-z]{2}/).first
+      return locale.to_sym if I18n.available_locales.include?(locale.to_sym)
+    end
+    
+    nil
   end
   
-  def extract_locale_from_accept_language_header
-    request.env['HTTP_ACCEPT_LANGUAGE']&.scan(/^[a-z]{2}/)&.first
-  end
-  
-  # Helper method สำหรับ URL helpers
   def default_url_options
     { locale: I18n.locale }
   end
 end
 ```
 
-### Language Switcher ใน View
+```ruby
+# Locale controller
+class LocalesController < ApplicationController
+  def update
+    locale = params[:locale].to_sym
+    
+    if I18n.available_locales.include?(locale)
+      session[:locale] = locale
+      current_user&.update(locale: locale)
+    end
+    
+    redirect_back fallback_location: root_path
+  end
+end
+```
 
 ```erb
-<%# app/views/shared/_language_switcher.html.erb %>
-<div class="language-switcher">
-  <% I18n.available_locales.each do |locale| %>
-    <%= link_to locale_display_name(locale), 
-                url_for(locale: locale),
-                class: "lang-btn #{locale == I18n.locale ? 'active' : ''}" %>
-  <% end %>
+<%# Locale switcher in view %>
+<div class="locale-switcher">
+  <%= link_to "🇹🇭 ไทย", url_for(locale: :th), 
+              class: I18n.locale == :th ? "active" : "" %>
+  <%= link_to "🇬🇧 English", url_for(locale: :en),
+              class: I18n.locale == :en ? "active" : "" %>
 </div>
 ```
 
-```ruby
-# app/helpers/application_helper.rb
-module ApplicationHelper
-  def locale_display_name(locale)
-    case locale.to_sym
-    when :th then "ภาษาไทย 🇹🇭"
-    when :en then "English 🇬🇧"
-    when :ja then "日本語 🇯🇵"
-    else locale.to_s.upcase
-    end
-  end
-end
-```
-
-### Subdomain-based Switching
-
-```ruby
-# config/routes.rb
-constraints subdomain: 'en' do
-  scope locale: :en do
-    resources :articles
-  end
-end
-
-constraints subdomain: 'th' do
-  scope locale: :th do
-    resources :articles
-  end
-end
-```
-
----
-
-## Step 1186: Active Record Error Messages
+## ขั้นตอนที่ 1185: ActiveRecord Error Translations
 
 ```yaml
 # config/locales/th.yml
 th:
+  activerecord:
+    models:
+      user: "ผู้ใช้"
+      post: "บทความ"
+      comment: "ความเห็น"
+    
+    attributes:
+      user:
+        name: "ชื่อ"
+        email: "อีเมล"
+        password: "รหัสผ่าน"
+        phone: "เบอร์โทร"
+      post:
+        title: "หัวข้อ"
+        content: "เนื้อหา"
+        category: "หมวดหมู่"
+    
+    errors:
+      models:
+        user:
+          attributes:
+            email:
+              blank: "กรุณากรอกอีเมล"
+              taken: "อีเมลนี้มีผู้ใช้แล้ว"
+              invalid: "รูปแบบอีเมลไม่ถูกต้อง"
+            password:
+              too_short: "รหัสผ่านต้องมีอย่างน้อย %{count} ตัวอักษร"
+  
   errors:
-    format: "%{attribute} %{message}"
     messages:
-      blank: "ต้องไม่เว้นว่าง"
-      empty: "ต้องไม่ว่างเปล่า"
+      blank: "ไม่สามารถเว้นว่างได้"
+      taken: "มีคนใช้แล้ว"
       invalid: "ไม่ถูกต้อง"
-      taken: "ถูกใช้ไปแล้ว"
-      too_short:
-        one: "สั้นเกินไป (ต้องมีอย่างน้อย %{count} ตัวอักษร)"
-        other: "สั้นเกินไป (ต้องมีอย่างน้อย %{count} ตัวอักษร)"
-      too_long:
-        one: "ยาวเกินไป (ต้องไม่เกิน %{count} ตัวอักษร)"
-        other: "ยาวเกินไป (ต้องไม่เกิน %{count} ตัวอักษร)"
+      too_short: "สั้นเกินไป (ต้องมีอย่างน้อย %{count} ตัวอักษร)"
+      too_long: "ยาวเกินไป (ไม่เกิน %{count} ตัวอักษร)"
       not_a_number: "ต้องเป็นตัวเลข"
       greater_than: "ต้องมากกว่า %{count}"
-      greater_than_or_equal_to: "ต้องมากกว่าหรือเท่ากับ %{count}"
       less_than: "ต้องน้อยกว่า %{count}"
-      less_than_or_equal_to: "ต้องน้อยกว่าหรือเท่ากับ %{count}"
-      inclusion: "ไม่อยู่ในรายการที่อนุญาต"
-      exclusion: "ถูก reserved ไว้"
+      inclusion: "ไม่อยู่ในรายการที่กำหนด"
       confirmation: "ไม่ตรงกัน"
-      accepted: "ต้องยอมรับ"
-      present: "ต้องไม่มีค่า"
-  
-  activerecord:
-    errors:
-      messages:
-        record_invalid: "Validation failed: %{errors}"
-        restrict_dependent_destroy:
-          has_one: "ไม่สามารถลบ record นี้ได้เนื่องจากมี %{record} ที่เกี่ยวข้อง"
-          has_many: "ไม่สามารถลบ record นี้ได้เนื่องจากมี %{record} ที่เกี่ยวข้อง"
 ```
 
-### แสดง Error Messages
-
-```erb
-<%# app/views/shared/_error_messages.html.erb %>
-<% if object.errors.any? %>
-  <div class="error-messages">
-    <h3>
-      <%= t('errors.title', 
-            count: object.errors.count,
-            model: object.class.model_name.human) %>
-    </h3>
-    <ul>
-      <% object.errors.full_messages.each do |message| %>
-        <li><%= message %></li>
-      <% end %>
-    </ul>
-  </div>
-<% end %>
-```
-
-```yaml
-th:
-  errors:
-    title:
-      one: "เกิดข้อผิดพลาด 1 รายการที่ทำให้ไม่สามารถบันทึก %{model} ได้"
-      other: "เกิดข้อผิดพลาด %{count} รายการที่ทำให้ไม่สามารถบันทึก %{model} ได้"
-```
-
----
-
-## Step 1187: Date และ Time Localization
-
-### l() Helper
-
-```erb
-<%# l() สำหรับ localize dates/times %>
-<%= l(article.created_at)                        # default format %>
-<%= l(article.created_at, format: :short)        # short format %>
-<%= l(article.created_at, format: :long)         # long format %>
-<%= l(Date.today, format: :date_only)            # date only %>
-```
-
-### Thai Date Format
+## ขั้นตอนที่ 1186: Date and Number Localization
 
 ```yaml
 # config/locales/th.yml
@@ -549,7 +248,6 @@ th:
       default: "%d/%m/%Y"
       short: "%d %b"
       long: "%d %B %Y"
-      thai_long: "วันที่ %d เดือน %B พ.ศ. %Y"
     
     day_names:
       - อาทิตย์
@@ -598,320 +296,244 @@ th:
       - ต.ค.
       - พ.ย.
       - ธ.ค.
-    
-    order:
-      - :day
-      - :month
-      - :year
   
   time:
     formats:
-      default: "%a, %d %b %Y %H:%M:%S %z"
+      default: "%a %d %b %Y เวลา %H:%M น."
       short: "%d %b %H:%M น."
-      long: "%d %B %Y %H:%M น."
-    
-    am: "AM"
-    pm: "PM"
-```
-
----
-
-## Step 1188: Number และ Currency Localization
-
-```yaml
-# config/locales/th.yml
-th:
+      long: "%A %d %B %Y เวลา %H:%M:%S น."
+  
   number:
     format:
       separator: "."
       delimiter: ","
       precision: 2
-      significant: false
-      strip_insignificant_zeros: false
     
     currency:
       format:
-        format: "%u%n"
         unit: "฿"
+        precision: 2
         separator: "."
         delimiter: ","
-        precision: 2
+        format: "%u%n"
     
     percentage:
       format:
         delimiter: ""
-        format: "%n%"
     
     human:
-      format:
-        delimiter: ""
-        precision: 3
-        significant: true
-      
       storage_units:
-        format: "%n %u"
         units:
-          byte:
-            one: "ไบต์"
-            other: "ไบต์"
-          kb: "KB"
-          mb: "MB"
-          gb: "GB"
-          tb: "TB"
+          byte: ไบต์
+          kb: KB
+          mb: MB
+          gb: GB
+          tb: TB
 ```
 
-### ใช้งาน Number Helpers
+## ขั้นตอนที่ 1187: Thai Buddhist Era (พ.ศ.)
 
-```erb
-<%= number_to_currency(1234.56) %>           # ฿1,234.56
-<%= number_to_percentage(85.5) %>            # 85.5%
-<%= number_to_human(1_234_567) %>            # 1.23 ล้าน (ถ้าตั้งค่า)
-<%= number_to_human_size(1.megabyte) %>      # 1 MB
-<%= number_with_delimiter(1234567) %>        # 1,234,567
-<%= number_with_precision(3.14159, precision: 2) %>  # 3.14
-```
+```ruby
+# config/initializers/thai_date.rb
+module ThaiDate
+  def to_thai_date(format = :default)
+    year = strftime("%Y").to_i + 543
+    
+    case format
+    when :short
+      strftime("%-d %b ") + year.to_s[-2..]
+    when :long
+      strftime("%-d %B ") + year.to_s + " (" + strftime("%H:%M น.") + ")"
+    else
+      strftime("%-d/%-m/") + year.to_s
+    end
+  end
+end
 
----
+class Date
+  include ThaiDate
+end
 
-## Step 1189: Plural Rules
+class Time
+  include ThaiDate
+end
 
-### Thai Plural (ไม่มี plural)
-
-```yaml
-# config/locales/th.yml
-th:
-  # Thai ไม่มี plural form แต่ Rails ยังต้องมี key
-  comments:
-    zero: "ยังไม่มีความคิดเห็น"
-    one: "1 ความคิดเห็น"
-    other: "%{count} ความคิดเห็น"
-  
-  articles_by:
-    zero: "ยังไม่มีบทความโดย %{name}"
-    one: "1 บทความโดย %{name}"
-    other: "%{count} บทความโดย %{name}"
+class DateTime
+  include ThaiDate
+end
 ```
 
 ```erb
-<%= t('comments', count: @article.comments.count) %>
-<%= t('articles_by', count: @user.articles.count, name: @user.name) %>
+<%# ใน view %>
+<p><%= @post.created_at.to_thai_date(:long) %></p>
+<%# => "1 มกราคม 2567 (12:00 น.)" %>
 ```
 
----
+## ขั้นตอนที่ 1188: Devise I18n
 
-## Step 1190: Thai Language Complete Setup
+```ruby
+# Gemfile
+gem 'devise-i18n'
 
-### Thai Locale File ที่สมบูรณ์
+# bundle install
+# rails generate devise:i18n:views -l th
+```
 
 ```yaml
-# config/locales/th.yml
+# config/locales/devise.th.yml
 th:
-  app_name: "แอปพลิเคชัน"
-  
-  # Devise messages
   devise:
     sessions:
       signed_in: "เข้าสู่ระบบสำเร็จ"
       signed_out: "ออกจากระบบสำเร็จ"
-      already_signed_in: "คุณเข้าสู่ระบบอยู่แล้ว"
     
     registrations:
-      signed_up: "สมัครสมาชิกสำเร็จ โปรดยืนยันอีเมลของคุณ"
-      signed_up_but_unconfirmed: "สมัครสมาชิกสำเร็จ โปรดตรวจสอบอีเมลของคุณ"
-      update_needs_confirmation: "อัปเดตข้อมูลสำเร็จ โปรดยืนยันอีเมลใหม่ของคุณ"
+      signed_up: "สมัครสมาชิกสำเร็จ"
       destroyed: "ลบบัญชีสำเร็จ"
+      updated: "อัพเดทข้อมูลสำเร็จ"
     
     passwords:
-      send_instructions: "คุณจะได้รับอีเมลสำหรับ reset รหัสผ่านในไม่ช้า"
-      send_paranoid_instructions: "หากอีเมลของคุณมีอยู่ในระบบ คุณจะได้รับอีเมลในไม่ช้า"
+      send_instructions: "ส่งคำแนะนำรีเซ็ตรหัสผ่านไปยังอีเมลของคุณแล้ว"
       updated: "เปลี่ยนรหัสผ่านสำเร็จ"
-      updated_not_active: "เปลี่ยนรหัสผ่านสำเร็จ"
     
     confirmations:
-      send_instructions: "คุณจะได้รับอีเมลสำหรับยืนยันในไม่ช้า"
-      send_paranoid_instructions: "หากอีเมลของคุณมีอยู่ในระบบและยังไม่ได้ยืนยัน คุณจะได้รับอีเมลในไม่ช้า"
-      confirmed: "ยืนยันอีเมลสำเร็จ"
-      
-    mailer:
-      confirmation_instructions:
-        subject: "ยืนยันอีเมลของคุณ"
-      reset_password_instructions:
-        subject: "Reset รหัสผ่าน"
-      unlock_instructions:
-        subject: "ปลดล็อกบัญชีของคุณ"
-      email_changed:
-        subject: "อีเมลของคุณเปลี่ยนแปลงแล้ว"
-      password_change:
-        subject: "รหัสผ่านของคุณเปลี่ยนแปลงแล้ว"
+      send_instructions: "ส่งคำแนะนำยืนยันไปยังอีเมลของคุณแล้ว"
+      confirmed: "ยืนยันบัญชีสำเร็จ"
+    
+    failures:
+      already_authenticated: "คุณเข้าสู่ระบบแล้ว"
+      unauthenticated: "กรุณาเข้าสู่ระบบก่อน"
+      unconfirmed: "กรุณายืนยันอีเมลก่อน"
+      locked: "บัญชีถูกล็อก"
+      invalid: "อีเมลหรือรหัสผ่านไม่ถูกต้อง"
+      invalid_token: "token ไม่ถูกต้อง"
+      timeout: "session หมดอายุ กรุณาเข้าสู่ระบบใหม่"
+      not_found_in_database: "ไม่พบอีเมลหรือรหัสผ่านนี้ในระบบ"
+```
+
+## ขั้นตอนที่ 1189: Translating Enum Values
+
+```ruby
+# app/models/post.rb
+class Post < ApplicationRecord
+  enum status: {
+    draft: 0,
+    published: 1,
+    archived: 2
+  }
   
-  # Kaminari pagination
-  views:
-    pagination:
-      first: "&laquo; หน้าแรก"
-      last: "หน้าสุดท้าย &raquo;"
-      previous: "&lsaquo; ก่อนหน้า"
-      next: "ถัดไป &rsaquo;"
-      truncate: "..."
-```
-
----
-
-## แบบฝึกหัด (20 ข้อ)
-
-### ระดับพื้นฐาน
-
-**ข้อ 1:** ตั้งค่า i18n ให้ default locale เป็น Thai
-```ruby
-# เฉลย
-# config/application.rb
-config.i18n.default_locale = :th
-config.i18n.available_locales = [:th, :en]
-```
-
-**ข้อ 2:** สร้าง th.yml ที่มี navigation translations
-```yaml
-# เฉลย
-th:
-  nav:
-    home: "หน้าแรก"
-    articles: "บทความ"
-    login: "เข้าสู่ระบบ"
-```
-
-**ข้อ 3:** ใช้ t() helper ใน view
-```erb
-<%# เฉลย %>
-<h1><%= t('nav.home') %></h1>
-<%= link_to t('actions.create'), new_article_path %>
-```
-
-**ข้อ 4:** ใช้ l() helper แสดงวันที่เป็นภาษาไทย
-```erb
-<%# เฉลย %>
-<%= l(@article.created_at, format: :long) %>
-```
-
-**ข้อ 5:** เพิ่ม locale switcher ใน navigation
-```erb
-<%# เฉลย %>
-<%= link_to "ภาษาไทย", url_for(locale: :th) %>
-<%= link_to "English", url_for(locale: :en) %>
-```
-
-### ระดับกลาง
-
-**ข้อ 6:** ตั้งค่า URL-based locale switching
-```ruby
-# เฉลย
-scope "/:locale", locale: /en|th/ do
-  resources :articles
-end
-
-before_action :set_locale
-
-def set_locale
-  I18n.locale = params[:locale] || I18n.default_locale
-end
-```
-
-**ข้อ 7:** แปล Active Record error messages เป็นภาษาไทย
-```yaml
-# เฉลย
-th:
-  errors:
-    messages:
-      blank: "ต้องไม่เว้นว่าง"
-      too_short:
-        other: "สั้นเกินไป (ต้องมีอย่างน้อย %{count} ตัวอักษร)"
-```
-
-**ข้อ 8:** เพิ่ม Thai date format
-```yaml
-# เฉลย
-th:
-  date:
-    formats:
-      long: "%d %B %Y"
-    month_names:
-      - ~
-      - มกราคม
-      - กุมภาพันธ์
-      # ...ต่อไปจนถึงธันวาคม
-```
-
-**ข้อ 9:** ใช้ number_to_currency กับ Thai Baht
-```yaml
-# เฉลย
-th:
-  number:
-    currency:
-      format:
-        unit: "฿"
-        format: "%u%n"
-```
-
-**ข้อ 10:** เพิ่ม plural rules สำหรับ articles count
-```yaml
-# เฉลย
-th:
-  articles_count:
-    zero: "ยังไม่มีบทความ"
-    one: "1 บทความ"
-    other: "%{count} บทความ"
-```
-
-### ระดับสูง
-
-**ข้อ 11-20:**
-
-```ruby
-# เฉลย ข้อ 11 - User locale preference
-class User < ApplicationRecord
-  validates :locale, inclusion: { in: %w[th en] }, allow_nil: true
-end
-
-# ApplicationController
-def set_locale
-  I18n.locale = if user_signed_in? && current_user.locale.present?
-    current_user.locale
-  else
-    params[:locale] || cookies[:locale] || I18n.default_locale
+  def status_label
+    I18n.t("post.statuses.#{status}")
   end
 end
 ```
 
+```yaml
+# config/locales/th.yml
+th:
+  post:
+    statuses:
+      draft: "แบบร่าง"
+      published: "เผยแพร่"
+      archived: "เก็บถาวร"
+```
+
+```erb
+<p>สถานะ: <%= @post.status_label %></p>
+
+<%# หรือใน select %>
+<%= f.select :status, 
+    Post.statuses.keys.map { |s| [I18n.t("post.statuses.#{s}"), s] } %>
+```
+
+## ขั้นตอนที่ 1190: i18n-tasks Gem
+
 ```ruby
-# เฉลย ข้อ 14 - Accept-Language header
-def extract_locale_from_headers
-  accept_language = request.env['HTTP_ACCEPT_LANGUAGE']
-  return nil unless accept_language
-  
-  locales = accept_language.scan(/[a-z]{2}/).map(&:to_sym)
-  locales.find { |l| I18n.available_locales.include?(l) }
+# Gemfile
+group :development do
+  gem 'i18n-tasks'
 end
 ```
 
-```ruby
-# เฉลย ข้อ 17 - Translation helper ใน tests
-RSpec.configure do |config|
-  config.include AbstractController::Translation
-end
+```bash
+# ตรวจสอบ missing translations
+rails i18n:missing_keys
+
+# ตรวจสอบ unused translations
+rails i18n:unused_keys
+
+# Copy keys จาก en ไป th (ใช้ machine translation)
+rails i18n:add_missing
+
+# Normalize (sort + format) YAML files
+rails i18n:normalize
 ```
 
 ---
 
-## สรุป
+## แบบฝึกหัด: I18n (20 ข้อ)
 
-ในบทนี้เราได้เรียนรู้:
+### ข้อที่ 1: Setup I18n
+```ruby
+config.i18n.default_locale = :th
+config.i18n.available_locales = [:th, :en]
+```
 
-1. **I18n Setup** - configuration สำหรับ multi-language
-2. **YAML Files** - โครงสร้าง translation files
-3. **t() Helper** - แปลข้อความใน views และ controllers
-4. **l() Helper** - localize dates, times, numbers
-5. **Locale Switching** - URL, subdomain, cookie, header
-6. **AR Error Messages** - แปล validation messages
-7. **Thai Date/Time** - Thai month names และ formats
-8. **Number/Currency** - Thai Baht formatting
-9. **Plural Rules** - handle singular/plural ภาษาไทย
+### ข้อที่ 2: YAML Translation Files
+```
+สร้าง th.yml และ en.yml สำหรับ navigation menu
+```
 
-i18n เป็นสิ่งสำคัญมากสำหรับ applications ที่มี users จากหลายประเทศ ควรวางแผน i18n ตั้งแต่ต้นเพราะการเพิ่มทีหลังจะยากกว่า
+### ข้อที่ 3: Locale Switcher
+```
+สร้าง UI ให้ user เปลี่ยนภาษาได้
+```
+
+### ข้อที่ 4: ActiveRecord Translations
+```
+Translate model name และ attribute names เป็นภาษาไทย
+```
+
+### ข้อที่ 5: Date Localization
+```
+แสดงวันที่เป็นภาษาไทย เช่น "1 มกราคม 2567"
+```
+
+### ข้อที่ 6-20 (แบบสรุป)
+
+**ข้อ 6:** Locale ใน URL path (`/th/posts`, `/en/posts`)
+**ข้อ 7:** Translate error messages
+**ข้อ 8:** Pluralization rules
+**ข้อ 9:** Number/currency formatting
+**ข้อ 10:** Buddhist Era year conversion
+**ข้อ 11:** Devise I18n setup
+**ข้อ 12:** Enum value translations
+**ข้อ 13:** Email templates ในหลายภาษา
+**ข้อ 14:** Test translations
+**ข้อ 15:** i18n-tasks missing keys check
+**ข้อ 16:** User locale preference
+**ข้อ 17:** Accept-Language header detection
+**ข้อ 18:** Time zone + locale
+**ข้อ 19:** Flash messages ในภาษาไทย
+**ข้อ 20:** SEO - hreflang tags
+
+---
+
+## สรุป: I18n
+
+| Function | Usage |
+|----------|-------|
+| `t("key")` | Translate string |
+| `l(date)` | Localize date/time |
+| `I18n.locale` | Get current locale |
+| `I18n.locale=` | Set locale |
+| `t(".key")` | Relative key (ใน view) |
+| `t("key", var: val)` | Interpolation |
+| `t("key", count: n)` | Pluralization |
+
+**Key Takeaways:**
+1. ตั้งค่า `default_locale` และ `available_locales` ใน application.rb
+2. แยก YAML ไฟล์ตาม scope (models, views, etc.)
+3. ใช้ relative keys ใน views เพื่อความสะดวก
+4. Translate error messages ของ ActiveRecord
+5. ใช้ i18n-tasks ตรวจสอบ missing/unused keys
