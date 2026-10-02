@@ -553,3 +553,389 @@ config.action_mailer.delivery_method = :letter_opener
 3. ทดสอบด้วย Letter Opener ใน development
 4. ให้ unsubscribe link ในทุก email
 5. Track delivery rates ใน production
+
+---
+
+## Step 1153: Advanced Action Mailer
+
+### Email Interceptors
+
+```ruby
+# app/mailers/development_mail_interceptor.rb
+class DevelopmentMailInterceptor
+  def self.delivering_email(message)
+    message.subject = "[TEST] #{message.subject}"
+    message.to = [ENV.fetch('TEST_EMAIL', 'dev@example.com')]
+    message.cc = nil
+    message.bcc = nil
+  end
+end
+
+# config/initializers/mail.rb
+if Rails.env.development?
+  ActionMailer::Base.register_interceptor(DevelopmentMailInterceptor)
+end
+```
+
+### Email Observers
+
+```ruby
+# app/mailers/email_delivery_observer.rb
+class EmailDeliveryObserver
+  def self.delivered_email(message)
+    EmailLog.create!(
+      to: message.to.join(', '),
+      from: message.from.join(', '),
+      subject: message.subject,
+      delivered_at: Time.current,
+      message_id: message.message_id
+    )
+  end
+end
+
+# config/initializers/mail.rb
+ActionMailer::Base.register_observer(EmailDeliveryObserver)
+```
+
+---
+
+## Step 1154: Email Templates with MJML
+
+```bash
+# ติดตั้ง MJML (email templating language)
+npm install -g mjml
+```
+
+```erb
+<%# app/views/user_mailer/welcome_email.mjml %>
+<mjml>
+  <mj-head>
+    <mj-title>ยินดีต้อนรับ</mj-title>
+    <mj-attributes>
+      <mj-all font-family="Arial, sans-serif" />
+      <mj-text font-size="16px" line-height="24px" />
+    </mj-attributes>
+  </mj-head>
+  <mj-body>
+    <mj-section background-color="#4a90e2">
+      <mj-column>
+        <mj-text color="#ffffff" font-size="24px" font-weight="bold" align="center">
+          ยินดีต้อนรับสู่ MyApp!
+        </mj-text>
+      </mj-column>
+    </mj-section>
+    
+    <mj-section>
+      <mj-column>
+        <mj-text>
+          สวัสดี <%= @user.name %>,
+        </mj-text>
+        <mj-text>
+          ขอบคุณที่ลงทะเบียนกับเรา
+        </mj-text>
+        <mj-button background-color="#4a90e2" href="<%= @confirmation_url %>">
+          ยืนยันอีเมล
+        </mj-button>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>
+```
+
+---
+
+## Step 1155: Email Queue Monitoring
+
+```ruby
+# app/jobs/email_stats_job.rb
+class EmailStatsJob < ApplicationJob
+  queue_as :default
+  
+  def perform
+    stats = {
+      sent_today: EmailLog.where("delivered_at > ?", Time.current.beginning_of_day).count,
+      failed_today: FailedEmail.where("failed_at > ?", Time.current.beginning_of_day).count,
+      queue_size: Sidekiq::Queue.new('mailers').size
+    }
+    
+    if stats[:failed_today] > 100
+      AdminMailer.email_failure_alert(stats).deliver_now
+    end
+    
+    StatsD.gauge('email.queue_size', stats[:queue_size])
+    StatsD.count('email.sent_today', stats[:sent_today])
+  end
+end
+```
+
+---
+
+## Step 1156: Bounce Handling
+
+```ruby
+# app/controllers/webhooks/mailgun_controller.rb
+class Webhooks::MailgunController < ApplicationController
+  skip_before_action :verify_authenticity_token
+  before_action :verify_mailgun_signature
+  
+  def bounce
+    email = params.dig('event-data', 'recipient')
+    severity = params.dig('event-data', 'severity')  # 'permanent' or 'temporary'
+    
+    if severity == 'permanent'
+      user = User.find_by(email: email)
+      user&.update!(
+        email_bounced: true,
+        email_bounce_at: Time.current,
+        email_bounce_reason: params.dig('event-data', 'delivery-status', 'message')
+      )
+      Rails.logger.warn "Permanent bounce for #{email}"
+    end
+    
+    head :ok
+  end
+  
+  def unsubscribe
+    email = params.dig('event-data', 'recipient')
+    User.find_by(email: email)&.update!(
+      email_unsubscribed: true,
+      email_unsubscribed_at: Time.current
+    )
+    head :ok
+  end
+  
+  private
+  
+  def verify_mailgun_signature
+    # Verify webhook signature for security
+    api_key = ENV['MAILGUN_API_KEY']
+    token = params[:token]
+    timestamp = params[:timestamp]
+    signature = params[:signature]
+    
+    expected = OpenSSL::HMAC.hexdigest(
+      OpenSSL::Digest::SHA256.new,
+      api_key,
+      "#{timestamp}#{token}"
+    )
+    
+    head :forbidden unless ActiveSupport::SecurityUtils.secure_compare(expected, signature)
+  end
+end
+```
+
+---
+
+## Step 1157: Scheduled Emails
+
+```ruby
+# app/jobs/send_birthday_emails_job.rb
+class SendBirthdayEmailsJob < ApplicationJob
+  queue_as :mailers
+  
+  def perform
+    today = Date.today
+    
+    User.where(
+      "EXTRACT(MONTH FROM birthday) = ? AND EXTRACT(DAY FROM birthday) = ?",
+      today.month, today.day
+    ).find_each do |user|
+      UserMailer.with(user: user).birthday_email.deliver_later
+    end
+  end
+end
+
+# app/mailers/user_mailer.rb
+class UserMailer < ApplicationMailer
+  def birthday_email
+    @user = params[:user]
+    @discount_code = generate_discount_code(@user)
+    
+    mail(
+      to: @user.email,
+      subject: "สุขสันต์วันเกิด #{@user.name}! 🎂 ของขวัญพิเศษรอคุณอยู่"
+    )
+  end
+  
+  private
+  
+  def generate_discount_code(user)
+    code = "BDAY#{user.id}#{Date.today.year}"
+    Discount.create_or_find_by!(
+      code: code,
+      user: user,
+      discount_percent: 20,
+      expires_at: 1.week.from_now
+    )
+    code
+  end
+end
+```
+
+---
+
+## Step 1158: Email Unsubscribe System
+
+```ruby
+# app/models/concerns/unsubscribable.rb
+module Unsubscribable
+  extend ActiveSupport::Concern
+  
+  included do
+    has_many :email_preferences, dependent: :destroy
+    
+    EMAIL_TYPES = %w[
+      marketing newsletters product_updates
+      security_alerts account_activity weekly_digest
+    ].freeze
+  end
+  
+  def unsubscribed_from?(email_type)
+    email_preferences.exists?(email_type: email_type, subscribed: false)
+  end
+  
+  def subscribe_to!(email_type)
+    pref = email_preferences.find_or_initialize_by(email_type: email_type)
+    pref.update!(subscribed: true)
+  end
+  
+  def unsubscribe_from!(email_type)
+    pref = email_preferences.find_or_initialize_by(email_type: email_type)
+    pref.update!(subscribed: false)
+  end
+  
+  def unsubscribe_all!
+    EMAIL_TYPES.each { |type| unsubscribe_from!(type) }
+    update!(global_unsubscribe: true)
+  end
+  
+  def unsubscribe_token
+    verifier = ActiveSupport::MessageVerifier.new(Rails.application.secret_key_base)
+    verifier.generate({ user_id: id, created_at: Time.current.to_i })
+  end
+  
+  def self.find_by_unsubscribe_token(token)
+    verifier = ActiveSupport::MessageVerifier.new(Rails.application.secret_key_base)
+    payload = verifier.verify(token)
+    find(payload[:user_id])
+  rescue ActiveSupport::MessageVerifier::InvalidSignature
+    nil
+  end
+end
+```
+
+```ruby
+# app/controllers/unsubscribes_controller.rb
+class UnsubscribesController < ApplicationController
+  skip_before_action :authenticate_user!
+  
+  def show
+    @user = User.find_by_unsubscribe_token(params[:token])
+    render :invalid_token unless @user
+  end
+  
+  def update
+    @user = User.find_by_unsubscribe_token(params[:token])
+    return render :invalid_token unless @user
+    
+    if params[:email_type] == 'all'
+      @user.unsubscribe_all!
+      flash[:notice] = "ยกเลิกการรับอีเมลทั้งหมดแล้ว"
+    else
+      @user.unsubscribe_from!(params[:email_type])
+      flash[:notice] = "ยกเลิกการรับอีเมลประเภทนี้แล้ว"
+    end
+    
+    redirect_to unsubscribe_confirmation_path
+  end
+end
+```
+
+---
+
+## Step 1159: Email Analytics
+
+```ruby
+# app/models/email_log.rb
+class EmailLog < ApplicationRecord
+  belongs_to :user, optional: true
+  
+  enum status: { sent: 0, delivered: 1, opened: 2, clicked: 3, bounced: 4, unsubscribed: 5 }
+  
+  scope :by_type, ->(type) { where(email_type: type) }
+  scope :in_period, ->(start, finish) { where(created_at: start..finish) }
+  
+  def self.stats_for_period(start_date, end_date)
+    emails = in_period(start_date, end_date)
+    total = emails.count
+    
+    return {} if total.zero?
+    
+    {
+      total_sent: total,
+      delivered: emails.delivered.count,
+      opened: emails.opened.count,
+      clicked: emails.clicked.count,
+      bounced: emails.bounced.count,
+      delivery_rate: (emails.delivered.count.to_f / total * 100).round(2),
+      open_rate: (emails.opened.count.to_f / total * 100).round(2),
+      click_rate: (emails.clicked.count.to_f / total * 100).round(2),
+      bounce_rate: (emails.bounced.count.to_f / total * 100).round(2)
+    }
+  end
+end
+```
+
+---
+
+## Step 1160: Transactional vs Marketing Emails
+
+```ruby
+# app/mailers/transactional_mailer.rb
+# Transactional emails - ส่งทุกครั้ง ไม่สนใจ unsubscribe preference
+class TransactionalMailer < ApplicationMailer
+  def password_reset(user)
+    @user = user
+    mail(to: user.email, subject: "Reset รหัสผ่าน")
+  end
+  
+  def order_confirmation(order)
+    @order = order
+    mail(to: order.user.email, subject: "ยืนยันคำสั่งซื้อ ##{order.id}")
+  end
+  
+  def security_alert(user, details)
+    @user = user
+    @details = details
+    mail(to: user.email, subject: "การแจ้งเตือนความปลอดภัย")
+  end
+end
+
+# app/mailers/marketing_mailer.rb
+# Marketing emails - ตรวจสอบ preferences ก่อนส่ง
+class MarketingMailer < ApplicationMailer
+  before_action :check_marketing_preferences!
+  
+  def weekly_newsletter(user)
+    @user = user
+    @articles = Article.trending.limit(5)
+    mail(to: user.email, subject: "Newsletter ประจำสัปดาห์")
+  end
+  
+  def promotional_offer(user, offer)
+    @user = user
+    @offer = offer
+    mail(to: user.email, subject: "โปรโมชั่นพิเศษสำหรับคุณ!")
+  end
+  
+  private
+  
+  def check_marketing_preferences!
+    user = params[:user]
+    if user.unsubscribed_from?('marketing') || user.global_unsubscribe?
+      Rails.logger.info "Skipping marketing email to #{user.email} (unsubscribed)"
+      throw :abort
+    end
+  end
+end
+```
