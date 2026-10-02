@@ -1,518 +1,712 @@
-# ตอนที่ 24: Gems และ Bundler (ขั้นตอนที่ 521-540)
+# ตอนที่ 24: Gems และ Bundler (Steps 521-540)
 
-RubyGems เป็นระบบจัดการ Package สำหรับ Ruby ที่ทำให้การแชร์และใช้ Library (เรียกว่า Gem) เป็นเรื่องง่าย Bundler เป็นเครื่องมือที่ช่วยจัดการ Dependencies ของโปรเจกต์
+## บทนำ
+
+**RubyGems** เป็นระบบ package manager สำหรับ Ruby ที่ช่วยให้คุณแชร์และใช้งาน code จากชุมชน Ruby ทั่วโลก **Bundler** เป็นเครื่องมือที่จัดการ dependencies ของ project ให้แน่ใจว่าทุกคนในทีมใช้ version เดียวกัน
 
 ---
 
-## ขั้นตอนที่ 521: Gems คืออะไร?
+## Step 521: RubyGems คืออะไร?
 
-### นิยามของ Gem
+**Gem** คือ package ของ Ruby code ที่มีโครงสร้างมาตรฐาน ประกอบด้วย:
+- Ruby code (library หรือ program)
+- Documentation
+- Tests
+- Gemspec (metadata)
 
-Gem คือ Package หรือ Library ของ Ruby ที่:
-- มีโค้ดที่สามารถ Reuse ได้
-- มี Metadata (ชื่อ, เวอร์ชัน, Dependencies)
-- ถูกเผยแพร่ใน RubyGems.org
-- ติดตั้งและใช้งานได้ง่าย
+```bash
+# ตรวจสอบ RubyGems version
+gem --version
+# 3.5.x
 
-### โครงสร้าง Gem
+# ดู help
+gem help
+gem help commands
+
+# ดูว่า gem อยู่ที่ไหน
+gem env
+# หรือดู specific info
+gem env GEM_HOME  # ที่เก็บ gems
+gem env GEM_PATH  # search paths
+```
+
+### โครงสร้างของ Gem
 
 ```
-my_gem/
+awesome_gem-1.0.0/
 ├── lib/
-│   ├── my_gem.rb          # Entry point หลัก
-│   └── my_gem/
-│       ├── version.rb     # เวอร์ชัน Constant
-│       ├── core.rb
-│       └── helpers.rb
-├── spec/
+│   ├── awesome_gem.rb        # main file
+│   └── awesome_gem/
+│       ├── version.rb        # version constant
+│       ├── calculator.rb     # classes
+│       └── formatter.rb
+├── spec/ (หรือ test/)
 │   ├── spec_helper.rb
-│   └── my_gem_spec.rb
+│   └── awesome_gem_spec.rb
+├── bin/
+│   └── awesome_gem           # executable (optional)
+├── awesome_gem.gemspec       # metadata
 ├── Gemfile
 ├── Gemfile.lock
-├── my_gem.gemspec         # Metadata ของ Gem
-├── README.md
 ├── LICENSE.txt
-└── CHANGELOG.md
-```
-
-### ทำไม Gem ถึงสำคัญ?
-
-```ruby
-# แทนที่จะเขียน HTTP Client เอง:
-require 'net/http'
-uri = URI('https://api.example.com/data')
-http = Net::HTTP.new(uri.host, uri.port)
-http.use_ssl = true
-request = Net::HTTP::Get.new(uri)
-response = http.request(request)
-data = JSON.parse(response.body)
-
-# ใช้ Gem 'httparty' ได้เลย:
-require 'httparty'
-data = HTTParty.get('https://api.example.com/data').parsed_response
+└── README.md
 ```
 
 ---
 
-## ขั้นตอนที่ 522: gem install, list, update
-
-### การใช้งาน gem Command
+## Step 522: gem Commands
 
 ```bash
-# ติดตั้ง Gem
-gem install rails
-gem install pry --version '0.14.2'
-gem install rails --version '>= 7.0'
+# ==========================================
+# ค้นหาและดู gems
+# ==========================================
+gem search rails              # ค้นหา gem ที่มี "rails"
+gem search ^rails$            # ค้นหา exact match
+gem list                      # รายการ gems ที่ install แล้ว
+gem list rails                # กรองด้วยชื่อ
+gem info rails                # ข้อมูลละเอียดของ gem
 
-# ดู Gem ที่ติดตั้งแล้ว
-gem list
-gem list --local
-gem list rails  # ค้นหา Gem ที่มีชื่อ rails
+# ==========================================
+# Install
+# ==========================================
+gem install rails             # install latest version
+gem install rails -v 7.1.0   # install specific version
+gem install rails --version "~> 7.1"  # install compatible version
+gem install rails --no-document  # ไม่ install docs (เร็วกว่า)
+gem install rails --pre         # install pre-release
+gem install rails -N            # shorthand ของ --no-document
 
-# ดู Gem ที่มีใน Remote
-gem list --remote rails
+# ==========================================
+# Update
+# ==========================================
+gem update                    # update all gems
+gem update rails              # update specific gem
+gem update --system           # update RubyGems itself
 
-# ข้อมูลรายละเอียด Gem
-gem info pry
-gem specification pry
+# ==========================================
+# Uninstall
+# ==========================================
+gem uninstall rails           # uninstall latest
+gem uninstall rails -v 7.0.0  # uninstall specific version
+gem uninstall -aIx            # uninstall all (a=all versions, I=ignore deps, x=exec files)
 
-# อัพเดท Gem
-gem update rails
-gem update --system  # อัพเดท RubyGems เอง
+# ==========================================
+# Inspect installed gems
+# ==========================================
+gem contents rails            # รายการไฟล์ใน gem
+gem open rails                # เปิด source ใน editor
+gem which rails               # หา path ของ gem file
+gem dependency rails          # ดู dependencies
 
-# ลบ Gem
-gem uninstall pry
-gem uninstall pry --version '0.14.0'  # ลบเวอร์ชันเฉพาะ
+# ==========================================
+# Local gem cache
+# ==========================================
+gem fetch rails               # download .gem file ไม่ install
+gem install --local rails     # install จาก local .gem file
+gem unpack rails              # extract .gem เป็น directory
 
-# ค้นหา Gem
-gem search "json"
-gem search "csv" --remote
+# ==========================================
+# Server
+# ==========================================
+gem server                    # start local gem documentation server
+# เปิด http://localhost:8808
 
-# Cleanup (ลบเวอร์ชันเก่า)
-gem cleanup
-gem cleanup pry
-```
-
-### gem Environment
-
-```bash
-# ดู Environment ของ RubyGems
-gem environment
-
-# ตัวอย่าง Output:
-# RubyGems Environment:
-#   - RUBYGEMS VERSION: 3.4.10
-#   - RUBY VERSION: 3.2.2
-#   - INSTALLATION DIRECTORY: /usr/local/lib/ruby/gems/3.2.0
-#   - USER INSTALLATION DIRECTORY: /home/user/.gem/ruby/3.2.0
-#   - GEM PATHS:
-#      - /usr/local/lib/ruby/gems/3.2.0
-#      - /home/user/.gem/ruby/3.2.0
+# ==========================================
+# Cleanup
+# ==========================================
+gem cleanup                   # ลบ old versions
+gem cleanup rails             # ลบเฉพาะ old versions ของ rails
+gem cleanup -d                # dry run (แสดงว่าจะลบอะไร)
 ```
 
 ---
 
-## ขั้นตอนที่ 523: Gemfile และ Gemfile.lock
-
-### Gemfile พื้นฐาน
+## Step 523: Gemfile Structure
 
 ```ruby
 # Gemfile
+
+# Ruby version
+ruby '3.2.0'
+
+# Source - ที่ดาวน์โหลด gems
 source 'https://rubygems.org'
 
-# กำหนดเวอร์ชัน Ruby
-ruby '3.2.2'
+# ==========================================
+# Basic gems
+# ==========================================
+gem 'rails', '7.1.2'          # specific version
+gem 'pg'                      # latest version
+gem 'puma'                    # web server
 
-# Gem ทั่วไป (ทุก Environment)
-gem 'rails', '~> 7.1.0'
-gem 'pg',    '>= 1.1'
-gem 'puma',  '>= 5.0'
+# ==========================================
+# Gems with options
+# ==========================================
+gem 'rails', path: '../rails'         # local path (development)
+gem 'private_gem', git: 'https://github.com/user/gem.git'  # from git
+gem 'private_gem', git: 'https://...', branch: 'main'       # specific branch
+gem 'private_gem', git: 'https://...', tag: 'v1.0.0'        # specific tag
+gem 'private_gem', git: 'https://...', ref: 'abc1234'       # specific commit
 
-# Asset Pipeline
-gem 'importmap-rails'
-gem 'turbo-rails'
-gem 'stimulus-rails'
-gem 'tailwindcss-rails'
-
+# ==========================================
+# Gem Groups
+# ==========================================
 group :development do
+  gem 'rubocop'               # code linter
+  gem 'rubocop-rails'
+  gem 'spring'                # faster startup
   gem 'web-console'
-  gem 'listen'
-  gem 'spring'
-  gem 'rubocop', require: false
-  gem 'rubocop-rails', require: false
 end
 
 group :test do
-  gem 'capybara'
-  gem 'selenium-webdriver'
-  gem 'webdrivers'
+  gem 'rspec-rails'
+  gem 'factory_bot_rails'
+  gem 'faker'
+  gem 'shoulda-matchers'
+  gem 'simplecov'
 end
 
 group :development, :test do
-  gem 'rspec-rails', '~> 6.0'
-  gem 'factory_bot_rails'
-  gem 'faker'
-  gem 'pry-rails'
-  gem 'dotenv-rails'
+  gem 'pry'                   # debugger
+  gem 'pry-byebug'
+  gem 'dotenv-rails'          # env variables
 end
 
 group :production do
-  gem 'aws-sdk-s3', require: false
-  gem 'cloudflare-rails'
+  gem 'newrelic_rpm'          # monitoring
+  gem 'lograge'               # logging
 end
+
+# ==========================================
+# Conditional inclusion
+# ==========================================
+gem 'platform_gem', platforms: :ruby   # only on MRI Ruby
+gem 'jruby_gem', platforms: :jruby     # only on JRuby
+gem 'windows_gem', platforms: :x64_mingw  # only on Windows 64-bit
+
+# ==========================================
+# Gemspec integration (สำหรับ gem development)
+# ==========================================
+gemspec  # ใช้ dependencies จาก .gemspec file
 ```
 
-### Version Specifiers
+---
+
+## Step 524: Version Constraints
 
 ```ruby
-# Exact Version
-gem 'rails', '7.1.0'
+# ==========================================
+# Version constraints ใน Gemfile
+# ==========================================
 
-# Greater Than or Equal
-gem 'pg', '>= 1.1'
+# Exact version
+gem 'rails', '7.1.2'        # exactly 7.1.2
 
-# Pessimistic Operator (~>) - Version Constraint ที่นิยมใช้
-gem 'rails', '~> 7.1'    # >= 7.1.0, < 8.0 (เปลี่ยนได้แค่ Minor)
-gem 'pry',   '~> 0.14.2' # >= 0.14.2, < 0.15 (เปลี่ยนได้แค่ Patch)
+# Greater than or equal to
+gem 'pg', '>= 1.0'          # 1.0 หรือมากกว่า
 
-# Range
-gem 'rake', '>= 12.0', '< 14.0'
+# Less than or equal to
+gem 'ruby-debug', '<= 0.10.4'
 
-# ไม่ระบุเวอร์ชัน (ใช้ Latest)
-gem 'json'
+# Greater than
+gem 'rails', '> 5.0'
+
+# Less than
+gem 'rails', '< 8.0'
+
+# Pessimistic version constraint (~>)
+gem 'rails', '~> 7.1'       # >= 7.1, < 8.0
+gem 'rails', '~> 7.1.2'     # >= 7.1.2, < 7.2.0
+gem 'activesupport', '~> 7.0.0'  # >= 7.0.0, < 7.1.0
+
+# Multiple constraints
+gem 'rails', '>= 7.0', '< 8.0'
+
+# ==========================================
+# Semantic Versioning (SemVer): MAJOR.MINOR.PATCH
+# ==========================================
+# 1.2.3
+# ^---- MAJOR: breaking changes
+#   ^-- MINOR: new features (backward compatible)
+#     ^- PATCH: bug fixes (backward compatible)
+
+# ~> 7.1 หมายถึง: "compatible with 7.1"
+# = >=7.1.0, < 8.0.0 (MINOR และ PATCH อาจเปลี่ยน)
+
+# ~> 7.1.2 หมายถึง: "compatible with 7.1.2"
+# = >=7.1.2, < 7.2.0 (เฉพาะ PATCH อาจเปลี่ยน)
+
+# Examples:
+gem 'devise', '~> 4.9'      # >= 4.9, < 5.0
+gem 'sidekiq', '~> 7.2.0'   # >= 7.2.0, < 7.3.0
+gem 'nokogiri', '>= 1.13.0'  # อย่างน้อย 1.13.0
 ```
 
-### Gemfile.lock
+---
+
+## Step 525: Gemfile.lock
+
+```bash
+# Gemfile.lock ถูกสร้างอัตโนมัติโดย bundle install
+# เก็บ exact versions ของ gems ทั้งหมด (รวม dependencies)
+
+# ตัวอย่าง Gemfile.lock
+```
 
 ```
 GEM
   remote: https://rubygems.org/
   specs:
-    actioncable (7.1.0)
-      actionpack (= 7.1.0)
-      activesupport (= 7.1.0)
-      nio4r (~> 2.0)
-      websocket-driver (>= 0.6.1)
-    rails (7.1.0)
-      actioncable (= 7.1.0)
-      actionmailer (= 7.1.0)
-      actionpack (= 7.1.0)
-      ...
+    actioncable (7.1.2)
+      actionpack (= 7.1.2)
+      activesupport (= 7.1.2)
+    actionmailer (7.1.2)
+      actionpack (= 7.1.2)
+      actionview (= 7.1.2)
+      activejob (= 7.1.2)
+    rails (7.1.2)
+      actioncable (= 7.1.2)
+      actionmailer (= 7.1.2)
+      actionpack (= 7.1.2)
+    pg (1.5.4)
+    puma (6.4.0)
 
 PLATFORMS
   x86_64-linux
+  arm64-darwin-23
 
 DEPENDENCIES
+  pg
+  puma (~> 6.0)
   rails (~> 7.1.0)
-  puma (>= 5.0)
+
+BUNDLED WITH
+   2.5.3
 ```
 
-Gemfile.lock ควร Commit ไปยัง Git เสมอ เพื่อให้ทุกคนในทีมใช้ Gem เวอร์ชันเดียวกัน
-
----
-
-## ขั้นตอนที่ 524: Bundler Commands
-
-### คำสั่ง Bundler พื้นฐาน
-
 ```bash
-# ติดตั้ง Bundler
-gem install bundler
+# ==========================================
+# ทำไม Gemfile.lock สำคัญ?
+# ==========================================
+# 1. ทุกคนในทีมใช้ version เดียวกัน
+# 2. Deploy ไป production ใช้ version เดิม
+# 3. Reproducible builds
 
-# ติดตั้ง Gems จาก Gemfile
-bundle install
-bundle install --without production  # ข้าม group production
-bundle install --path vendor/bundle  # ติดตั้งใน local directory
+# Commit Gemfile.lock เสมอสำหรับ applications
+# อย่า commit Gemfile.lock สำหรับ gems (libraries)
 
-# อัพเดท Gems
-bundle update              # อัพเดท Gem ทั้งหมด
-bundle update rails        # อัพเดทเฉพาะ rails
-bundle update rails pry    # อัพเดทหลาย Gem
-
-# รันคำสั่งใน Bundler Environment
-bundle exec rspec
-bundle exec rake db:migrate
-bundle exec rails server
-
-# ดู Dependencies
-bundle list
-bundle show rails           # แสดง path ของ rails gem
-bundle show --paths         # แสดง paths ทั้งหมด
-
-# ตรวจสอบ
-bundle check               # ตรวจสอบว่า Gems ทั้งหมดติดตั้งครบ
-bundle outdated            # แสดง Gems ที่มีเวอร์ชันใหม่
-
-# สร้าง Gemfile ใหม่
-bundle init
-
-# Cleanup
-bundle clean               # ลบ Gems ที่ไม่ได้ใช้ออกจาก cache
-bundle clean --force
-```
-
-### bundle exec
-
-```bash
-# ใช้ bundle exec เสมอเพื่อใช้ Version ที่ถูกต้อง
-bundle exec rspec spec/
-bundle exec rails server
-bundle exec rake test
-bundle exec rubocop
-
-# สร้าง Binstubs (shortcut)
-bundle binstubs rspec-core
-./bin/rspec spec/  # ไม่ต้องพิมพ์ bundle exec แล้ว!
-
-# สร้าง Binstubs ทั้งหมด
-bundle binstubs --all
-```
-
-### Bundler Configuration
-
-```bash
-# ตั้งค่า Global
-bundle config set --global path 'vendor/bundle'
-bundle config set --global without 'development test'
-
-# ตั้งค่าเฉพาะโปรเจกต์ (.bundle/config)
-bundle config set --local path 'vendor/bundle'
-
-# ดูการตั้งค่า
-bundle config
+# ==========================================
+# Update lock file
+# ==========================================
+bundle update                # update all gems (เปลี่ยน lock file)
+bundle update rails          # update only rails
+bundle update --minor        # update only minor versions
+bundle update --patch        # update only patch versions
 ```
 
 ---
 
-## ขั้นตอนที่ 525: Semantic Versioning
+## Step 526: bundle Commands
 
-### SemVer: MAJOR.MINOR.PATCH
+```bash
+# ==========================================
+# bundle install
+# ==========================================
+bundle install               # install all gems in Gemfile
+bundle install --without production  # skip production group
+bundle install --path vendor/bundle  # install locally
+bundle install --jobs 4      # parallel install
+bundle install --retry 3     # retry on failure
+bundle install --frozen      # fail ถ้า Gemfile.lock ล้าสมัย
 
+# ==========================================
+# bundle exec
+# ==========================================
+bundle exec rails server     # รัน command ใน bundle context
+bundle exec rspec            # รัน rspec จาก bundle
+bundle exec rake             # รัน rake tasks
+bundle exec ruby my_script.rb
+
+# ทำไมต้องใช้ bundle exec?
+# - ใช้ gems จาก Gemfile แทน global gems
+# - หลีกเลี่ยง version conflicts
+
+# ==========================================
+# bundle update
+# ==========================================
+bundle update                # update all (careful!)
+bundle update rails          # update specific gem
+bundle update rails activesupport  # update multiple
+bundle update --conservative  # minimal updates
+
+# ==========================================
+# bundle check
+# ==========================================
+bundle check                 # ตรวจสอบว่า gems พร้อมใช้งาน
+
+# ==========================================
+# bundle show
+# ==========================================
+bundle show                  # รายการ gems ทั้งหมด
+bundle show rails            # path ของ rails gem
+bundle info rails            # ข้อมูลละเอียด
+
+# ==========================================
+# bundle outdated
+# ==========================================
+bundle outdated              # gems ที่มี update
+bundle outdated --minor      # เฉพาะ minor updates
+bundle outdated --strict     # เฉพาะ versions ที่ตรง constraints
+
+# ==========================================
+# bundle console
+# ==========================================
+bundle console               # irb กับ gems loaded
+
+# ==========================================
+# bundle clean
+# ==========================================
+bundle clean                 # ลบ gems ที่ไม่ได้ใช้
+bundle clean --force         # force clean
+
+# ==========================================
+# bundle binstubs
+# ==========================================
+bundle binstubs rspec-core   # สร้าง bin/rspec
+bundle binstubs rails        # สร้าง bin/rails
+# หลังจากนี้ใช้ ./bin/rspec แทน bundle exec rspec
+
+# ==========================================
+# bundle config
+# ==========================================
+bundle config list           # ดู config ทั้งหมด
+bundle config set path vendor/bundle  # set path
+bundle config set without development test  # skip groups
+bundle config unset path     # ลบ config
 ```
-Version: 2.4.1
-          │ │ └── PATCH: แก้ Bug (Backward Compatible)
-          │ └──── MINOR: เพิ่ม Feature (Backward Compatible)
-          └────── MAJOR: เปลี่ยน Breaking Changes
-```
 
-### ตัวอย่างการเปลี่ยนแปลง
+---
+
+## Step 527: Gem Groups
 
 ```ruby
-# PATCH: 1.0.0 → 1.0.1
-# แก้ Bug ที่ไม่กระทบ API
+# Gemfile กับ groups ที่ชัดเจน
+source 'https://rubygems.org'
+ruby '3.2.0'
 
-# MINOR: 1.0.1 → 1.1.0
-# เพิ่ม Method ใหม่ ยังใช้งาน Old Code ได้
+# ===========================
+# Core gems (ทุก environment)
+# ===========================
+gem 'rails', '~> 7.1'
+gem 'pg', '>= 1.0'
+gem 'redis', '~> 5.0'
+gem 'sidekiq', '~> 7.0'
+gem 'image_processing', '~> 1.2'
 
-# MAJOR: 1.1.0 → 2.0.0
-# เปลี่ยน Method Signature
-# ลบ Deprecated Methods
-# เปลี่ยนพฤติกรรมหลัก
-```
+# ===========================
+# Development only
+# ===========================
+group :development do
+  gem 'web-console'
+  gem 'spring'
+  gem 'spring-watcher-listen'
+  gem 'listen'
+  gem 'letter_opener'         # preview emails in browser
+  gem 'rack-mini-profiler'    # performance profiler
+  gem 'bullet'                # N+1 query detector
+  gem 'annotate'              # add DB schema comments
+end
 
-### Pre-release Versions
+# ===========================
+# Test only
+# ===========================
+group :test do
+  gem 'rspec-rails'
+  gem 'capybara'
+  gem 'selenium-webdriver'
+  gem 'webdrivers'
+  gem 'factory_bot_rails'
+  gem 'faker'
+  gem 'shoulda-matchers'
+  gem 'simplecov', require: false
+  gem 'vcr'
+  gem 'webmock'
+  gem 'database_cleaner-active_record'
+end
 
-```
-1.0.0-alpha    # Alpha - ยังไม่เสถียร
-1.0.0-beta.1   # Beta - ใกล้จะ Release
-1.0.0-rc.1     # Release Candidate - เกือบ Final
-1.0.0          # Stable Release
-```
+# ===========================
+# Development + Test
+# ===========================
+group :development, :test do
+  gem 'pry-rails'
+  gem 'pry-byebug'
+  gem 'dotenv-rails'
+  gem 'rubocop-rails-omakase', require: false
+end
 
----
-
-## ขั้นตอนที่ 526-530: สร้าง Gem ของตัวเอง
-
-### สร้าง Gem Structure
-
-```bash
-# สร้าง Gem ด้วย bundler
-bundle gem my_awesome_gem
-
-# โครงสร้างที่ได้
-my_awesome_gem/
-├── lib/
-│   ├── my_awesome_gem.rb
-│   └── my_awesome_gem/
-│       └── version.rb
-├── spec/
-│   ├── spec_helper.rb
-│   └── my_awesome_gem_spec.rb
-├── .github/
-│   └── workflows/
-│       └── main.yml
-├── .gitignore
-├── .rspec
-├── Gemfile
-├── LICENSE.txt
-├── my_awesome_gem.gemspec
-├── Rakefile
-└── README.md
-```
-
-### gemspec File
-
-```ruby
-# my_awesome_gem.gemspec
-require_relative 'lib/my_awesome_gem/version'
-
-Gem::Specification.new do |spec|
-  spec.name          = 'my_awesome_gem'
-  spec.version       = MyAwesomeGem::VERSION
-  spec.authors       = ['สมชาย ดีใจ']
-  spec.email         = ['somchai@example.com']
-  
-  spec.summary       = 'Gem ที่ยอดเยี่ยมสำหรับทำ...'
-  spec.description   = <<~DESC
-    คำอธิบายโดยละเอียดของ Gem นี้
-    รองรับ Ruby 2.7+
-    ใช้สำหรับ...
-  DESC
-  
-  spec.homepage      = 'https://github.com/somchai/my_awesome_gem'
-  spec.license       = 'MIT'
-  
-  # Version Constraints
-  spec.required_ruby_version = '>= 2.7.0'
-  
-  # URLs
-  spec.metadata = {
-    'homepage_uri'      => spec.homepage,
-    'source_code_uri'   => spec.homepage,
-    'changelog_uri'     => "#{spec.homepage}/blob/main/CHANGELOG.md",
-    'documentation_uri' => "https://rubydoc.info/gems/#{spec.name}",
-    'bug_tracker_uri'   => "#{spec.homepage}/issues"
-  }
-  
-  # Files ที่รวมใน Gem
-  spec.files = Dir.glob('{lib,exe}/**/*') + 
-               ['README.md', 'LICENSE.txt', 'CHANGELOG.md']
-  
-  spec.bindir        = 'exe'
-  spec.executables   = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
-  spec.require_paths = ['lib']
-  
-  # Runtime Dependencies
-  spec.add_dependency 'activesupport', '>= 6.0'
-  spec.add_dependency 'faraday',       '~> 2.0'
-  
-  # Development Dependencies
-  spec.add_development_dependency 'rspec',     '~> 3.12'
-  spec.add_development_dependency 'rubocop',   '~> 1.50'
-  spec.add_development_dependency 'simplecov', '~> 0.22'
+# ===========================
+# Production only
+# ===========================
+group :production do
+  gem 'aws-sdk-s3'            # file storage
+  gem 'newrelic_rpm'          # monitoring
+  gem 'lograge'               # structured logging
+  gem 'rack-timeout'          # request timeout
 end
 ```
 
-### Gem Implementation
+```bash
+# Install without certain groups
+bundle install --without development test
+
+# หรือ ใน config
+bundle config set without development:test
+bundle install
+
+# BUNDLE_WITHOUT environment variable
+BUNDLE_WITHOUT=development:test bundle install
+```
+
+---
+
+## Step 528: สร้าง Gem ของตัวเอง - Bundle Gem
+
+```bash
+# สร้าง gem structure ด้วย bundler
+bundle gem my_awesome_gem
+
+# สร้าง:
+# my_awesome_gem/
+# ├── bin/
+# │   ├── console     (interactive console)
+# │   └── setup       (setup script)
+# ├── lib/
+# │   ├── my_awesome_gem.rb
+# │   └── my_awesome_gem/
+# │       └── version.rb
+# ├── spec/
+# │   ├── my_awesome_gem_spec.rb
+# │   └── spec_helper.rb
+# ├── .git/
+# ├── .gitignore
+# ├── .rspec
+# ├── CHANGELOG.md
+# ├── CODE_OF_CONDUCT.md
+# ├── Gemfile
+# ├── LICENSE.txt
+# ├── README.md
+# ├── Rakefile
+# └── my_awesome_gem.gemspec
+
+# Options
+bundle gem my_gem --mit      # MIT license
+bundle gem my_gem --coc      # Code of Conduct
+bundle gem my_gem --test rspec  # RSpec testing
+bundle gem my_gem --ci github   # GitHub Actions CI
+bundle gem my_gem --exe      # executable
+```
+
+---
+
+## Step 529: Gemspec File
+
+```ruby
+# my_awesome_gem.gemspec
+
+require_relative "lib/my_awesome_gem/version"
+
+Gem::Specification.new do |spec|
+  # ==========================================
+  # Required fields
+  # ==========================================
+  spec.name    = "my_awesome_gem"
+  spec.version = MyAwesomeGem::VERSION
+  spec.authors = ["Your Name"]
+  spec.email   = ["your.email@example.com"]
+
+  # ==========================================
+  # Description
+  # ==========================================
+  spec.summary     = "A short description (one sentence)"
+  spec.description = "A longer description of what this gem does, what problems it solves, and how to use it."
+  spec.homepage    = "https://github.com/yourusername/my_awesome_gem"
+  spec.license     = "MIT"
+
+  # ==========================================
+  # Ruby version requirement
+  # ==========================================
+  spec.required_ruby_version = ">= 3.0.0"
+
+  # ==========================================
+  # Files to include
+  # ==========================================
+  spec.files = Dir.chdir(__dir__) do
+    `git ls-files -z`.split("\x0").reject do |f|
+      (File.expand_path(f) == __FILE__) ||
+        f.start_with?(*%w[bin/ test/ spec/ features/ .git .circleci appveyor Gemfile])
+    end
+  end
+
+  spec.bindir        = "exe"
+  spec.executables   = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
+  spec.require_paths = ["lib"]
+
+  # ==========================================
+  # Metadata
+  # ==========================================
+  spec.metadata = {
+    "homepage_uri"    => spec.homepage,
+    "source_code_uri" => "https://github.com/yourusername/my_awesome_gem",
+    "changelog_uri"   => "https://github.com/yourusername/my_awesome_gem/blob/main/CHANGELOG.md",
+    "bug_tracker_uri" => "https://github.com/yourusername/my_awesome_gem/issues",
+    "documentation_uri" => "https://rubydoc.info/gems/my_awesome_gem",
+    "rubygems_mfa_required" => "true"  # require MFA for publishing
+  }
+
+  # ==========================================
+  # Runtime dependencies
+  # ==========================================
+  spec.add_dependency "activesupport", "~> 7.0"
+  spec.add_dependency "faraday", "~> 2.0"
+
+  # ==========================================
+  # Development dependencies
+  # ==========================================
+  spec.add_development_dependency "rspec", "~> 3.12"
+  spec.add_development_dependency "rake", "~> 13.0"
+  spec.add_development_dependency "rubocop", "~> 1.50"
+end
+```
+
+---
+
+## Step 530: Gem Structure และ Code
 
 ```ruby
 # lib/my_awesome_gem/version.rb
 module MyAwesomeGem
-  VERSION = '0.1.0'
+  VERSION = "0.1.0"
 end
+```
 
-# lib/my_awesome_gem.rb
-require 'my_awesome_gem/version'
-require 'my_awesome_gem/thai_text'
-require 'my_awesome_gem/formatter'
-require 'my_awesome_gem/validator'
+```ruby
+# lib/my_awesome_gem.rb - Main entry point
+require "my_awesome_gem/version"
+require "my_awesome_gem/configuration"
+require "my_awesome_gem/errors"
+require "my_awesome_gem/client"
 
 module MyAwesomeGem
   class Error < StandardError; end
   class ConfigurationError < Error; end
-  
+  class ApiError < Error; end
+
   class << self
     attr_reader :configuration
-    
+
     def configure
-      @configuration = Configuration.new
-      yield(@configuration)
+      @configuration ||= Configuration.new
+      yield(@configuration) if block_given?
+      @configuration
     end
-    
+
     def reset!
       @configuration = nil
     end
   end
-  
-  class Configuration
-    attr_accessor :api_key, :timeout, :debug
-    
-    def initialize
-      @timeout = 30
-      @debug   = false
-    end
-  end
 end
+```
 
-# lib/my_awesome_gem/thai_text.rb
+```ruby
+# lib/my_awesome_gem/configuration.rb
 module MyAwesomeGem
-  module ThaiText
-    def self.to_digits(number)
-      THAI_DIGITS = {
-        '0' => '๐', '1' => '๑', '2' => '๒', '3' => '๓', '4' => '๔',
-        '5' => '๕', '6' => '๖', '7' => '๗', '8' => '๘', '9' => '๙'
-      }
-      
-      number.to_s.chars.map { |c| THAI_DIGITS[c] || c }.join
+  class Configuration
+    attr_accessor :api_key, :api_url, :timeout, :logger
+
+    def initialize
+      @api_url = "https://api.example.com"
+      @timeout = 30
+      @logger  = Logger.new($stdout)
     end
-    
-    def self.count_words(text)
-      # นับคำในภาษาไทย (แบบง่าย)
-      text.split(/[\s,]+/).reject(&:empty?).size
-    end
-    
-    def self.truncate(text, max_length)
-      return text if text.length <= max_length
-      "#{text[0...max_length]}..."
+
+    def valid?
+      !@api_key.nil? && !@api_key.empty?
     end
   end
 end
 ```
 
-### Testing Gem
-
 ```ruby
-# spec/my_awesome_gem_spec.rb
-require 'spec_helper'
+# lib/my_awesome_gem/client.rb
+require 'net/http'
+require 'json'
 
-RSpec.describe MyAwesomeGem do
-  it 'has a version number' do
-    expect(MyAwesomeGem::VERSION).not_to be nil
-  end
-  
-  describe '.configure' do
-    it 'ตั้งค่า API Key ได้' do
-      MyAwesomeGem.configure do |config|
-        config.api_key = 'test_key_123'
-        config.timeout = 60
+module MyAwesomeGem
+  class Client
+    def initialize(config = MyAwesomeGem.configuration)
+      raise ConfigurationError, "API key is required" unless config&.valid?
+      @config = config
+    end
+
+    def get(endpoint, params = {})
+      uri = build_uri(endpoint, params)
+      response = make_request(:get, uri)
+      parse_response(response)
+    end
+
+    def post(endpoint, body = {})
+      uri = build_uri(endpoint)
+      response = make_request(:post, uri, body)
+      parse_response(response)
+    end
+
+    private
+
+    def build_uri(endpoint, params = {})
+      uri = URI.parse("#{@config.api_url}#{endpoint}")
+      uri.query = URI.encode_www_form(params) unless params.empty?
+      uri
+    end
+
+    def make_request(method, uri, body = nil)
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = uri.scheme == 'https'
+      http.read_timeout = @config.timeout
+
+      request = case method
+        when :get  then Net::HTTP::Get.new(uri)
+        when :post then Net::HTTP::Post.new(uri)
       end
-      
-      expect(MyAwesomeGem.configuration.api_key).to eq('test_key_123')
-      expect(MyAwesomeGem.configuration.timeout).to eq(60)
-    end
-    
-    after { MyAwesomeGem.reset! }
-  end
-end
 
-RSpec.describe MyAwesomeGem::ThaiText do
-  describe '.to_digits' do
-    it 'แปลงตัวเลขเป็นตัวเลขไทย' do
-      expect(MyAwesomeGem::ThaiText.to_digits(12345)).to eq('๑๒๓๔๕')
-      expect(MyAwesomeGem::ThaiText.to_digits(0)).to eq('๐')
+      request['Authorization'] = "Bearer #{@config.api_key}"
+      request['Content-Type']  = 'application/json'
+      request.body = body.to_json if body
+
+      @config.logger.debug "#{method.upcase} #{uri}"
+      http.request(request)
+    rescue Net::TimeoutError
+      raise ApiError, "Request timed out after #{@config.timeout}s"
+    rescue => e
+      raise ApiError, "Request failed: #{e.message}"
     end
-  end
-  
-  describe '.truncate' do
-    it 'ตัดข้อความที่ยาวเกิน' do
-      long_text = "สวัสดีชาวโลกทุกท่าน"
-      result    = MyAwesomeGem::ThaiText.truncate(long_text, 5)
-      expect(result).to eq("สวัสดี...")
-    end
-    
-    it 'ไม่ตัดข้อความที่ไม่เกิน Limit' do
-      short_text = "สวัสดี"
-      expect(MyAwesomeGem::ThaiText.truncate(short_text, 10)).to eq("สวัสดี")
+
+    def parse_response(response)
+      body = JSON.parse(response.body) rescue response.body
+
+      case response.code.to_i
+      when 200..299
+        body
+      when 401
+        raise ApiError, "Unauthorized: check your API key"
+      when 404
+        raise ApiError, "Resource not found"
+      when 422
+        raise ApiError, "Validation failed: #{body['errors']}"
+      when 500..599
+        raise ApiError, "Server error: #{response.code}"
+      else
+        raise ApiError, "Unexpected response: #{response.code}"
+      end
     end
   end
 end
@@ -520,588 +714,763 @@ end
 
 ---
 
-## ขั้นตอนที่ 531-535: Publishing Gem ไปยัง RubyGems.org
+## Step 531: Writing Gem Code
 
-### ขั้นตอนการ Publish
+```ruby
+# ตัวอย่าง gem ที่สมบูรณ์กว่า: text_analyzer gem
+
+# lib/text_analyzer.rb
+require "text_analyzer/version"
+require "text_analyzer/analyzer"
+require "text_analyzer/formatter"
+
+module TextAnalyzer
+  class << self
+    def analyze(text)
+      Analyzer.new(text)
+    end
+
+    def configure
+      @config ||= Configuration.new
+      yield(@config) if block_given?
+    end
+  end
+end
+
+# lib/text_analyzer/analyzer.rb
+module TextAnalyzer
+  class Analyzer
+    attr_reader :text
+
+    def initialize(text)
+      @text = text.to_s
+    end
+
+    def word_count
+      words.size
+    end
+
+    def sentence_count
+      @text.scan(/[.!?]+/).size
+    end
+
+    def char_count(include_spaces: true)
+      include_spaces ? @text.length : @text.gsub(/\s/, '').length
+    end
+
+    def words
+      @words ||= @text.downcase.scan(/\b[a-z']+\b/)
+    end
+
+    def unique_words
+      words.uniq
+    end
+
+    def word_frequency
+      words.tally.sort_by { |_, v| -v }.to_h
+    end
+
+    def most_common_words(n = 10)
+      word_frequency.first(n)
+    end
+
+    def reading_time(wpm: 200)
+      (word_count.to_f / wpm).ceil
+    end
+
+    def flesch_kincaid_grade
+      avg_sentence_length = word_count.to_f / sentence_count
+      avg_syllables = syllable_count.to_f / word_count
+      0.39 * avg_sentence_length + 11.8 * avg_syllables - 15.59
+    end
+
+    def summary(max_sentences: 3)
+      sentences = @text.split(/[.!?]+/).map(&:strip).reject(&:empty?)
+      important = sentences.first(max_sentences)
+      important.join('. ') + '.'
+    end
+
+    def to_h
+      {
+        word_count:     word_count,
+        unique_words:   unique_words.size,
+        sentence_count: sentence_count,
+        char_count:     char_count,
+        reading_time:   reading_time
+      }
+    end
+
+    private
+
+    def syllable_count
+      words.sum { |w| count_syllables(w) }
+    end
+
+    def count_syllables(word)
+      word.downcase.gsub(/[^aeiouy]/, ' ').split.size.then { |n| [n, 1].max }
+    end
+  end
+end
+```
+
+---
+
+## Step 532: Testing Gems
+
+```ruby
+# spec/spec_helper.rb
+require "bundler/setup"
+require "text_analyzer"
+
+RSpec.configure do |config|
+  config.expect_with :rspec do |c|
+    c.syntax = :expect
+  end
+  config.order = :random
+end
+
+# spec/text_analyzer/analyzer_spec.rb
+RSpec.describe TextAnalyzer::Analyzer do
+  let(:sample_text) do
+    "The quick brown fox jumps over the lazy dog. " \
+    "This is a simple sentence. Ruby is a great language!"
+  end
+
+  subject(:analyzer) { described_class.new(sample_text) }
+
+  describe "#word_count" do
+    it "counts all words" do
+      expect(analyzer.word_count).to eq(18)
+    end
+
+    it "returns 0 for empty text" do
+      expect(described_class.new("").word_count).to eq(0)
+    end
+  end
+
+  describe "#sentence_count" do
+    it "counts sentences" do
+      expect(analyzer.sentence_count).to eq(3)
+    end
+  end
+
+  describe "#word_frequency" do
+    it "counts word occurrences" do
+      freq = analyzer.word_frequency
+      expect(freq["the"]).to eq(2)
+    end
+
+    it "sorts by frequency" do
+      freq = analyzer.word_frequency
+      values = freq.values
+      expect(values).to eq(values.sort.reverse)
+    end
+  end
+
+  describe "#most_common_words" do
+    it "returns N most common words" do
+      result = analyzer.most_common_words(3)
+      expect(result.size).to eq(3)
+    end
+  end
+
+  describe "#reading_time" do
+    it "estimates reading time in minutes" do
+      expect(analyzer.reading_time).to be_a(Integer)
+      expect(analyzer.reading_time).to be >= 1
+    end
+  end
+
+  describe "#to_h" do
+    it "returns hash with all stats" do
+      hash = analyzer.to_h
+      expect(hash).to include(:word_count, :unique_words, :sentence_count)
+    end
+  end
+end
+```
+
+---
+
+## Step 533: Publishing to RubyGems.org
 
 ```bash
-# 1. สมัครสมาชิก RubyGems.org
-# ไปที่ https://rubygems.org/sign_up
+# 1. สร้าง account บน rubygems.org
 
-# 2. ตั้งค่า Credentials
+# 2. Setup credentials
 gem signin
-# ใส่ Email และ Password
+# หรือ
+gem push --key rubygems
 
-# 3. Build Gem
+# 3. Build gem
 gem build my_awesome_gem.gemspec
-# ได้ไฟล์ my_awesome_gem-0.1.0.gem
+# สร้าง my_awesome_gem-0.1.0.gem
 
-# 4. ตรวจสอบ Gem ก่อน Publish
-gem contents my_awesome_gem-0.1.0.gem
-
-# 5. Publish
+# 4. Push to RubyGems.org
 gem push my_awesome_gem-0.1.0.gem
 
-# ตรวจสอบว่า Publish แล้ว
-gem list my_awesome_gem --remote
+# 5. ตรวจสอบ
+gem info my_awesome_gem
+
+# ==========================================
+# Update version
+# ==========================================
+# แก้ lib/my_awesome_gem/version.rb
+# VERSION = "0.2.0"
+
+# Build และ push อีกครั้ง
+gem build my_awesome_gem.gemspec
+gem push my_awesome_gem-0.2.0.gem
+
+# ==========================================
+# Yank (ถอน) version
+# ==========================================
+gem yank my_awesome_gem -v 0.1.0
+
+# ==========================================
+# Rake tasks สำหรับ gem release
+# ==========================================
+# Rakefile
+require "bundler/gem_tasks"
+require "rspec/core/rake_task"
+
+RSpec::Core::RakeTask.new(:spec)
+
+task default: :spec
 ```
 
-### การทำ Release ด้วย rake-release
-
 ```ruby
-# Rakefile
-require 'bundler/gem_tasks'
-require 'rspec/core/rake_task'
-require 'rubocop/rake_task'
+# Rakefile สำหรับ gem development
+require "bundler/gem_tasks"
+require "rspec/core/rake_task"
+require "rubocop/rake_task"
 
-RSpec::RakeTask.new(:spec)
+RSpec::Core::RakeTask.new(:spec)
 RuboCop::RakeTask.new
 
+desc "Run specs and rubocop"
 task default: %i[spec rubocop]
 
-# คำสั่งที่ได้จาก bundler/gem_tasks:
-# rake build      - Build Gem
-# rake install    - Build และติดตั้ง Local
-# rake release    - Build, Tag, Push ไปยัง GitHub และ RubyGems
-```
-
-```bash
-# Workflow การ Release
-# 1. อัพเดทเวอร์ชันใน version.rb
-# 2. อัพเดท CHANGELOG.md
-# 3. Commit changes
-# 4. รัน rake release
-rake release
-
-# Output:
-# my_awesome_gem 0.1.0 built to pkg/my_awesome_gem-0.1.0.gem
-# Tagged v0.1.0
-# Pushed git commits and release tag
-# Pushed my_awesome_gem 0.1.0 to rubygems.org
-```
-
-### Private Gem Server
-
-```ruby
-# Gemfile สำหรับ Private Gem Server
-source 'https://rubygems.org'
-
-# Private gem server
-source 'https://gems.example.com' do
-  gem 'our_internal_gem'
-  gem 'another_private_gem'
-end
-
-gem 'rails', '~> 7.1'
+# รัน: rake release  # bump version, tag, push to rubygems
+# รัน: rake spec     # run tests
+# รัน: rake rubocop  # lint code
 ```
 
 ---
 
-## ขั้นตอนที่ 536-538: Popular Gems Overview
-
-### Development Tools
+## Step 534: Popular Ruby Gems Overview
 
 ```ruby
-# pry - Interactive Ruby Shell ที่ทรงพลัง
-gem 'pry'
+# ==========================================
+# Web Frameworks
+# ==========================================
+gem 'rails'          # Full-stack web framework
+gem 'sinatra'        # Minimal web framework
+gem 'hanami'         # Clean architecture framework
+gem 'grape'          # REST API framework
 
-# การใช้งาน
-require 'pry'
+# ==========================================
+# Database
+# ==========================================
+gem 'activerecord'   # ORM (comes with Rails)
+gem 'sequel'         # Alternative ORM
+gem 'pg'             # PostgreSQL adapter
+gem 'mysql2'         # MySQL adapter
+gem 'sqlite3'        # SQLite adapter
+gem 'redis'          # Redis client
+gem 'mongoid'        # MongoDB ORM
 
-def complex_method
-  data = fetch_data
-  binding.pry  # Pause และเปิด pry session
-  process_data(data)
-end
-```
-
-```ruby
-# awesome_print - Pretty Print Ruby Objects
-gem 'awesome_print'
-
-require 'awesome_print'
-
-# แทนที่ p หรือ pp
-ap { name: 'สมชาย', age: 30, roles: [:admin, :user] }
-# Output สวยงาม มีสี และ Indentation
-
-# ตั้งค่า Default
-AwesomePrint.defaults = {
-  indent: 2,
-  sort_keys: true,
-  color: {
-    string: :yellow,
-    symbol: :green,
-    integer: :cyan
-  }
-}
-```
-
-```ruby
-# irb (built-in) vs pry
-# pry มีฟีเจอร์เพิ่มเติม:
-# - Syntax Highlighting
-# - Method introspection (show-method)
-# - Debugging (binding.pry)
-# - History
-# - Plugins
-
-# pry-byebug - Debugging
-gem 'pry-byebug'
-
-binding.pry
-# Commands:
-# next - ไปบรรทัดถัดไป
-# step - เข้าไปใน Method
-# finish - ออกจาก Method ปัจจุบัน
-# continue - ทำงานต่อจนถึง breakpoint ถัดไป
-```
-
-### HTTP Clients
-
-```ruby
-# httparty - Simple HTTP Client
-gem 'httparty'
-
-class WeatherClient
-  include HTTParty
-  base_uri 'https://api.weatherapi.com/v1'
-  
-  def initialize(api_key)
-    @options = { query: { key: api_key } }
-  end
-  
-  def current(city)
-    self.class.get('/current.json', @options.merge(
-      query: @options[:query].merge(q: city)
-    ))
-  end
-end
-
-client = WeatherClient.new('your_api_key')
-weather = client.current('Bangkok')
-puts weather['current']['temp_c']
-
-# faraday - Flexible HTTP Client
-gem 'faraday'
-gem 'faraday-retry'
-gem 'faraday-follow_redirects'
-
-connection = Faraday.new('https://api.example.com') do |conn|
-  conn.use Faraday::Retry::Middleware, max: 3
-  conn.response :json
-  conn.adapter Faraday.default_adapter
-end
-
-response = connection.get('/users', { page: 1, per_page: 20 })
-puts response.body
-```
-
-### JSON/Data Processing
-
-```ruby
-# oj - Fast JSON Parser (Optimized JSON)
-gem 'oj'
-
-require 'oj'
-
-# Fast JSON
-json_string = '{"name":"สมชาย","age":30}'
-data = Oj.load(json_string)
-puts data  # {"name"=>"สมชาย", "age"=>30}
-
-output = Oj.dump({ name: 'สมชาย', age: 30 })
-puts output  # {"name":"สมชาย","age":30}
-
-# dry-types - Type System สำหรับ Ruby
-gem 'dry-types'
-
-module Types
-  include Dry.Types()
-  
-  Email    = String.constrained(format: /\A[^@\s]+@[^@\s]+\z/)
-  Age      = Integer.constrained(gteq: 0, lteq: 150)
-  ThaiName = String.constrained(min_size: 2, max_size: 100)
-end
-
-# ใช้งาน
-Types::Email.('valid@example.com')   # OK
-Types::Email.('invalid')              # Error!
-Types::Age.(25)                       # OK
-Types::Age.(200)                      # Error!
-```
-
-### Database
-
-```ruby
-# sequel - Database Toolkit
-gem 'sequel'
-
-DB = Sequel.connect('postgres://localhost/mydb')
-
-class User < Sequel::Model
-  many_to_many :roles
-  one_to_many  :orders
-  
-  def before_save
-    self.email = email.downcase
-    super
-  end
-end
-
-# Query API คล้าย ActiveRecord
-User.where(active: true).order(:name).limit(10)
-User.where { age > 18 }.all
-DB[:users].insert(name: 'สมชาย', email: 'test@example.com')
-```
-
-### Utility Gems
-
-```ruby
-# activesupport - Standalone ActiveSupport
-gem 'activesupport', require: false
-
-require 'active_support/all'
-
-# Timezone
-Time.now.in_time_zone('Bangkok')
-'สวัสดี'.truncate(3)    # "สวั..."
-2.weeks.ago
-1.month.from_now
-[1, 2, 3].sum
-{ a: 1, b: 2 }.slice(:a)  # {a: 1}
-
-# thor - CLI Framework
-gem 'thor'
-
-class MyCLI < Thor
-  desc "hello NAME", "สวัสดี NAME"
-  option :thai, type: :boolean, default: false
-  
-  def hello(name)
-    greeting = options[:thai] ? "สวัสดี" : "Hello"
-    puts "#{greeting}, #{name}!"
-  end
-  
-  desc "list", "แสดงรายการ"
-  def list
-    puts "รายการ..."
-  end
-end
-
-MyCLI.start(ARGV)
-# ruby my_cli.rb hello สมชาย --thai
-# ruby my_cli.rb list
-```
-
-### Background Jobs
-
-```ruby
-# sidekiq - Background Job Processing
-gem 'sidekiq'
-
-class SendEmailWorker
-  include Sidekiq::Worker
-  
-  sidekiq_options queue: :mailers, retry: 3
-  
-  def perform(user_id, template_name)
-    user = User.find(user_id)
-    UserMailer.send(template_name, user).deliver_now
-  end
-end
-
-# Enqueue Job
-SendEmailWorker.perform_async(user.id, 'welcome_email')
-SendEmailWorker.perform_in(5.minutes, user.id, 'reminder_email')
-SendEmailWorker.perform_at(Time.now + 1.hour, user.id, 'followup_email')
-
-# good_job - Multi-threaded Active Job Backend
-gem 'good_job'
-
-class ImportDataJob < ApplicationJob
-  queue_as :default
-  
-  def perform(file_path)
-    ImportService.new(file_path).import!
-  end
-end
-
-ImportDataJob.perform_later('data.csv')
-ImportDataJob.set(wait: 5.minutes).perform_later('data.csv')
-```
-
----
-
-## ขั้นตอนที่ 539: Gem Security
-
-```bash
-# ตรวจสอบ Security Vulnerabilities
-gem install bundler-audit
-
-# อัพเดท Advisory Database
-bundle audit update
-
-# ตรวจสอบ Gemfile.lock
-bundle audit check
-# Output:
-# Name: rack
-# Version: 2.2.6
-# Advisory: CVE-2022-44570
-# Criticality: Medium
-# URL: https://github.com/advisories/GHSA-65f5-mfpf-vfhj
-# Title: Denial of Service Vulnerability
-# Solution: upgrade to >= 2.2.6.3
-
-# ตรวจสอบพร้อมอัพเดท
-bundle audit check --update
-```
-
-### การเพิ่ม Security ใน CI/CD
-
-```yaml
-# .github/workflows/security.yml
-name: Security Check
-
-on: [push, pull_request]
-
-jobs:
-  security:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.2'
-          bundler-cache: true
-      
-      - name: Run bundler-audit
-        run: |
-          gem install bundler-audit
-          bundle audit check --update
-      
-      - name: Run brakeman (Rails Security)
-        run: |
-          gem install brakeman
-          brakeman -q
-```
-
----
-
-## ขั้นตอนที่ 540: Best Practices สำหรับ Gems
-
-### Gemfile Organization
-
-```ruby
-# Gemfile ที่จัดระเบียบดี
-source 'https://rubygems.org'
-ruby File.read('.ruby-version').strip
-
-# Core
-gem 'rails',    '~> 7.1.0'
-gem 'pg',       '>= 1.1'
-gem 'puma',     '>= 5.0'
-gem 'redis',    '~> 5.0'
-gem 'sidekiq',  '~> 7.0'
-
+# ==========================================
 # Authentication
-gem 'devise',   '~> 4.9'
-gem 'jwt',      '~> 2.7'
+# ==========================================
+gem 'devise'         # User authentication
+gem 'bcrypt'         # Password hashing
+gem 'jwt'            # JSON Web Tokens
+gem 'doorkeeper'     # OAuth 2.0
+gem 'omniauth'       # Multi-provider auth
+gem 'cancancan'      # Authorization
+gem 'pundit'         # Policy-based authorization
 
-# API
-gem 'jbuilder', '~> 2.11'
-gem 'oj',       '~> 3.16'
+# ==========================================
+# HTTP Clients
+# ==========================================
+gem 'faraday'        # HTTP client with middleware
+gem 'httparty'       # Simple HTTP client
+gem 'rest-client'    # REST client
+gem 'typhoeus'       # Parallel HTTP requests
+gem 'mechanize'      # Web scraping with cookies
 
-# Storage
-gem 'aws-sdk-s3',      require: false
-gem 'image_processing', '~> 1.2'
+# ==========================================
+# Background Jobs
+# ==========================================
+gem 'sidekiq'        # Background jobs with Redis
+gem 'delayed_job'    # Database-backed jobs
+gem 'resque'         # Redis-backed jobs
+gem 'sucker_punch'   # In-process async jobs
+gem 'good_job'       # Database-backed with Postgres
 
-# Monitoring
-gem 'sentry-ruby',     '~> 5.11'
-gem 'sentry-rails'
-gem 'rack-mini-profiler', require: false
+# ==========================================
+# Testing
+# ==========================================
+gem 'rspec'          # Testing framework
+gem 'minitest'       # Built-in testing
+gem 'capybara'       # Browser testing
+gem 'factory_bot'    # Test fixtures
+gem 'faker'          # Fake data
+gem 'vcr'            # Record HTTP interactions
+gem 'webmock'        # Stub HTTP requests
+gem 'timecop'        # Time manipulation
 
-group :development do
-  gem 'web-console'
-  gem 'letter_opener'         # Preview emails ใน browser
-  gem 'bullet'                # Detect N+1 Queries
-  gem 'annotate'              # เพิ่ม Schema ใน Model files
-  gem 'brakeman', require: false
-  gem 'rubocop-rails', require: false
+# ==========================================
+# Code Quality
+# ==========================================
+gem 'rubocop'        # Style linter
+gem 'reek'           # Code smell detector
+gem 'flay'           # Code duplication
+gem 'flog'           # Code complexity
+gem 'brakeman'       # Security scanner
+
+# ==========================================
+# Performance
+# ==========================================
+gem 'rack-mini-profiler'  # Performance profiler
+gem 'bullet'              # N+1 query detector
+gem 'skylight'            # Performance monitoring
+gem 'scout_apm'           # APM solution
+
+# ==========================================
+# File Processing
+# ==========================================
+gem 'carrierwave'    # File uploading
+gem 'shrine'         # File uploading (modern)
+gem 'image_processing'  # Image resizing
+gem 'mini_magick'    # ImageMagick wrapper
+gem 'pdf-reader'     # Read PDFs
+gem 'prawn'          # Generate PDFs
+gem 'axlsx'          # Generate Excel files
+
+# ==========================================
+# Email
+# ==========================================
+gem 'action_mailer'  # Built into Rails
+gem 'mail'           # Email composition
+gem 'letter_opener'  # Preview emails
+gem 'mailgun-ruby'   # Mailgun client
+
+# ==========================================
+# Serialization
+# ==========================================
+gem 'active_model_serializers'  # JSON serialization
+gem 'fast_jsonapi'   # Fast JSON:API serializer
+gem 'jbuilder'       # JSON builder (Rails)
+gem 'blueprinter'    # Object serialization
+gem 'alba'           # Fast serialization
+
+# ==========================================
+# CLI
+# ==========================================
+gem 'thor'           # CLI toolkit
+gem 'optparse'       # Built-in option parsing
+gem 'tty-prompt'     # Interactive CLI
+gem 'colorize'       # Colored output
+gem 'terminal-table' # ASCII tables
+
+# ==========================================
+# Debugging
+# ==========================================
+gem 'pry'            # Better REPL
+gem 'pry-byebug'     # Debugger
+gem 'byebug'         # Debugger
+gem 'binding_of_caller'  # Access binding
+gem 'better_errors'  # Better error pages
+```
+
+---
+
+## Step 535: สร้าง Gem ตั้งแต่ต้น - ตัวอย่างสมบูรณ์
+
+```ruby
+# สร้าง gem ชื่อ "thai_text" ที่ process ข้อความภาษาไทย
+
+# lib/thai_text.rb
+require "thai_text/version"
+require "thai_text/analyzer"
+require "thai_text/formatter"
+require "thai_text/validator"
+
+module ThaiText
+  class Error < StandardError; end
+
+  def self.analyze(text)
+    Analyzer.new(text)
+  end
+
+  def self.validate_id(id)
+    Validator.valid_national_id?(id)
+  end
+
+  def self.format_phone(phone)
+    Formatter.phone(phone)
+  end
+end
+
+# lib/thai_text/version.rb
+module ThaiText
+  VERSION = "1.0.0"
+end
+
+# lib/thai_text/analyzer.rb
+module ThaiText
+  class Analyzer
+    THAI_RANGE = ("฀".."๿")
+
+    def initialize(text)
+      @text = text.to_s
+    end
+
+    def thai_char_count
+      @text.chars.count { |c| THAI_RANGE.cover?(c) }
+    end
+
+    def contains_thai?
+      @text.chars.any? { |c| THAI_RANGE.cover?(c) }
+    end
+
+    def thai_percentage
+      return 0.0 if @text.empty?
+      (thai_char_count.to_f / @text.length * 100).round(2)
+    end
+
+    def thai_words
+      # ตัวอย่างง่ายๆ - real word segmentation ซับซ้อนกว่านี้
+      @text.scan(/[฀-๿]+/)
+    end
+
+    def stats
+      {
+        total_chars:      @text.length,
+        thai_chars:       thai_char_count,
+        thai_percentage:  thai_percentage,
+        thai_words:       thai_words.count,
+        contains_thai:    contains_thai?
+      }
+    end
+  end
+end
+
+# lib/thai_text/validator.rb
+module ThaiText
+  module Validator
+    # ตรวจสอบเลขบัตรประชาชนไทย
+    def self.valid_national_id?(id)
+      digits = id.to_s.gsub(/\D/, '')
+      return false unless digits.length == 13
+
+      sum = 0
+      12.times { |i| sum += digits[i].to_i * (13 - i) }
+      checksum = (11 - sum % 11) % 10
+      checksum == digits[12].to_i
+    end
+
+    # ตรวจสอบเบอร์โทรศัพท์ไทย
+    def self.valid_phone?(phone)
+      cleaned = phone.to_s.gsub(/[\s\-\.]/, '')
+      cleaned.match?(/\A(0[689]\d{8}|0[1-5]\d{7})\z/)
+    end
+
+    # ตรวจสอบ Thai postal code
+    def self.valid_postal_code?(code)
+      code.to_s.match?(/\A[1-9]\d{4}\z/)
+    end
+  end
+end
+
+# lib/thai_text/formatter.rb
+module ThaiText
+  module Formatter
+    def self.phone(number)
+      digits = number.to_s.gsub(/\D/, '')
+      return number unless digits.length.between?(9, 10)
+
+      if digits.length == 10
+        "#{digits[0..1]}-#{digits[2..4]}-#{digits[5..9]}"
+      else
+        "#{digits[0..1]}-#{digits[2..8]}"
+      end
+    end
+
+    def self.national_id(id)
+      digits = id.to_s.gsub(/\D/, '')
+      return id unless digits.length == 13
+      "#{digits[0]}-#{digits[1..4]}-#{digits[5..9]}-#{digits[10..11]}-#{digits[12]}"
+    end
+
+    def self.currency(amount, currency: "฿")
+      "#{currency}#{format('%.2f', amount.to_f)}"
+    end
+  end
+end
+```
+
+---
+
+## แบบฝึกหัด: Gems และ Bundler (20 ข้อ)
+
+**ข้อ 1:** สร้าง Gemfile สำหรับ REST API application
+
+```ruby
+# เฉลย
+source "https://rubygems.org"
+ruby "3.2.0"
+
+gem "rails", "~> 7.1"
+gem "pg", "~> 1.5"
+gem "puma", "~> 6.0"
+gem "rack-cors"
+gem "jwt", "~> 2.7"
+gem "bcrypt", "~> 3.1"
+gem "kaminari"                    # pagination
+gem "active_model_serializers"    # JSON serialization
+gem "sidekiq", "~> 7.0"          # background jobs
+gem "redis", "~> 5.0"
+
+group :development, :test do
+  gem "rspec-rails"
+  gem "factory_bot_rails"
+  gem "faker"
+  gem "pry-rails"
+  gem "dotenv-rails"
 end
 
 group :test do
-  gem 'capybara'
-  gem 'selenium-webdriver'
-  gem 'webdrivers'
-  gem 'vcr'                   # Record HTTP Interactions
-  gem 'webmock'               # Stub HTTP Requests
-  gem 'timecop'               # Control Time ใน Tests
-end
-
-group :development, :test do
-  gem 'rspec-rails',          '~> 6.0'
-  gem 'factory_bot_rails',    '~> 6.2'
-  gem 'faker',                '~> 3.2'
-  gem 'pry-rails'
-  gem 'pry-byebug'
-  gem 'simplecov', require: false
-  gem 'dotenv-rails'
+  gem "shoulda-matchers"
+  gem "simplecov", require: false
+  gem "database_cleaner-active_record"
 end
 ```
 
----
-
-## แบบฝึกหัดบทที่ 24 (20 ข้อ)
-
-**ข้อ 1:** ติดตั้ง `pry` และ `awesome_print` gems จากนั้นสำรวจฟีเจอร์ต่างๆ ของแต่ละ Gem
-
-**ข้อ 2:** สร้าง Gemfile สำหรับโปรเจกต์ Web Scraper ที่ต้องการ `nokogiri`, `httparty`, `csv` พร้อม Development/Test groups
-
-**ข้อ 3:** ใช้ `bundle outdated` ตรวจสอบ Gems ที่ล้าสมัย และอธิบาย SemVer ของแต่ละ Gem
-
-**ข้อ 4:** สร้าง Gem skeleton ด้วย `bundle gem` และ Implement `ThaiNumberFormatter` ที่แปลงตัวเลขเป็นภาษาไทย
-
-**ข้อ 5:** เขียน gemspec ที่สมบูรณ์พร้อม Dependencies สำหรับ Gem ที่สร้างใน ข้อ 4
-
-**ข้อ 6:** ทดสอบ Gem ที่สร้างด้วย RSpec และเพิ่ม SimpleCov สำหรับ Coverage
-
-**ข้อ 7:** ใช้ `bundle audit` ตรวจสอบ Security Vulnerabilities ในโปรเจกต์ที่มี
-
-**ข้อ 8:** สร้าง CLI Tool ด้วย `thor` gem ที่มีคำสั่ง `greet`, `list`, `create`
-
-**ข้อ 9:** สำรวจ `activesupport` gem โดยใช้ Time extensions, String extensions, Array extensions
-
-**ข้อ 10:** สร้าง HTTP Client Class โดยใช้ `faraday` พร้อม Retry และ Error Handling
-
-**ข้อ 11:** อธิบายความแตกต่างระหว่าง `gem install` และ `bundle install`
-
-**ข้อ 12:** สร้าง Rake task สำหรับ Build และ Test Gem ที่สร้าง
-
-**ข้อ 13:** ใช้ `dry-types` สร้าง Type-safe Data Structures สำหรับ User และ Order
-
-**ข้อ 14:** สำรวจ `oj` gem และเปรียบเทียบ Performance กับ `json` built-in ด้วย Benchmark
-
-**ข้อ 15:** สร้าง Background Worker ด้วย `sidekiq` สำหรับส่ง Email และ Process Image
-
-**ข้อ 16:** เขียน Changelog สำหรับ Gem ที่สร้าง โดยใช้ Keep a Changelog format
-
-**ข้อ 17:** ตั้งค่า GitHub Actions สำหรับ Test Gem อัตโนมัติ
-
-**ข้อ 18:** สำรวจ `timecop` gem และใช้ใน Tests ที่มี Time-dependent Logic
-
-**ข้อ 19:** สร้าง Private Gem ที่มี Configuration Options และ Error Handling ที่สมบูรณ์
-
-**ข้อ 20:** ทำ Complete Workflow: สร้าง Gem → Test → Build → Mock Publish (ไม่ต้อง Publish จริง)
-
----
-
-### เฉลยตัวอย่าง ข้อ 4: ThaiNumberFormatter Gem
+**ข้อ 2:** เขียน version constraints สำหรับ Rails project dependencies
 
 ```ruby
-# lib/thai_number_formatter.rb
-require 'thai_number_formatter/version'
-require 'thai_number_formatter/thai_number'
+# เฉลย - เหตุผลของ constraints
+gem 'rails', '~> 7.1.0'        # อยู่ใน 7.1.x เท่านั้น (patch updates OK)
+gem 'pg', '>= 1.1', '< 3.0'    # 1.1+ แต่ไม่ถึง 3.0
+gem 'devise', '~> 4.9'         # >= 4.9, < 5.0
+gem 'sidekiq', '~> 7.2'        # >= 7.2, < 8.0
+gem 'jwt', '~> 2.7.1'          # >= 2.7.1, < 2.8.0 (strict)
+gem 'nokogiri', '>= 1.13.10'   # minimum version สำหรับ security
+```
 
-module ThaiNumberFormatter
-  class Error < StandardError; end
-  
-  def self.format(number, options = {})
-    ThaiNumber.new(number, options).format
+**ข้อ 3:** สร้างโครงสร้าง gem ด้วย bundle gem
+
+```bash
+# เฉลย
+bundle gem string_utils --mit --test rspec --ci github
+
+# โครงสร้างที่ได้:
+# string_utils/
+# ├── lib/
+# │   ├── string_utils.rb
+# │   └── string_utils/
+# │       └── version.rb
+# ├── spec/
+# │   └── string_utils_spec.rb
+# ├── string_utils.gemspec
+# └── Gemfile
+```
+
+**ข้อ 4:** เขียน gemspec สำหรับ simple utility gem
+
+```ruby
+# เฉลย
+require_relative "lib/string_utils/version"
+
+Gem::Specification.new do |spec|
+  spec.name    = "string_utils"
+  spec.version = StringUtils::VERSION
+  spec.authors = ["Developer Name"]
+  spec.email   = ["dev@example.com"]
+
+  spec.summary     = "Useful string utilities for Ruby"
+  spec.description = "Collection of helpful string manipulation methods"
+  spec.homepage    = "https://github.com/dev/string_utils"
+  spec.license     = "MIT"
+
+  spec.required_ruby_version = ">= 3.0.0"
+
+  spec.files         = Dir["lib/**/*.rb", "README.md", "LICENSE.txt"]
+  spec.require_paths = ["lib"]
+
+  spec.add_development_dependency "rspec", "~> 3.12"
+  spec.add_development_dependency "rake", "~> 13.0"
+end
+```
+
+**ข้อ 5-10:** (ตัวอย่างย่อ)
+
+```bash
+# ข้อ 5: bundle exec vs โดยตรง
+# รัน rspec ผ่าน bundle
+bundle exec rspec spec/models/
+
+# สร้าง binstub เพื่อสะดวก
+bundle binstubs rspec-core
+./bin/rspec spec/models/  # เหมือนกัน
+
+# ข้อ 6: update gem อย่างปลอดภัย
+bundle outdated --strict
+bundle update devise --conservative
+
+# ข้อ 7: install gems locally (CI/CD)
+bundle install --path vendor/bundle --jobs 4
+bundle exec rails s
+
+# ข้อ 8: skip groups in production
+bundle install --without development test
+
+# ข้อ 9: อ่าน gem source
+bundle open devise
+gem open activerecord
+
+# ข้อ 10: pin version เมื่อ bug
+# Gemfile
+gem 'activerecord', '7.1.1'  # pin เพราะ 7.1.2 มี bug
+```
+
+**ข้อ 11-20:** (สร้าง gem จริง)
+
+```ruby
+# ข้อ 11: สร้าง Color class สำหรับ gem
+class Color
+  attr_reader :r, :g, :b
+
+  def initialize(r, g, b)
+    @r, @g, @b = r.clamp(0, 255), g.clamp(0, 255), b.clamp(0, 255)
   end
-  
-  def self.to_text(number)
-    ThaiNumber.new(number).to_text
+
+  def self.from_hex(hex)
+    hex = hex.gsub('#', '')
+    r = hex[0..1].to_i(16)
+    g = hex[2..3].to_i(16)
+    b = hex[4..5].to_i(16)
+    new(r, g, b)
+  end
+
+  def to_hex
+    "##{[@r, @g, @b].map { |c| c.to_s(16).rjust(2, '0') }.join.upcase}"
+  end
+
+  def to_hsl
+    r, g, b = @r / 255.0, @g / 255.0, @b / 255.0
+    max, min = [r, g, b].max, [r, g, b].min
+    l = (max + min) / 2.0
+
+    if max == min
+      h = s = 0
+    else
+      d = max - min
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+      h = case max
+          when r then ((g - b) / d + (g < b ? 6 : 0)) / 6.0
+          when g then ((b - r) / d + 2) / 6.0
+          when b then ((r - g) / d + 4) / 6.0
+          end
+    end
+
+    { h: (h * 360).round, s: (s * 100).round, l: (l * 100).round }
+  end
+
+  def lighten(amount = 10)
+    hsl = to_hsl
+    from_hsl(hsl[:h], hsl[:s], [hsl[:l] + amount, 100].min)
+  end
+
+  def darken(amount = 10)
+    hsl = to_hsl
+    from_hsl(hsl[:h], hsl[:s], [hsl[:l] - amount, 0].max)
+  end
+
+  def mix(other, weight = 0.5)
+    Color.new(
+      ((@r * (1 - weight)) + (other.r * weight)).round,
+      ((@g * (1 - weight)) + (other.g * weight)).round,
+      ((@b * (1 - weight)) + (other.b * weight)).round
+    )
+  end
+
+  def contrast_color
+    luminance = (0.299 * @r + 0.587 * @g + 0.114 * @b) / 255
+    luminance > 0.5 ? Color.new(0, 0, 0) : Color.new(255, 255, 255)
+  end
+
+  def to_s
+    to_hex
+  end
+
+  private
+
+  def from_hsl(h, s, l)
+    h, s, l = h / 360.0, s / 100.0, l / 100.0
+    if s == 0
+      rgb = (l * 255).round
+      Color.new(rgb, rgb, rgb)
+    else
+      q = l < 0.5 ? l * (1 + s) : l + s - l * s
+      p = 2 * l - q
+      r = hue_to_rgb(p, q, h + 1.0/3)
+      g = hue_to_rgb(p, q, h)
+      b = hue_to_rgb(p, q, h - 1.0/3)
+      Color.new((r * 255).round, (g * 255).round, (b * 255).round)
+    end
+  end
+
+  def hue_to_rgb(p, q, t)
+    t += 1 if t < 0
+    t -= 1 if t > 1
+    return p + (q - p) * 6 * t if t < 1.0/6
+    return q if t < 1.0/2
+    return p + (q - p) * (2.0/3 - t) * 6 if t < 2.0/3
+    p
   end
 end
 
-# lib/thai_number_formatter/thai_number.rb
-module ThaiNumberFormatter
-  class ThaiNumber
-    THAI_DIGITS = %w[๐ ๑ ๒ ๓ ๔ ๕ ๖ ๗ ๘ ๙].freeze
-    
-    ONES = %w[ศูนย์ หนึ่ง สอง สาม สี่ ห้า หก เจ็ด แปด เก้า].freeze
-    POSITIONS = %w['' สิบ ร้อย พัน หมื่น แสน ล้าน].freeze
-    
-    def initialize(number, options = {})
-      @number  = number
-      @options = options
-    end
-    
-    def format
-      digits_string.chars.map { |c| THAI_DIGITS[c.to_i] }.join
-    end
-    
-    def to_text
-      return 'ศูนย์' if @number.zero?
-      
-      parts = []
-      n = @number.abs
-      
-      millions = n / 1_000_000
-      parts << "#{convert_below_million(millions)}ล้าน" if millions > 0
-      
-      remainder = n % 1_000_000
-      parts << convert_below_million(remainder) if remainder > 0
-      
-      result = parts.join('')
-      @number < 0 ? "ลบ#{result}" : result
-    end
-    
-    private
-    
-    def digits_string
-      @number.to_s
-    end
-    
-    def convert_below_million(n)
-      return '' if n == 0
-      
-      result = ''
-      position = 0
-      
-      while n > 0
-        digit = n % 10
-        
-        if digit > 0
-          digit_name = digit == 1 && position == 1 ? 'เอ็ด' : ONES[digit]
-          digit_name = 'ยี่' if digit == 2 && position == 1
-          
-          result = "#{digit_name}#{POSITIONS[position]}#{result}"
-        end
-        
-        n /= 10
-        position += 1
-      end
-      
-      result
+# ข้อ 12-20 specs สำหรับ Color gem
+RSpec.describe Color do
+  describe ".from_hex" do
+    it "creates color from hex" do
+      color = Color.from_hex("#FF5733")
+      expect(color.r).to eq(255)
+      expect(color.g).to eq(87)
+      expect(color.b).to eq(51)
     end
   end
-end
 
-# spec/thai_number_formatter_spec.rb
-RSpec.describe ThaiNumberFormatter do
-  describe '.format' do
-    it 'แปลงเลข 0-9 เป็นเลขไทย' do
-      expect(ThaiNumberFormatter.format(0)).to eq('๐')
-      expect(ThaiNumberFormatter.format(5)).to eq('๕')
-      expect(ThaiNumberFormatter.format(9)).to eq('๙')
-    end
-    
-    it 'แปลงเลขหลายหลัก' do
-      expect(ThaiNumberFormatter.format(2567)).to eq('๒๕๖๗')
-      expect(ThaiNumberFormatter.format(12345)).to eq('๑๒๓๔๕')
+  describe "#to_hex" do
+    it "converts to hex string" do
+      color = Color.new(255, 87, 51)
+      expect(color.to_hex).to eq("#FF5733")
     end
   end
-  
-  describe '.to_text' do
-    it 'แปลงตัวเลขเป็นตัวอักษรไทย' do
-      expect(ThaiNumberFormatter.to_text(0)).to eq('ศูนย์')
-      expect(ThaiNumberFormatter.to_text(1)).to eq('หนึ่ง')
-      expect(ThaiNumberFormatter.to_text(10)).to eq('สิบ')
-      expect(ThaiNumberFormatter.to_text(11)).to eq('สิบเอ็ด')
-      expect(ThaiNumberFormatter.to_text(20)).to eq('ยี่สิบ')
-      expect(ThaiNumberFormatter.to_text(100)).to eq('ร้อย')
+
+  describe "#mix" do
+    it "mixes two colors" do
+      red = Color.new(255, 0, 0)
+      blue = Color.new(0, 0, 255)
+      mixed = red.mix(blue, 0.5)
+      expect(mixed.r).to eq(128)
+      expect(mixed.b).to eq(128)
+    end
+  end
+
+  describe "#contrast_color" do
+    it "returns black for light colors" do
+      white = Color.new(255, 255, 255)
+      expect(white.contrast_color.to_hex).to eq("#000000")
+    end
+
+    it "returns white for dark colors" do
+      black = Color.new(0, 0, 0)
+      expect(black.contrast_color.to_hex).to eq("#FFFFFF")
     end
   end
 end
@@ -1109,4 +1478,46 @@ end
 
 ---
 
-*สรุปบทที่ 24: Gems และ Bundler เป็นส่วนสำคัญของ Ruby Ecosystem การเข้าใจวิธีจัดการ Dependencies, การสร้าง Gem ของตัวเอง และการรักษา Security จะช่วยให้พัฒนา Ruby Application ได้อย่างมีประสิทธิภาพ*
+## สรุป
+
+### RubyGems Commands สำคัญ
+```bash
+gem install <name>       # install gem
+gem uninstall <name>     # remove gem
+gem update <name>        # update gem
+gem list                 # list installed gems
+gem search <query>       # search rubygems.org
+```
+
+### Bundler Commands สำคัญ
+```bash
+bundle install           # install from Gemfile
+bundle update            # update gems
+bundle exec <command>    # run with bundle context
+bundle outdated          # check for updates
+bundle show              # list gem paths
+```
+
+### Version Constraints
+| Operator | ความหมาย |
+|----------|----------|
+| `= 1.0` | exactly 1.0 |
+| `!= 1.0` | not 1.0 |
+| `> 1.0` | greater than 1.0 |
+| `>= 1.0` | 1.0 or greater |
+| `< 2.0` | less than 2.0 |
+| `<= 2.0` | 2.0 or less |
+| `~> 1.5` | >= 1.5, < 2.0 |
+| `~> 1.5.0` | >= 1.5.0, < 1.6.0 |
+
+### Best Practices
+1. **Lock dependencies** - commit Gemfile.lock (applications)
+2. **Don't lock** Gemfile.lock (libraries/gems)
+3. **Use semantic versioning** - `~>` operator
+4. **Group correctly** - :development, :test, :production
+5. **bundle exec** - always use for consistency
+6. **Keep gems updated** - use bundle outdated regularly
+
+---
+
+*ตอนถัดไป: ตอนที่ 25 - Concurrency และ Threads*
