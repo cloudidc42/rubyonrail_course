@@ -1,1213 +1,1086 @@
-# Part 18: Enumerables ใน Ruby
-
-## ขั้นตอนที่ 366-390: Enumerable Module อย่างละเอียด
-
----
+# ตอนที่ 18: Enumerables (Steps 366-390)
 
 ## บทนำ
 
-Enumerable module เป็นหนึ่งในเครื่องมือที่ทรงพลังที่สุดใน Ruby มี method มากกว่า 50 ตัวที่ทำงานกับ collection ใดๆ ก็ตามที่ implement `each` ไว้ การเข้าใจ Enumerable จะทำให้คุณเขียน Ruby code ได้อย่างสวยงามและมีประสิทธิภาพ
+**Enumerable** เป็น module ที่ทรงพลังที่สุดตัวหนึ่งใน Ruby ซึ่งมี methods สำหรับการทำงานกับ collections (เช่น Array, Hash) มากกว่า 50 methods มันเป็นหัวใจของ functional programming style ใน Ruby
 
 ---
 
-## ขั้นตอนที่ 366: Enumerable Module คืออะไร?
+## Step 366: Enumerable Module คืออะไร?
 
 ```ruby
-# Enumerable เป็น module ที่ Array, Hash, Range, Set และ class อื่นๆ include ไว้
-puts Array.ancestors.include?(Enumerable)    # => true
-puts Hash.ancestors.include?(Enumerable)     # => true
-puts Range.ancestors.include?(Enumerable)    # => true
+# Enumerable module ถูก include ใน Array และ Hash โดยอัตโนมัติ
+puts Array.include?(Enumerable)  # true
+puts Hash.include?(Enumerable)   # true
+puts Range.include?(Enumerable)  # true
 
-# Enumerable ต้องการแค่ each method เป็นพื้นฐาน
-# แล้วจะได้ method อื่นๆ อีกกว่า 50 ตัวมาฟรี!
-
-# ดู methods ทั้งหมดของ Enumerable
+# ดู methods ทั้งหมด
 puts Enumerable.instance_methods.sort.inspect
+# [:all?, :any?, :chunk, :chunk_while, :collect, :collect_concat,
+#  :count, :cycle, :detect, :drop, :drop_while, :each_cons,
+#  :each_entry, :each_slice, :each_with_index, :each_with_object,
+#  :entries, :filter, :filter_map, :find, :find_all, :find_index,
+#  :first, :flat_map, :grep, :grep_v, :group_by, :include?,
+#  :inject, :lazy, :map, :max, :max_by, :min, :min_by, :minmax,
+#  :minmax_by, :none?, :one?, :reduce, :reject, :reverse_each,
+#  :select, :sort, :sort_by, :sum, :take, :take_while, :tally,
+#  :to_a, :to_h, :uniq, :zip]
 
-# ตัวอย่างง่ายๆ
-numbers = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5]
+# Enumerable ต้องการแค่ method each
+class SimpleCollection
+  include Enumerable
 
-puts numbers.sort.inspect            # [1, 1, 2, 3, 3, 4, 5, 5, 5, 6, 9]
-puts numbers.min                     # 1
-puts numbers.max                     # 9
-puts numbers.sum                     # 44
-puts numbers.count                   # 11
-puts numbers.uniq.inspect            # [3, 1, 4, 5, 9, 2, 6]
-puts numbers.select(&:odd?).inspect  # [3, 1, 1, 5, 9, 5, 3, 5]
+  def initialize(*items)
+    @items = items
+  end
+
+  def each(&block)
+    @items.each(&block)
+  end
+end
+
+col = SimpleCollection.new(3, 1, 4, 1, 5, 9, 2, 6)
+puts col.sort.inspect     # [1, 1, 2, 3, 4, 5, 6, 9]
+puts col.min              # 1
+puts col.max              # 9
+puts col.select(&:odd?).inspect  # [3, 1, 1, 5, 9]
 ```
 
 ---
 
-## ขั้นตอนที่ 367: map / collect
+## Step 367: map/collect - Transform Each Element
 
-`map` แปลงทุก element และคืนค่า Array ใหม่
+`map` (หรือ `collect`) แปลง collection โดยประมวลผลแต่ละ element:
 
 ```ruby
-numbers = [1, 2, 3, 4, 5]
-
 # map พื้นฐาน
+numbers = [1, 2, 3, 4, 5]
 squares = numbers.map { |n| n ** 2 }
-puts squares.inspect   # => [1, 4, 9, 16, 25]
+puts squares.inspect  # [1, 4, 9, 16, 25]
 
-# map กับ string
+# map กับ String
 words = ["hello", "world", "ruby"]
-puts words.map(&:upcase).inspect      # => ["HELLO", "WORLD", "RUBY"]
-puts words.map(&:length).inspect      # => [5, 5, 4]
-puts words.map(&:reverse).inspect     # => ["olleh", "dlrow", "ybur"]
-
-# map กับ index (each_with_index หรือ map.with_index)
-words.map.with_index(1) { |word, i| "#{i}. #{word}" }.each { |w| puts w }
-# => 1. hello
-# => 2. world
-# => 3. ruby
+upcased = words.map(&:upcase)
+puts upcased.inspect  # ["HELLO", "WORLD", "RUBY"]
 
 # map กับ Hash
-users = [
-  { name: "สมชาย", age: 25 },
-  { name: "สมหญิง", age: 30 },
-  { name: "สมศรี", age: 22 }
-]
+prices = { apple: 10, banana: 5, cherry: 25 }
+discounted = prices.map { |item, price| [item, price * 0.9] }.to_h
+puts discounted.inspect
+# {:apple=>9.0, :banana=>4.5, :cherry=>22.5}
 
-names = users.map { |u| u[:name] }
-puts names.inspect   # => ["สมชาย", "สมหญิง", "สมศรี"]
+# map กับ index (each_with_index)
+items = ["a", "b", "c", "d"]
+numbered = items.each_with_index.map { |item, idx| "#{idx + 1}. #{item}" }
+puts numbered.inspect
+# ["1. a", "2. b", "3. c", "4. d"]
 
 # map! แก้ไข in-place
-arr = [1, 2, 3]
-arr.map! { |n| n * 10 }
-puts arr.inspect   # => [10, 20, 30]
+numbers = [1, 2, 3, 4, 5]
+numbers.map! { |n| n * 10 }
+puts numbers.inspect  # [10, 20, 30, 40, 50]
 
-# ตัวอย่างจริง: แปลงข้อมูล
-class Product
-  attr_accessor :name, :price_thb
-  
-  def initialize(name, price_thb)
-    @name = name
-    @price_thb = price_thb
-  end
-  
-  def to_usd(rate = 35.0)
-    (@price_thb / rate).round(2)
-  end
-end
-
-products = [
-  Product.new("หนังสือ", 350),
-  Product.new("กระเป๋า", 1500),
-  Product.new("นาฬิกา", 5000)
+# ตัวอย่างจริง: แปลงข้อมูล API
+users_json = [
+  { "id" => 1, "first_name" => "John", "last_name" => "Doe", "email" => "john@example.com" },
+  { "id" => 2, "first_name" => "Jane", "last_name" => "Smith", "email" => "jane@example.com" }
 ]
 
-usd_prices = products.map do |p|
-  { name: p.name, price_usd: p.to_usd }
+users = users_json.map do |u|
+  {
+    id:   u["id"],
+    name: "#{u["first_name"]} #{u["last_name"]}",
+    email: u["email"]
+  }
 end
-
-usd_prices.each { |p| puts "#{p[:name]}: $#{p[:price_usd]}" }
+users.each { |u| puts "#{u[:id]}: #{u[:name]} (#{u[:email]})" }
 ```
 
 ---
 
-## ขั้นตอนที่ 368: select / reject / filter
+## Step 368: select/filter - Keep Matching Elements
+
+`select` (หรือ `filter`) เก็บเฉพาะ elements ที่ตรงกับเงื่อนไข:
 
 ```ruby
+# select พื้นฐาน
 numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+evens = numbers.select(&:even?)
+odds = numbers.select(&:odd?)
+puts evens.inspect  # [2, 4, 6, 8, 10]
+puts odds.inspect   # [1, 3, 5, 7, 9]
 
-# select - เลือก element ที่ block คืน true
-evens = numbers.select { |n| n.even? }
-puts evens.inspect   # => [2, 4, 6, 8, 10]
+# select กับ String
+words = ["apple", "banana", "cherry", "date", "elderberry", "fig"]
+long_words = words.select { |w| w.length > 5 }
+puts long_words.inspect  # ["banana", "cherry", "elderberry"]
 
-# ใช้ shorthand
-puts numbers.select(&:odd?).inspect    # => [1, 3, 5, 7, 9]
-
-# reject - เลือก element ที่ block คืน false (ตรงข้ามกับ select)
-odds = numbers.reject { |n| n.even? }
-puts odds.inspect   # => [1, 3, 5, 7, 9]
-
-# filter เป็น alias ของ select (Ruby 2.5+)
-puts numbers.filter { |n| n > 5 }.inspect   # => [6, 7, 8, 9, 10]
+short_words = words.filter { |w| w.length <= 4 }
+puts short_words.inspect  # ["date", "fig"]
 
 # select กับ Hash
-hash = { a: 1, b: 2, c: 3, d: 4, e: 5 }
-even_pairs = hash.select { |k, v| v.even? }
-puts even_pairs.inspect   # => {:b=>2, :d=>4}
+inventory = {
+  apple:  { count: 50, price: 10 },
+  banana: { count: 0,  price: 5 },
+  cherry: { count: 20, price: 25 },
+  date:   { count: 0,  price: 15 }
+}
 
-# ตัวอย่างจริง
-users = [
-  { name: "สมชาย", age: 17, active: true },
-  { name: "สมหญิง", age: 25, active: true },
-  { name: "สมศรี", age: 15, active: false },
-  { name: "สมบัติ", age: 30, active: true }
-]
+available = inventory.select { |_, info| info[:count] > 0 }
+puts available.keys.inspect  # [:apple, :cherry]
 
-# ผู้ใช้ที่ active และอายุ >= 18
-eligible = users.select { |u| u[:active] && u[:age] >= 18 }
-puts eligible.map { |u| u[:name] }.inspect
-# => ["สมหญิง", "สมบัติ"]
+# filter_map - select + map ในขั้นตอนเดียว (Ruby 2.7+)
+numbers = [1, 2, 3, 4, 5, 6]
+even_squares = numbers.filter_map { |n| n ** 2 if n.even? }
+puts even_squares.inspect  # [4, 16, 36]
 
-# ผู้ใช้ที่ไม่ active
-inactive = users.reject { |u| u[:active] }
-puts inactive.map { |u| u[:name] }.inspect
-# => ["สมศรี"]
-
-# filter_map - select + map ใน step เดียว (Ruby 2.7+)
-numbers = [1, 2, 3, 4, 5, 6, 7, 8]
-result = numbers.filter_map { |n| n * 2 if n.even? }
-puts result.inspect   # => [4, 8, 12, 16]
+# เทียบกับการเขียนแบบเก่า
+old_way = numbers.select(&:even?).map { |n| n ** 2 }
+puts old_way.inspect  # [4, 16, 36]
 ```
 
 ---
 
-## ขั้นตอนที่ 369: reduce / inject
+## Step 369: reject - Remove Matching Elements
 
-`reduce` สะสมค่าจากทุก element
+`reject` เป็นตรงข้ามของ `select`:
 
 ```ruby
+# reject พื้นฐาน
+numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+non_evens = numbers.reject(&:even?)
+puts non_evens.inspect  # [1, 3, 5, 7, 9]
+
+# reject กับ nil/empty
+mixed = [1, nil, 2, "", 3, false, 4, 0]
+compact = mixed.reject(&:nil?)
+puts compact.inspect  # [1, 2, "", 3, false, 4, 0]
+
+# หยุด nil และ false
+truthy = mixed.reject { |x| !x }
+puts truthy.inspect  # [1, 2, "", 3, 4, 0]
+
+# compact เป็น alias สำหรับ reject nil
+arr = [1, nil, 2, nil, 3]
+puts arr.compact.inspect  # [1, 2, 3]
+
+# ตัวอย่างจริง: กรองรายการ invalid
+emails = ["alice@example.com", "invalid", "bob@test.org", "@broken", "charlie@company.co"]
+valid_emails = emails.reject { |e| !e.match?(/\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/i) }
+puts valid_emails.inspect
+# ["alice@example.com", "bob@test.org", "charlie@company.co"]
+
+# ตัวอย่าง: กรองคำ stop words ออก
+stop_words = %w[the a an is are was were be been being]
+text = "the quick brown fox is a very fast animal"
+words = text.split.reject { |w| stop_words.include?(w) }
+puts words.join(" ")
+# quick brown fox very fast animal
+```
+
+---
+
+## Step 370: reduce/inject - Accumulate Values
+
+`reduce` (หรือ `inject`) สะสมค่าจาก collection:
+
+```ruby
+# ผลรวม
 numbers = [1, 2, 3, 4, 5]
-
-# reduce พื้นฐาน
-sum = numbers.reduce(0) { |total, n| total + n }
-puts sum   # => 15
-
-# ไม่ใส่ initial value (ใช้ element แรกเป็น accumulator)
-sum = numbers.reduce { |total, n| total + n }
-puts sum   # => 15
+sum = numbers.reduce(0) { |acc, n| acc + n }
+puts sum  # 15
 
 # ใช้ Symbol shorthand
-puts numbers.reduce(:+)   # => 15
-puts numbers.reduce(:*)   # => 120
-puts numbers.reduce(:-)   # => -13 (1-2-3-4-5)
+sum = numbers.reduce(:+)
+puts sum  # 15
 
-# inject เป็น alias ของ reduce
-puts numbers.inject(:+)   # => 15
+product = numbers.reduce(:*)
+puts product  # 120
 
-# ตัวอย่าง: สร้าง Hash จาก Array
-keys = [:name, :age, :city]
-values = ["สมชาย", 25, "กรุงเทพ"]
+# ใช้ initial value
+sum_plus_100 = numbers.reduce(100, :+)
+puts sum_plus_100  # 115
 
-hash = keys.zip(values).reduce({}) do |h, (k, v)|
-  h[k] = v
-  h
+# หา maximum ด้วย reduce
+max = numbers.reduce { |max, n| n > max ? n : max }
+puts max  # 5
+
+# เปรียบเทียบกับ max method
+puts numbers.max  # 5
+
+# ตัวอย่างซับซ้อน: สร้าง Hash จาก Array
+pairs = [[:name, "Alice"], [:age, 30], [:city, "Bangkok"]]
+hash = pairs.reduce({}) do |result, (key, value)|
+  result[key] = value
+  result
 end
-puts hash.inspect   # => {:name=>"สมชาย", :age=>25, :city=>"กรุงเทพ"}
+puts hash.inspect  # {:name=>"Alice", :age=>30, :city=>"Bangkok"}
 
-# ตัวอย่าง: factorial
+# หรือใช้ each_with_object (อ่านง่ายกว่า)
+hash2 = pairs.each_with_object({}) do |(key, value), result|
+  result[key] = value
+end
+puts hash2.inspect
+
+# ตัวอย่าง: Word count
+words = "hello world hello ruby world world"
+word_count = words.split.reduce(Hash.new(0)) do |counts, word|
+  counts[word] += 1
+  counts
+end
+puts word_count.sort_by { |_, v| -v }.inspect
+# [["world", 3], ["hello", 2], ["ruby", 1]]
+
+# ตัวอย่าง: Flattening nested structure
+nested = [[1, 2], [3, 4], [5, 6]]
+flat = nested.reduce([]) { |arr, group| arr + group }
+puts flat.inspect  # [1, 2, 3, 4, 5, 6]
+
+# Factorial ด้วย reduce
 def factorial(n)
   (1..n).reduce(:*)
 end
 
-puts factorial(5)    # => 120
-puts factorial(10)   # => 3628800
+puts factorial(5)   # 120
+puts factorial(10)  # 3628800
 
-# ตัวอย่าง: สร้าง Word frequency count
-text = "the quick brown fox jumps over the lazy dog the fox"
-word_count = text.split.reduce(Hash.new(0)) do |counts, word|
-  counts[word] += 1
-  counts
+# Running total
+transactions = [100, -20, 50, -30, 200]
+running_total = transactions.reduce([]) do |totals, t|
+  totals << (totals.empty? ? t : totals.last + t)
 end
-puts word_count.sort_by { |_, v| -v }.first(5).to_h.inspect
-# => {"the"=>3, "fox"=>2, "quick"=>1, ...}
-
-# each_with_object - คล้าย reduce แต่ object ที่ส่ง pass ไม่ต้องคืนค่า
-result = [1, 2, 3, 4, 5].each_with_object([]) do |n, arr|
-  arr << n * 2 if n.odd?
-end
-puts result.inspect   # => [2, 6, 10]
+puts running_total.inspect  # [100, 80, 130, 100, 300]
 ```
 
 ---
 
-## ขั้นตอนที่ 370: flat_map / flatten
+## Step 371: flat_map - Map Then Flatten
 
 ```ruby
 # flat_map = map + flatten(1)
-arrays = [[1, 2], [3, 4], [5, 6]]
+numbers = [[1, 2], [3, 4], [5, 6]]
+flat = numbers.flat_map { |group| group }
+puts flat.inspect  # [1, 2, 3, 4, 5, 6]
 
-puts arrays.map { |a| a }.inspect
-# => [[1, 2], [3, 4], [5, 6]]
+# เทียบกับ map + flatten
+same = numbers.map { |group| group }.flatten
+puts same.inspect  # [1, 2, 3, 4, 5, 6]
 
-puts arrays.flat_map { |a| a }.inspect
-# => [1, 2, 3, 4, 5, 6]
+# ตัวอย่างจริง: แยก words จากหลาย sentences
+sentences = [
+  "Hello World Ruby",
+  "Enumerable is powerful",
+  "Learn Ruby today"
+]
+all_words = sentences.flat_map(&:split)
+puts all_words.inspect
+# ["Hello", "World", "Ruby", "Enumerable", "is", "powerful", "Learn", "Ruby", "today"]
 
-# ตัวอย่างที่ใช้บ่อย
-sentences = ["Hello World", "Ruby is Great", "I Love Code"]
-words = sentences.flat_map { |s| s.split }
-puts words.inspect
-# => ["Hello", "World", "Ruby", "is", "Great", "I", "Love", "Code"]
-
-# flat_map กับ range
-result = (1..5).flat_map { |n| [n, n * n] }
-puts result.inspect
-# => [1, 1, 2, 4, 3, 9, 4, 16, 5, 25]
-
-# ตัวอย่างจริง: แต่ละ user มีหลาย orders
-users_with_orders = [
-  { name: "สมชาย", orders: ["order1", "order2"] },
-  { name: "สมหญิง", orders: ["order3"] },
-  { name: "สมศรี", orders: ["order4", "order5", "order6"] }
+# ตัวอย่าง: Expand product variants
+products = [
+  { name: "T-Shirt", sizes: ["S", "M", "L", "XL"] },
+  { name: "Hoodie",  sizes: ["M", "L", "XL", "XXL"] }
 ]
 
-all_orders = users_with_orders.flat_map { |u| u[:orders] }
-puts all_orders.inspect
-# => ["order1", "order2", "order3", "order4", "order5", "order6"]
+variants = products.flat_map do |product|
+  product[:sizes].map { |size| "#{product[:name]} - #{size}" }
+end
+variants.each { |v| puts v }
+# T-Shirt - S
+# T-Shirt - M
+# T-Shirt - L
+# T-Shirt - XL
+# Hoodie - M
+# Hoodie - L
+# Hoodie - XL
+# Hoodie - XXL
 
-# flatten กับ depth
-nested = [[1, [2, 3]], [4, [5, [6]]]]
-puts nested.flatten.inspect     # => [1, 2, 3, 4, 5, 6]
-puts nested.flatten(1).inspect  # => [1, [2, 3], 4, [5, [6]]]
+# ตัวอย่าง: Friends of friends (unique)
+network = {
+  alice: [:bob, :charlie],
+  bob:   [:alice, :diana],
+  charlie: [:alice, :eve]
+}
+
+friends_of_alice = network[:alice]
+friends_of_friends = friends_of_alice.flat_map { |friend| network[friend] }
+                                      .uniq
+                                      .reject { |f| f == :alice || friends_of_alice.include?(f) }
+puts "Friends of Alice's friends: #{friends_of_friends.inspect}"
+# [:diana, :eve]
 ```
 
 ---
 
-## ขั้นตอนที่ 371: group_by
-
-`group_by` จัดกลุ่ม elements โดยค่าที่ block คืนมา
+## Step 372: group_by - Group Elements
 
 ```ruby
+# group_by พื้นฐาน
 numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+grouped = numbers.group_by { |n| n.even? ? :even : :odd }
+puts grouped.inspect
+# {:odd=>[1, 3, 5, 7, 9], :even=>[2, 4, 6, 8, 10]}
 
-# group by odd/even
-groups = numbers.group_by { |n| n.even? ? :even : :odd }
-puts groups.inspect
-# => {:odd=>[1, 3, 5, 7, 9], :even=>[2, 4, 6, 8, 10]}
-
-# group by modulo
-groups = numbers.group_by { |n| n % 3 }
-puts groups.inspect
-# => {1=>[1, 4, 7, 10], 2=>[2, 5, 8], 0=>[3, 6, 9]}
-
-# group by string length
-words = %w[cat elephant dog hippopotamus ox bee]
+# group_by กับ String
+words = ["one", "two", "three", "four", "five", "six"]
 by_length = words.group_by(&:length)
-puts by_length.sort.to_h.inspect
+puts by_length.inspect
+# {3=>["one", "two", "six"], 5=>["three"], 4=>["four", "five"]}
 
 # ตัวอย่างจริง: จัดกลุ่มนักศึกษาตามเกรด
 students = [
-  { name: "ก", score: 95 },
-  { name: "ข", score: 82 },
-  { name: "ค", score: 73 },
-  { name: "ง", score: 88 },
-  { name: "จ", score: 65 },
-  { name: "ฉ", score: 91 }
+  { name: "Alice", score: 92 },
+  { name: "Bob",   score: 78 },
+  { name: "Charlie", score: 85 },
+  { name: "Diana",  score: 67 },
+  { name: "Eve",    score: 95 },
+  { name: "Frank",  score: 55 }
 ]
 
-by_grade = students.group_by do |s|
-  case s[:score]
+def letter_grade(score)
+  case score
   when 90..100 then "A"
   when 80...90 then "B"
   when 70...80 then "C"
-  else "D"
+  when 60...70 then "D"
+  else "F"
   end
 end
 
-by_grade.sort.each do |grade, students|
-  names = students.map { |s| s[:name] }
-  puts "#{grade}: #{names.join(', ')}"
+by_grade = students.group_by { |s| letter_grade(s[:score]) }
+by_grade.each do |grade, students_list|
+  names = students_list.map { |s| s[:name] }.join(", ")
+  puts "Grade #{grade}: #{names}"
 end
 
-# group_by กับ Date
-require 'date'
-events = [
-  { date: Date.new(2024, 1, 5), name: "Event A" },
-  { date: Date.new(2024, 1, 5), name: "Event B" },
-  { date: Date.new(2024, 1, 10), name: "Event C" }
+# ตัวอย่าง: Log analysis
+logs = [
+  { time: "09:00", level: :info,    message: "Server started" },
+  { time: "09:05", level: :warning, message: "High memory" },
+  { time: "09:10", level: :error,   message: "Connection failed" },
+  { time: "09:15", level: :info,    message: "Request processed" },
+  { time: "09:20", level: :error,   message: "Timeout" }
 ]
 
-by_date = events.group_by { |e| e[:date] }
-by_date.each do |date, events|
-  puts "#{date}: #{events.map { |e| e[:name] }.join(', ')}"
-end
+by_level = logs.group_by { |log| log[:level] }
+puts "Errors: #{by_level[:error].length}"
+puts "Warnings: #{by_level[:warning].length}"
+puts "Info: #{by_level[:info].length}"
 ```
 
 ---
 
-## ขั้นตอนที่ 372: chunk และ chunk_while
+## Step 373: chunk - Group Consecutive Elements
 
 ```ruby
-# chunk - จัดกลุ่ม consecutive elements ที่มีค่าเดียวกัน
-numbers = [1, 1, 2, 2, 3, 1, 1, 2]
+# chunk จัดกลุ่ม elements ที่ติดกันและ return ค่าเหมือนกัน
+numbers = [1, 1, 2, 2, 3, 1, 1, 3, 3]
+chunked = numbers.chunk { |n| n }.to_a
+puts chunked.inspect
+# [[1, [1, 1]], [2, [2, 2]], [3, [3]], [1, [1, 1]], [3, [3, 3]]]
 
-chunks = numbers.chunk { |n| n }.to_a
-puts chunks.inspect
-# => [[1, [1, 1]], [2, [2, 2]], [3, [3]], [1, [1, 1]], [2, [2]]]
+# ต่างจาก group_by ตรงที่ chunk ดู "consecutive" เท่านั้น
+grouped = numbers.group_by { |n| n }
+puts grouped.inspect
+# {1=>[1, 1, 1, 1], 2=>[2, 2], 3=>[3, 3, 3]}  <- รวมทุก occurrence
 
-# chunk_while - จัดกลุ่ม elements ที่ consecutive และ predicate เป็น true
-numbers = [1, 2, 3, 5, 6, 10, 11, 12]
-
-# จัดกลุ่มตัวเลขต่อเนื่อง
-groups = numbers.chunk_while { |i, j| j - i == 1 }.to_a
-puts groups.inspect
-# => [[1, 2, 3], [5, 6], [10, 11, 12]]
-
-# ตัวอย่าง: แบ่ง array ตามการเพิ่มขึ้น
-data = [1, 2, 3, 1, 2, 5, 6, 7, 3]
-ascending_groups = data.chunk_while { |i, j| j > i }.to_a
-puts ascending_groups.inspect
-# => [[1, 2, 3], [1, 2, 5, 6, 7], [3]]
-
-# slice_when - ตรงข้ามกับ chunk_while
-numbers = [1, 2, 3, 5, 6, 10, 11, 12]
-groups = numbers.slice_when { |i, j| j - i > 1 }.to_a
-puts groups.inspect
-# => [[1, 2, 3], [5, 6], [10, 11, 12]]
-
-# chunk_while สำหรับ run-length encoding
+# ตัวอย่าง: Run-length encoding
 def run_length_encode(str)
-  str.chars.chunk_while { |a, b| a == b }.map do |group|
-    [group.length, group.first]
+  str.chars.chunk { |c| c }.map { |char, chars| "#{chars.length}#{char}" }.join
+end
+
+puts run_length_encode("AAABBBCCDDDDEE")  # 3A3B2C4D2E
+puts run_length_encode("AABBAAB")         # 2A2B2A1B
+
+# chunk_while - ใช้ condition บน consecutive pairs
+numbers = [1, 2, 3, 5, 6, 7, 10, 11]
+consecutive_groups = numbers.chunk_while { |a, b| b == a + 1 }.to_a
+puts consecutive_groups.inspect
+# [[1, 2, 3], [5, 6, 7], [10, 11]]
+
+# ตัวอย่าง: หา consecutive working days
+require 'date'
+dates = [
+  Date.new(2024, 1, 1),
+  Date.new(2024, 1, 2),
+  Date.new(2024, 1, 3),
+  Date.new(2024, 1, 5),  # gap
+  Date.new(2024, 1, 6),
+  Date.new(2024, 1, 10)  # gap
+]
+
+date_groups = dates.chunk_while { |a, b| b == a + 1 }.to_a
+date_groups.each do |group|
+  if group.length > 1
+    puts "#{group.first} ถึง #{group.last} (#{group.length} วัน)"
+  else
+    puts group.first.to_s
   end
 end
-
-puts run_length_encode("aabbbccddddee").inspect
-# => [[2, "a"], [3, "b"], [2, "c"], [4, "d"], [2, "e"]]
 ```
 
 ---
 
-## ขั้นตอนที่ 373: each_slice และ each_cons
+## Step 374: each_slice และ each_cons
 
 ```ruby
-# each_slice - แบ่งเป็น chunks ขนาด n
-(1..10).each_slice(3) do |slice|
-  puts slice.inspect
+# each_slice - แบ่งเป็นกลุ่มๆ ละ N
+(1..12).each_slice(3) do |group|
+  puts group.inspect
 end
-# => [1, 2, 3]
-# => [4, 5, 6]
-# => [7, 8, 9]
-# => [10]
+# [1, 2, 3]
+# [4, 5, 6]
+# [7, 8, 9]
+# [10, 11, 12]
 
-# each_cons - sliding window ขนาด n
-(1..8).each_cons(3) do |window|
+# กลุ่มสุดท้ายอาจไม่เต็ม
+(1..10).each_slice(3) do |group|
+  puts group.inspect
+end
+# [1, 2, 3]
+# [4, 5, 6]
+# [7, 8, 9]
+# [10]
+
+# each_cons - sliding window ขนาด N
+(1..6).each_cons(3) do |window|
   puts window.inspect
 end
-# => [1, 2, 3]
-# => [2, 3, 4]
-# => [3, 4, 5]
-# => [4, 5, 6]
-# => [5, 6, 7]
-# => [6, 7, 8]
+# [1, 2, 3]
+# [2, 3, 4]
+# [3, 4, 5]
+# [4, 5, 6]
 
-# ตัวอย่างจริง: batch processing
-def process_in_batches(items, batch_size: 100)
-  items.each_slice(batch_size) do |batch|
-    puts "Processing #{batch.size} items..."
-    # simulate processing
+# ตัวอย่างจริง: Batch processing
+def process_in_batches(items, batch_size)
+  items.each_slice(batch_size).each_with_index do |batch, i|
+    puts "Processing batch #{i + 1}: #{batch.inspect}"
+    # ทำ database insert หรือ API call ที่นี่
   end
 end
 
-process_in_batches((1..350).to_a, batch_size: 100)
-# => Processing 100 items...
-# => Processing 100 items...
-# => Processing 100 items...
-# => Processing 50 items...
+users_to_create = (1..15).map { |i| { id: i, name: "User #{i}" } }
+process_in_batches(users_to_create, 5)
 
-# ตัวอย่าง: calculate moving average
-def moving_average(data, window_size)
-  data.each_cons(window_size).map do |window|
-    window.sum.to_f / window_size
-  end
-end
-
-temperatures = [22, 24, 23, 25, 27, 26, 28, 29, 27, 26]
-avg = moving_average(temperatures, 3)
-puts avg.map { |t| t.round(1) }.inspect
-# => [23.0, 24.0, 25.0, 26.0, 27.0, 27.7, 28.0, 27.3]
-
-# each_slice สำหรับ progress tracking
-data = (1..1000).to_a
-total = data.size
-data.each_slice(100).with_index(1) do |batch, i|
-  progress = (i * 100.0 / (total / 100)).round
-  print "\rProgress: #{[progress, 100].min}%"
-end
-puts
+# ตัวอย่าง: Moving average (each_cons)
+stock_prices = [100, 102, 98, 105, 110, 108, 115, 112, 120, 118]
+moving_avg = stock_prices.each_cons(3).map { |group| group.sum.to_f / group.size }
+puts moving_avg.map { |v| v.round(2) }.inspect
+# [100.0, 101.67, 104.33, 107.67, 111.0, 111.67, 115.67, 116.67]
 ```
 
 ---
 
-## ขั้นตอนที่ 374: min, max, min_by, max_by, minmax
+## Step 375: min_by, max_by, minmax_by
 
 ```ruby
-numbers = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3]
+products = [
+  { name: "Apple",  price: 10, rating: 4.5 },
+  { name: "Banana", price: 5,  rating: 4.0 },
+  { name: "Cherry", price: 25, rating: 4.8 },
+  { name: "Date",   price: 15, rating: 4.2 }
+]
 
-# min / max
-puts numbers.min    # => 1
-puts numbers.max    # => 9
+# min_by
+cheapest = products.min_by { |p| p[:price] }
+puts "Cheapest: #{cheapest[:name]} (#{cheapest[:price]})"
 
-# min / max กับ argument (n smallest/largest)
-puts numbers.min(3).inspect   # => [1, 1, 2]
-puts numbers.max(3).inspect   # => [9, 6, 5]
+# max_by
+priciest = products.max_by { |p| p[:price] }
+puts "Priciest: #{priciest[:name]} (#{priciest[:price]})"
 
-# minmax
-puts numbers.minmax.inspect   # => [1, 9]
-
-# min_by / max_by - เปรียบเทียบด้วยค่าที่ block คืนมา
-words = %w[ant elephant fox bee hippopotamus]
-puts words.min_by(&:length)   # => "ant"
-puts words.max_by(&:length)   # => "hippopotamus"
-
-# min_by กับ n
-puts words.min_by(2, &:length).inspect   # => ["ant", "bee"]
-puts words.max_by(2, &:length).inspect   # => ["hippopotamus", "elephant"]
+best_rated = products.max_by { |p| p[:rating] }
+puts "Best rated: #{best_rated[:name]} (#{best_rated[:rating]})"
 
 # minmax_by
-puts words.minmax_by(&:length).inspect
-# => ["ant", "hippopotamus"]
+min_max = products.minmax_by { |p| p[:price] }
+puts "Price range: #{min_max.first[:name]} to #{min_max.last[:name]}"
 
-# ตัวอย่างจริง: หาสินค้าราคาถูกสุดและแพงสุด
-products = [
-  { name: "หนังสือ", price: 350 },
-  { name: "กระเป๋า", price: 1500 },
-  { name: "นาฬิกา", price: 5000 },
-  { name: "ปากกา", price: 50 },
-  { name: "แล็ปท็อป", price: 35000 }
-]
+# หลาย values
+top_3_expensive = products.max_by(3) { |p| p[:price] }
+puts "Top 3 expensive: #{top_3_expensive.map { |p| p[:name] }.inspect}"
 
-cheapest = products.min_by { |p| p[:price] }
-most_expensive = products.max_by { |p| p[:price] }
+# ตัวอย่าง: String operations
+words = ["elephant", "cat", "rhinoceros", "fox", "hippopotamus"]
+puts words.min_by(&:length)  # cat
+puts words.max_by(&:length)  # hippopotamus
 
-puts "ถูกสุด: #{cheapest[:name]} (฿#{cheapest[:price]})"
-puts "แพงสุด: #{most_expensive[:name]} (฿#{most_expensive[:price]})"
-
-# top 3 most expensive
-top3 = products.max_by(3) { |p| p[:price] }
-top3.each { |p| puts "#{p[:name]}: ฿#{p[:price]}" }
+sorted = words.sort_by(&:length)
+puts sorted.inspect
+# ["cat", "fox", "elephant", "rhinoceros", "hippopotamus"]
 ```
 
 ---
 
-## ขั้นตอนที่ 375: sort_by
+## Step 376: sort_by
 
 ```ruby
-# sort_by - เรียงลำดับด้วยค่าที่ block คืนมา
-words = %w[banana apple cherry date elderberry]
+# sort_by พื้นฐาน
+numbers = [3, 1, 4, 1, 5, 9, 2, 6]
+puts numbers.sort.inspect      # [1, 1, 2, 3, 4, 5, 6, 9]
+puts numbers.sort_by { |n| -n }.inspect  # [9, 6, 5, 4, 3, 2, 1, 1]
 
-puts words.sort_by(&:length).inspect
-# => ["date", "apple", "banana", "cherry", "elderberry"]
+# sort_by กับ String
+words = ["banana", "apple", "cherry", "date"]
+puts words.sort.inspect        # alphabetical: ["apple", "banana", "cherry", "date"]
+puts words.sort_by(&:length).inspect  # by length: ["date", "apple", "banana", "cherry"]
+puts words.sort_by { |w| [-w.length, w] }.inspect  # length desc, then alpha
 
-# sort_by กับ multiple keys (Schwartzian transform)
-puts words.sort_by { |w| [w.length, w] }.inspect
-# => ["date", "apple", "banana", "cherry", "elderberry"]
-
-# sort กับ custom comparator
-puts words.sort { |a, b| a.length <=> b.length }.inspect
-
-# sort ตาม multiple criteria
+# sort_by กับ Object
 students = [
-  { name: "ก", grade: "A", score: 95 },
-  { name: "ข", grade: "B", score: 85 },
-  { name: "ค", grade: "A", score: 92 },
-  { name: "ง", grade: "B", score: 88 }
+  { name: "Charlie", gpa: 3.5, year: 2 },
+  { name: "Alice",   gpa: 3.8, year: 3 },
+  { name: "Bob",     gpa: 3.5, year: 1 },
+  { name: "Diana",   gpa: 3.9, year: 2 }
 ]
 
-# เรียงตาม grade ก่อน แล้วตาม score มากไปน้อย
-sorted = students.sort_by { |s| [s[:grade], -s[:score]] }
-sorted.each { |s| puts "#{s[:name]}: #{s[:grade]} (#{s[:score]})" }
-# => ก: A (95)
-# => ค: A (92)
-# => ง: B (88)
-# => ข: B (85)
+# เรียงตาม GPA มากไปน้อย
+by_gpa = students.sort_by { |s| -s[:gpa] }
+by_gpa.each { |s| puts "#{s[:name]}: #{s[:gpa]}" }
 
-# sort_by! แก้ไข in-place
-arr = ["banana", "apple", "cherry"]
-arr.sort_by!(&:length)
-puts arr.inspect   # => ["apple", "banana", "cherry"]
+# Multi-key sort: GPA มากไปน้อย, ถ้า GPA เท่ากันให้เรียงตามชื่อ
+multi_sort = students.sort_by { |s| [-s[:gpa], s[:name]] }
+multi_sort.each { |s| puts "#{s[:name]}: #{s[:gpa]}" }
 
-# ตัวอย่าง: sort files by multiple criteria
-files = [
-  { name: "z_file.rb", size: 100, modified: "2024-01-10" },
-  { name: "a_file.rb", size: 500, modified: "2024-01-15" },
-  { name: "m_file.rb", size: 100, modified: "2024-01-12" }
-]
-
-# เรียงตาม size ก่อน แล้วตาม name
-sorted_files = files.sort_by { |f| [f[:size], f[:name]] }
-sorted_files.each { |f| puts "#{f[:name]} (#{f[:size]})" }
+# Schwartzian transform - เร็วกว่าสำหรับ expensive operations
+files = ["file10.txt", "file2.txt", "file1.txt", "file20.txt"]
+natural_sorted = files.sort_by { |f| f.scan(/\d+/).map(&:to_i) }
+puts natural_sorted.inspect
+# ["file1.txt", "file2.txt", "file10.txt", "file20.txt"]
 ```
 
 ---
 
-## ขั้นตอนที่ 376: count และ tally
-
-```ruby
-numbers = [1, 2, 2, 3, 3, 3, 4, 4, 4, 4, 5]
-
-# count - นับจำนวน elements
-puts numbers.count          # => 11 (ทั้งหมด)
-puts numbers.count(3)       # => 3 (นับ element ที่เท่ากับ 3)
-puts numbers.count(&:even?) # => 6 (นับ element ที่ block คืน true)
-
-# tally - นับความถี่ของแต่ละค่า (Ruby 2.7+)
-puts numbers.tally.inspect
-# => {1=>1, 2=>2, 3=>3, 4=>4, 5=>1}
-
-# tally กับ string
-words = "the quick brown fox jumps over the lazy dog".split
-puts words.tally.select { |_, v| v > 1 }.inspect
-# => {"the"=>2}
-
-# tally_by (Ruby 3.1+) หรือ group_by + transform_values
-colors = ["red", "blue", "red", "green", "blue", "red"]
-puts colors.tally.inspect
-# => {"red"=>3, "blue"=>2, "green"=>1}
-
-# Sort by frequency
-puts colors.tally.sort_by { |_, v| -v }.to_h.inspect
-# => {"red"=>3, "blue"=>2, "green"=>1}
-
-# ตัวอย่างจริง: vote counting
-votes = %w[Alice Bob Alice Charlie Bob Alice Charlie Bob Alice]
-result = votes.tally.sort_by { |_, v| -v }
-puts "ผลการเลือกตั้ง:"
-result.each_with_index do |(candidate, votes), rank|
-  puts "#{rank + 1}. #{candidate}: #{votes} คะแนน"
-end
-```
-
----
-
-## ขั้นตอนที่ 377: zip
-
-```ruby
-# zip - รวม arrays โดยจับคู่ตาม index
-a = [1, 2, 3]
-b = ["a", "b", "c"]
-c = [:x, :y, :z]
-
-puts a.zip(b).inspect        # => [[1, "a"], [2, "b"], [3, "c"]]
-puts a.zip(b, c).inspect     # => [[1, "a", :x], [2, "b", :y], [3, "c", :z]]
-
-# zip กับ arrays ที่ยาวไม่เท่ากัน
-puts [1, 2, 3].zip([4, 5]).inspect
-# => [[1, 4], [2, 5], [3, nil]]
-
-# zip กับ block
-[1, 2, 3].zip([4, 5, 6]) do |pair|
-  puts "#{pair[0]} + #{pair[1]} = #{pair[0] + pair[1]}"
-end
-
-# ตัวอย่างจริง: สร้าง Hash จาก 2 arrays
-keys = [:name, :age, :city]
-values = ["สมชาย", 25, "กรุงเทพ"]
-
-hash = keys.zip(values).to_h
-puts hash.inspect
-# => {:name=>"สมชาย", :age=>25, :city=>"กรุงเทพ"}
-
-# ตัวอย่าง: แสดงข้อมูลเปรียบเทียบ
-before = [100, 200, 300]
-after = [120, 180, 350]
-labels = ["Product A", "Product B", "Product C"]
-
-labels.zip(before, after).each do |label, b, a|
-  change = ((a - b) / b.to_f * 100).round(1)
-  direction = change > 0 ? "↑" : "↓"
-  puts "#{label}: #{b} → #{a} (#{direction}#{change.abs}%)"
-end
-```
-
----
-
-## ขั้นตอนที่ 378: cycle
-
-```ruby
-# cycle - วนซ้ำ n รอบ หรือวนตลอดไป
-days = ["จันทร์", "อังคาร", "พุธ", "พฤหัส", "ศุกร์"]
-
-# วน 2 รอบ
-days.cycle(2) { |day| print "#{day} " }
-puts
-
-# ตัวอย่าง: Round Robin scheduling
-team = ["สมชาย", "สมหญิง", "สมศรี", "สมบัติ"]
-tasks = (1..10).to_a
-
-assignments = {}
-team.cycle.each_with_index do |person, i|
-  break if i >= tasks.size
-  assignments[tasks[i]] = person
-end
-
-assignments.each { |task, person| puts "Task #{task}: #{person}" }
-
-# cycle สำหรับ animation
-colors = ["🔴", "🟡", "🟢"]
-5.times do |i|
-  color = colors[i % colors.size]
-  print "#{color} "
-end
-puts
-
-# cycle กับ Enumerator
-counter = [1, 2, 3].cycle
-puts counter.next   # => 1
-puts counter.next   # => 2
-puts counter.next   # => 3
-puts counter.next   # => 1 (วนกลับ)
-
-# ใช้ cycle สำหรับ pagination
-def paginate_data(data, page_size: 5)
-  data.each_slice(page_size).with_index(1).map do |page, num|
-    { page: num, data: page }
-  end
-end
-
-items = (1..23).to_a
-pages = paginate_data(items)
-puts "Total pages: #{pages.size}"
-puts "Page 3: #{pages[2][:data].inspect}"
-```
-
----
-
-## ขั้นตอนที่ 379: first, take, drop
-
-```ruby
-data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-
-# first
-puts data.first         # => 1
-puts data.first(3).inspect   # => [1, 2, 3]
-
-# last
-puts data.last          # => 10
-puts data.last(3).inspect    # => [8, 9, 10]
-
-# take - เหมือน first แต่ใช้กับ Enumerable ทั่วไป
-puts data.take(4).inspect        # => [1, 2, 3, 4]
-puts data.take_while { |n| n < 6 }.inspect   # => [1, 2, 3, 4, 5]
-
-# drop
-puts data.drop(3).inspect        # => [4, 5, 6, 7, 8, 9, 10]
-puts data.drop_while { |n| n < 5 }.inspect   # => [5, 6, 7, 8, 9, 10]
-
-# ตัวอย่างจริง: pagination
-def paginate(collection, page:, per_page:)
-  collection.drop((page - 1) * per_page).take(per_page)
-end
-
-items = (1..100).to_a
-puts "Page 3 (5 per page): #{paginate(items, page: 3, per_page: 5).inspect}"
-# => [11, 12, 13, 14, 15]
-
-# take_while / drop_while
-transactions = [
-  { date: "2024-01-01", amount: 100 },
-  { date: "2024-01-05", amount: 200 },
-  { date: "2024-01-10", amount: 150 },
-  { date: "2024-02-01", amount: 300 }
-]
-
-# เอาแค่ transactions ในเดือน January
-jan_txns = transactions.take_while { |t| t[:date].start_with?("2024-01") }
-puts jan_txns.length   # => 3
-```
-
----
-
-## ขั้นตอนที่ 380: find / detect
+## Step 377: count กับ Block
 
 ```ruby
 numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
-# find (alias: detect) - หา element แรกที่ block คืน true
-first_even = numbers.find { |n| n.even? }
-puts first_even   # => 2
+# count ไม่มี argument - นับทั้งหมด
+puts numbers.count  # 10
 
-first_over_5 = numbers.find { |n| n > 5 }
-puts first_over_5   # => 6
+# count กับ value - นับที่เท่ากับ value
+arr = [1, 2, 2, 3, 3, 3, 4]
+puts arr.count(3)  # 3
 
-# ถ้าไม่พบคืน nil
-result = numbers.find { |n| n > 100 }
-puts result.nil?   # => true
+# count กับ block
+puts numbers.count(&:even?)  # 5
+puts numbers.count { |n| n > 5 }  # 5
 
-# find กับ default value (proc)
-result = numbers.find(-> { "not found" }) { |n| n > 100 }
-puts result   # => "not found"
+# ตัวอย่างจริง
+votes = [:yes, :no, :yes, :yes, :no, :abstain, :yes]
+puts "Yes: #{votes.count(:yes)}"
+puts "No: #{votes.count(:no)}"
+puts "Abstain: #{votes.count(:abstain)}"
 
-# find_index - คืน index
-puts numbers.find_index { |n| n > 5 }   # => 5
-puts numbers.find_index(7)               # => 6
-
-# ตัวอย่างจริง: หา user ด้วย condition
-users = [
-  { id: 1, name: "สมชาย", role: :admin },
-  { id: 2, name: "สมหญิง", role: :user },
-  { id: 3, name: "สมศรี", role: :admin }
-]
-
-admin = users.find { |u| u[:role] == :admin }
-puts admin[:name]   # => "สมชาย"
-
-user = users.find { |u| u[:id] == 2 }
-puts user[:name]   # => "สมหญิง"
-
-# find_all เป็น alias ของ select
-puts users.find_all { |u| u[:role] == :admin }.map { |u| u[:name] }.inspect
-# => ["สมชาย", "สมศรี"]
+# นับ nil
+data = [1, nil, 2, nil, 3, nil, 4]
+puts "Nil count: #{data.count(&:nil?)}"
+puts "Non-nil count: #{data.count { |x| !x.nil? }}"
 ```
 
 ---
 
-## ขั้นตอนที่ 381: any?, all?, none?, one?
+## Step 378: tally - Count Occurrences (Ruby 2.7+)
+
+```ruby
+# tally - สร้าง Hash นับจำนวนแต่ละ element
+fruits = ["apple", "banana", "apple", "cherry", "banana", "apple"]
+counts = fruits.tally
+puts counts.inspect
+# {"apple"=>3, "banana"=>2, "cherry"=>1}
+
+# เรียงตามความถี่
+sorted_counts = counts.sort_by { |_, v| -v }
+puts sorted_counts.inspect
+# [["apple", 3], ["banana", 2], ["cherry", 1]]
+
+# ก่อน Ruby 2.7 ต้องใช้ reduce หรือ each_with_object
+old_way = fruits.each_with_object(Hash.new(0)) { |f, h| h[f] += 1 }
+puts old_way.inspect
+
+# tally_by (ใช้ group_by + transform_values)
+words = ["hello", "world", "hi", "how", "hey"]
+by_first_letter = words.group_by { |w| w[0] }.transform_values(&:tally)
+puts by_first_letter.inspect
+
+# ตัวอย่าง: Word frequency analysis
+text = "the quick brown fox jumps over the lazy dog the fox"
+word_freq = text.split.tally.sort_by { |_, v| -v }
+word_freq.first(5).each { |word, count| puts "#{word}: #{count}" }
+```
+
+---
+
+## Step 379: zip - Combine Arrays
+
+```ruby
+# zip รวม arrays เข้าด้วยกัน
+names = ["Alice", "Bob", "Charlie"]
+ages  = [30, 25, 35]
+cities = ["Bangkok", "Chiang Mai", "Phuket"]
+
+zipped = names.zip(ages, cities)
+puts zipped.inspect
+# [["Alice", 30, "Bangkok"], ["Bob", 25, "Chiang Mai"], ["Charlie", 35, "Phuket"]]
+
+# แปลงเป็น Hash
+people = names.zip(ages).map { |name, age| { name: name, age: age } }
+puts people.inspect
+
+# zip กับ block
+names.zip(ages) do |name, age|
+  puts "#{name} อายุ #{age} ปี"
+end
+
+# zip ที่มีความยาวไม่เท่ากัน - ส่วนที่ขาดเป็น nil
+short = [1, 2, 3]
+long  = [4, 5, 6, 7, 8]
+puts short.zip(long).inspect
+# [[1, 4], [2, 5], [3, 6]]  <- ตัดตาม array แรก
+
+puts long.zip(short).inspect
+# [[4, 1], [5, 2], [6, 3], [7, nil], [8, nil]]  <- nil เติม
+
+# Unzip (ด้วย transpose)
+pairs = [["a", 1], ["b", 2], ["c", 3]]
+letters, numbers_array = pairs.transpose
+puts letters.inspect  # ["a", "b", "c"]
+puts numbers_array.inspect  # [1, 2, 3]
+```
+
+---
+
+## Step 380: cycle - วนซ้ำแบบ Circular
+
+```ruby
+# cycle วนซ้ำ collection N รอบ
+[1, 2, 3].cycle(3) { |n| print "#{n} " }
+puts
+# 1 2 3 1 2 3 1 2 3
+
+# cycle โดยไม่กำหนดจำนวน (infinite loop)
+# ต้องใช้ break เพื่อหยุด
+count = 0
+[:red, :green, :blue].cycle do |color|
+  puts color
+  count += 1
+  break if count >= 9
+end
+
+# ตัวอย่างจริง: Round-robin assignment
+servers = ["server1", "server2", "server3"]
+requests = 10.times.map { |i| "request_#{i}" }
+
+assigned = {}
+server_cycle = servers.cycle
+requests.each do |req|
+  assigned[req] = server_cycle.next
+end
+
+assigned.each { |req, server| puts "#{req} -> #{server}" }
+
+# ตัวอย่าง: สร้าง color pattern
+colors = %w[red blue green]
+pattern = []
+colors.cycle do |c|
+  pattern << c
+  break if pattern.length >= 10
+end
+puts pattern.inspect
+```
+
+---
+
+## Step 381: find/detect - ค้นหา Element แรก
+
+```ruby
+numbers = [3, 7, 1, 8, 4, 2, 6, 5]
+
+# find หา element แรกที่ตรง
+first_even = numbers.find(&:even?)
+puts first_even  # 8
+
+first_gt_5 = numbers.find { |n| n > 5 }
+puts first_gt_5  # 7
+
+# detect เป็น alias ของ find
+puts numbers.detect(&:odd?)  # 3
+
+# ถ้าหาไม่พบ return nil
+puts numbers.find { |n| n > 100 }.inspect  # nil
+
+# find กับ default (ifnone)
+not_found = numbers.find(-> { "not found" }) { |n| n > 100 }
+puts not_found  # "not found"
+
+# ตัวอย่างจริง
+users = [
+  { id: 1, name: "Alice", admin: false },
+  { id: 2, name: "Bob",   admin: true },
+  { id: 3, name: "Charlie", admin: false }
+]
+
+admin = users.find { |u| u[:admin] }
+puts "Admin user: #{admin[:name]}"
+
+user_by_id = users.find { |u| u[:id] == 2 }
+puts "User with id 2: #{user_by_id[:name]}"
+```
+
+---
+
+## Step 382: find_index - ค้นหา Index
+
+```ruby
+arr = [10, 20, 30, 40, 50]
+
+# find_index ด้วย value
+puts arr.find_index(30)  # 2
+puts arr.find_index(99)  # nil
+
+# find_index ด้วย block
+puts arr.find_index { |n| n > 25 }  # 2 (first match)
+
+# ตัวอย่าง
+words = ["apple", "banana", "cherry", "date"]
+idx = words.find_index { |w| w.start_with?("c") }
+puts "First 'c' word at index: #{idx}"  # 2
+
+# index เป็น alias
+puts arr.index(20)  # 1
+puts arr.index { |n| n.even? }  # 0
+
+# rindex - หาจากด้านหลัง
+arr2 = [1, 2, 3, 2, 1]
+puts arr2.find_index(2)   # 1 (first occurrence)
+puts arr2.rindex(2)       # 3 (last occurrence)
+```
+
+---
+
+## Step 383: any?, all?, none?, one?
 
 ```ruby
 numbers = [1, 2, 3, 4, 5]
 
-# any? - มีอย่างน้อย 1 element ที่ block คืน true?
-puts numbers.any? { |n| n > 3 }    # => true
-puts numbers.any? { |n| n > 10 }   # => false
-puts numbers.any?(&:even?)          # => true
+# any? - อย่างน้อยหนึ่งตรงเงื่อนไข
+puts numbers.any?(&:even?)           # true
+puts numbers.any? { |n| n > 10 }    # false
 
-# all? - ทุก element ต้อง block คืน true?
-puts numbers.all? { |n| n > 0 }    # => true
-puts numbers.all? { |n| n > 3 }    # => false
-puts numbers.all?(&:positive?)      # => true
+# all? - ทั้งหมดตรงเงื่อนไข
+puts numbers.all? { |n| n > 0 }     # true
+puts numbers.all? { |n| n > 3 }     # false
 
-# none? - ไม่มี element ใดที่ block คืน true?
-puts numbers.none? { |n| n > 10 }  # => true
-puts numbers.none? { |n| n > 3 }   # => false
-puts numbers.none?(&:negative?)     # => true
+# none? - ไม่มีตัวใดตรงเงื่อนไข
+puts numbers.none? { |n| n > 10 }   # true
+puts numbers.none? { |n| n > 3 }    # false
 
-# one? - มีแค่ 1 element ที่ block คืน true?
-puts numbers.one? { |n| n == 3 }   # => true
-puts numbers.one? { |n| n > 3 }    # => false (มี 2 ตัวคือ 4 และ 5)
-
-# ตัวอย่างจริง
-def valid_user_input?(inputs)
-  # ตรวจว่าไม่มี blank fields
-  inputs.none?(&:empty?) &&
-  # ตรวจว่ามีอย่างน้อยหนึ่งค่าที่ไม่ใช่ nil
-  inputs.any? { |i| !i.nil? }
-end
-
-puts valid_user_input?(["สมชาย", "25", "Bangkok"])  # => true
-puts valid_user_input?(["สมชาย", "", "Bangkok"])    # => false
+# one? - มีแค่หนึ่งตัวเท่านั้นที่ตรง
+puts numbers.one? { |n| n == 3 }    # true
+puts numbers.one?(&:even?)          # false (มี 2 และ 4)
 
 # ใช้กับ Hash
-users = [
-  { name: "ก", verified: true },
-  { name: "ข", verified: true },
-  { name: "ค", verified: false }
-]
+users = { alice: true, bob: false, charlie: true }
+puts users.any? { |_, active| active }   # true
+puts users.all? { |_, active| active }   # false
+puts users.none? { |_, active| active }  # false
 
-puts users.all? { |u| u[:verified] }    # => false
-puts users.any? { |u| u[:verified] }    # => true
-puts users.none? { |u| u[:verified] }   # => false
-puts users.one? { |u| !u[:verified] }   # => true
+# ไม่มี block - ตรวจสอบว่ามี truthy element หรือไม่
+puts [nil, false, nil].any?    # false
+puts [nil, 1, nil].any?        # true
+puts [1, 2, 3].all?            # true
+puts [1, nil, 3].all?          # false
+puts [nil, false, nil].none?   # true
+puts [nil, 1, nil].none?       # false
 ```
 
 ---
 
-## ขั้นตอนที่ 382: Lazy Enumerators
+## Step 384: first, take, take_while
 
 ```ruby
-# Lazy enumerator จะไม่ evaluate จนกว่าจะถูกเรียกจริงๆ
+arr = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
-# ไม่มี lazy - จะ enumerate ทุก element
-# (1..Float::INFINITY).select { |n| n.odd? }.first(5)  # infinite loop!
+# first
+puts arr.first      # 1
+puts arr.first(3).inspect  # [1, 2, 3]
 
-# ใช้ lazy - evaluate เมื่อต้องการเท่านั้น
+# take - เหมือน first แต่ return [] ถ้า n=0
+puts arr.take(4).inspect   # [1, 2, 3, 4]
+puts arr.take(0).inspect   # []
+
+# take_while - take จนกว่า condition เป็น false
+ascending = arr.take_while { |n| n < 6 }
+puts ascending.inspect  # [1, 2, 3, 4, 5]
+
+# ต่างจาก select - take_while หยุดเมื่อ condition แรกที่เป็น false
+mixed = [2, 4, 6, 3, 8, 10]
+evens_from_start = mixed.take_while(&:even?)
+puts evens_from_start.inspect  # [2, 4, 6]  <- หยุดที่ 3
+
+all_evens = mixed.select(&:even?)
+puts all_evens.inspect  # [2, 4, 6, 8, 10]  <- select ทั้งหมด
+
+# ตัวอย่างจริง: Top N items
+scores = [95, 88, 72, 91, 85, 67, 78, 90]
+top_3 = scores.sort.reverse.first(3)
+puts "Top 3 scores: #{top_3.inspect}"
+```
+
+---
+
+## Step 385: drop, drop_while
+
+```ruby
+arr = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+# drop - ข้าม N elements แรก
+puts arr.drop(3).inspect   # [4, 5, 6, 7, 8, 9, 10]
+puts arr.drop(0).inspect   # [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+# drop_while - ข้ามจนกว่า condition เป็น false
+result = arr.drop_while { |n| n < 5 }
+puts result.inspect  # [5, 6, 7, 8, 9, 10]
+
+# ใช้ drop + take เพื่อ pagination
+def paginate(items, page, per_page)
+  items.drop((page - 1) * per_page).take(per_page)
+end
+
+items = (1..50).to_a
+puts paginate(items, 1, 10).inspect  # [1..10]
+puts paginate(items, 2, 10).inspect  # [11..20]
+puts paginate(items, 5, 10).inspect  # [41..50]
+
+# drop_while ใช้กับ stream ที่มี header
+log_lines = [
+  "# Header 1",
+  "# Header 2",
+  "# End of headers",
+  "actual data line 1",
+  "actual data line 2",
+  "# This is data, not header!"
+]
+
+data_lines = log_lines.drop_while { |line| line.start_with?("#") }
+puts data_lines.inspect
+```
+
+---
+
+## Step 386: Lazy Enumerators
+
+```ruby
+# Lazy evaluation - คำนวณเมื่อต้องการเท่านั้น
+# มีประโยชน์มากเมื่อ collection ใหญ่หรือ infinite
+
+# ปกติ (eager)
+result = (1..Float::INFINITY).select { |n| n.odd? }.first(5)
+# ❌ infinite loop! ไม่สามารถทำได้
+
+# ด้วย lazy
 result = (1..Float::INFINITY).lazy.select { |n| n.odd? }.first(5)
-puts result.inspect   # => [1, 3, 5, 7, 9]
+puts result.inspect  # [1, 3, 5, 7, 9]
 
-# lazy chain
-result = (1..Float::INFINITY)
-  .lazy
-  .map { |n| n * n }
-  .select { |n| n % 3 == 0 }
-  .reject { |n| n % 9 == 0 }
-  .first(5)
-puts result.inspect
+# lazy + map + select
+result = (1..Float::INFINITY).lazy
+                              .map { |n| n * n }
+                              .select { |n| n % 3 == 0 }
+                              .first(5)
+puts result.inspect  # [9, 36, 81, 144, 225]
 
-# force evaluation ด้วย to_a หรือ force
-lazy_result = (1..100).lazy.select(&:odd?)
-puts lazy_result.class   # => Enumerator::Lazy
-puts lazy_result.to_a.first(5).inspect   # => [1, 3, 5, 7, 9]
+# lazy กับ finite collection
+# ไม่คำนวณทั้งหมด - หยุดเมื่อได้ค่าตามต้องการ
+numbers = (1..1_000_000)
+first_10_squares = numbers.lazy.map { |n| n * n }.first(10)
+puts first_10_squares.inspect
 
-# ตัวอย่าง: หา Fibonacci ที่เป็น perfect square
+# force/to_a แปลงกลับเป็น Array ปกติ
+lazy_enum = (1..10).lazy.select(&:even?).map { |n| n * 2 }
+puts lazy_enum.class  # Enumerator::Lazy
+puts lazy_enum.to_a.inspect  # [4, 8, 12, 16, 20]
+
+# ตัวอย่าง: Fibonacci sequence
 fib = Enumerator.new do |y|
   a, b = 0, 1
-  loop { y << a; a, b = b, a + b }
+  loop do
+    y << a
+    a, b = b, a + b
+  end
 end
 
-def perfect_square?(n)
-  n >= 0 && Math.sqrt(n) == Math.sqrt(n).to_i
-end
+puts fib.lazy.first(10).inspect
+# [0, 1, 1, 2, 3, 5, 8, 13, 21, 34]
 
-fib_squares = fib.lazy
-  .select { |n| perfect_square?(n) }
-  .first(5)
-puts fib_squares.inspect   # => [0, 1, 1, 144, ...]
-
-# lazy กับ custom Enumerator
-power_of_2 = Enumerator.new do |y|
-  n = 1
-  loop { y << n; n *= 2 }
-end
-
-puts power_of_2.lazy.select { |n| n % 3 == 0 }.first(5).inspect
+puts fib.lazy.select(&:even?).first(5).inspect
+# [0, 2, 8, 34, 144]
 ```
 
 ---
 
-## ขั้นตอนที่ 383: each_with_index และ each_with_object
+## Step 387: each_with_object
 
 ```ruby
-# each_with_index
-fruits = ["apple", "banana", "cherry"]
+# each_with_object - วนซ้ำพร้อมสะสมผลลัพธ์ใน object เดิม
+numbers = [1, 2, 3, 4, 5]
 
-fruits.each_with_index do |fruit, index|
-  puts "#{index + 1}. #{fruit}"
+# สร้าง Hash
+result = numbers.each_with_object({}) do |n, hash|
+  hash[n] = n ** 2
 end
+puts result.inspect  # {1=>1, 2=>4, 3=>9, 4=>16, 5=>25}
 
-# map.with_index สำหรับ map พร้อม index
-numbered = fruits.map.with_index(1) { |fruit, i| "#{i}. #{fruit}" }
-puts numbered.inspect
-# => ["1. apple", "2. banana", "3. cherry"]
-
-# each_with_object - accumulate ผลลัพธ์ใน object
-# object ที่ส่งไปจะไม่เปลี่ยน reference
-words = ["hello", "world", "foo", "bar"]
-
-word_lengths = words.each_with_object({}) do |word, hash|
-  hash[word] = word.length
+# สร้าง Array
+doubled = numbers.each_with_object([]) do |n, arr|
+  arr << n * 2
 end
-puts word_lengths.inspect
-# => {"hello"=>5, "world"=>5, "foo"=>3, "bar"=>3}
+puts doubled.inspect  # [2, 4, 6, 8, 10]
 
-# ตัวอย่าง: สร้าง lookup table
-numbers = (1..5).each_with_object({}) do |n, hash|
-  hash[n] = { square: n**2, cube: n**3 }
+# ต่างจาก reduce
+# reduce: return value ของ block เป็น accumulator ใหม่
+# each_with_object: object เดิมถูก pass เข้า block เสมอ
+
+# ตัวอย่างจริง: Grouping with transformation
+students = [
+  { name: "Alice", grade: "A", score: 95 },
+  { name: "Bob",   grade: "B", score: 82 },
+  { name: "Charlie", grade: "A", score: 91 },
+  { name: "Diana",  grade: "B", score: 78 }
+]
+
+grade_scores = students.each_with_object(Hash.new { |h, k| h[k] = [] }) do |s, h|
+  h[s[:grade]] << s[:score]
 end
-numbers.each { |n, v| puts "#{n}: square=#{v[:square]}, cube=#{v[:cube]}" }
+puts grade_scores.inspect
+# {"A"=>[95, 91], "B"=>[82, 78]}
 
-# เปรียบเทียบกับ reduce
-# each_with_object ไม่ต้อง return object (ต่างจาก reduce)
-result1 = [1, 2, 3].each_with_object([]) { |n, arr| arr << n * 2 }
-result2 = [1, 2, 3].reduce([]) { |arr, n| arr << n * 2; arr }  # ต้อง return arr
-puts result1.inspect   # => [2, 4, 6]
-puts result2.inspect   # => [2, 4, 6]
+# คำนวณ average per grade
+averages = grade_scores.transform_values { |scores| scores.sum.to_f / scores.size }
+puts averages.inspect
+# {"A"=>93.0, "B"=>80.0}
 ```
 
 ---
 
-## ขั้นตอนที่ 384: sum, inject สำหรับ complex aggregation
+## Step 388: sum, tally, uniq กับ blocks
 
 ```ruby
-# sum
-puts [1, 2, 3, 4, 5].sum   # => 15
-puts [1.5, 2.5, 3.0].sum   # => 7.0
+# sum พื้นฐาน
+puts [1, 2, 3, 4, 5].sum  # 15
+puts [1.5, 2.5, 3.0].sum  # 7.0
 
-# sum กับ block (Ruby 2.4+)
-words = ["hello", "world", "ruby"]
-total_chars = words.sum(&:length)
-puts total_chars   # => 14
+# sum กับ block
+puts [1, 2, 3, 4, 5].sum { |n| n * 2 }  # 30
+puts ["hello", "world", "ruby"].sum(0) { |w| w.length }  # 14
 
 # sum กับ initial value
-puts [1, 2, 3].sum(100)   # => 106
+puts [1, 2, 3].sum(100)  # 106
 
-# ตัวอย่างจริง
-orders = [
-  { product: "A", qty: 3, price: 100 },
-  { product: "B", qty: 2, price: 250 },
-  { product: "C", qty: 5, price: 75 }
+# ตัวอย่างจริง: คำนวณ order total
+cart_items = [
+  { name: "Book", price: 250, qty: 2 },
+  { name: "Pen",  price: 15,  qty: 5 },
+  { name: "Notebook", price: 80, qty: 3 }
 ]
 
-total = orders.sum { |o| o[:qty] * o[:price] }
-puts "ยอดรวม: ฿#{total}"   # => ฿1,425
+total = cart_items.sum { |item| item[:price] * item[:qty] }
+puts "Total: #{total} บาท"  # 815 บาท
 
-# inject สำหรับ complex aggregation
-# สร้าง running total
-running_totals = [10, 20, 30, 40].inject([]) do |totals, n|
-  totals << (totals.last || 0) + n
-end
-puts running_totals.inspect   # => [10, 30, 60, 100]
-
-# nested aggregation
-transactions = [
-  { month: "Jan", amount: 1000 },
-  { month: "Jan", amount: 500 },
-  { month: "Feb", amount: 800 },
-  { month: "Feb", amount: 1200 },
-  { month: "Mar", amount: 600 }
+# uniq กับ block
+people = [
+  { name: "Alice", city: "Bangkok" },
+  { name: "Bob",   city: "Bangkok" },
+  { name: "Charlie", city: "Chiang Mai" }
 ]
 
-monthly_totals = transactions.inject(Hash.new(0)) do |totals, t|
-  totals[t[:month]] += t[:amount]
-  totals
-end
-puts monthly_totals.inspect
-# => {"Jan"=>1500, "Feb"=>2000, "Mar"=>600}
+unique_cities = people.map { |p| p[:city] }.uniq
+puts unique_cities.inspect  # ["Bangkok", "Chiang Mai"]
+
+# เลือก unique โดย criteria
+unique_by_city = people.uniq { |p| p[:city] }
+puts unique_by_city.map { |p| p[:name] }.inspect  # ["Alice", "Charlie"]
+
+# flat_map + uniq
+nested = [[1, 2, 3], [2, 3, 4], [3, 4, 5]]
+all_unique = nested.flat_map { |a| a }.uniq
+puts all_unique.sort.inspect  # [1, 2, 3, 4, 5]
 ```
 
 ---
 
-## ขั้นตอนที่ 385: flat_map สำหรับ nested collections
-
-```ruby
-# ตัวอย่างจริงของ flat_map
-categories = [
-  { name: "ผลไม้", items: ["แอปเปิ้ล", "กล้วย", "มะม่วง"] },
-  { name: "ผัก", items: ["แครอท", "มะเขือ"] },
-  { name: "เนื้อสัตว์", items: ["หมู", "ไก่", "เนื้อ"] }
-]
-
-# หา items ทั้งหมด
-all_items = categories.flat_map { |cat| cat[:items] }
-puts all_items.inspect
-# => ["แอปเปิ้ล", "กล้วย", "มะม่วง", "แครอท", "มะเขือ", "หมู", "ไก่", "เนื้อ"]
-
-# ตัวอย่าง: database-like query
-users = [
-  { name: "สมชาย", posts: [
-    { title: "Ruby 101", likes: 10 },
-    { title: "Rails Guide", likes: 25 }
-  ]},
-  { name: "สมหญิง", posts: [
-    { title: "Python Tips", likes: 15 }
-  ]}
-]
-
-# หา posts ทั้งหมดที่ likes > 12
-popular_posts = users.flat_map { |u| u[:posts] }
-  .select { |p| p[:likes] > 12 }
-  .map { |p| p[:title] }
-
-puts popular_posts.inspect
-# => ["Rails Guide", "Python Tips"]
-
-# flat_map vs map + flatten
-matrix = [[1, 2], [3, 4], [5, 6]]
-
-# map ธรรมดา
-puts matrix.map { |row| row.map { |n| n * 2 } }.inspect
-# => [[2, 4], [6, 8], [10, 12]]
-
-# flat_map
-puts matrix.flat_map { |row| row.map { |n| n * 2 } }.inspect
-# => [2, 4, 6, 8, 10, 12]
-```
-
----
-
-## ขั้นตอนที่ 386: Enumerable สำหรับ Hash
-
-```ruby
-hash = { a: 1, b: 2, c: 3, d: 4, e: 5 }
-
-# map บน Hash คืน Array of arrays
-puts hash.map { |k, v| [k, v * 2] }.inspect
-# => [[:a, 2], [:b, 4], [:c, 6], [:d, 8], [:e, 10]]
-
-# transform_values คืน Hash ใหม่
-puts hash.transform_values { |v| v * 2 }.inspect
-# => {:a=>2, :b=>4, :c=>6, :d=>8, :e=>10}
-
-# transform_keys คืน Hash ใหม่
-puts hash.transform_keys { |k| k.to_s }.inspect
-# => {"a"=>1, "b"=>2, "c"=>3, "d"=>4, "e"=>5}
-
-# select บน Hash
-puts hash.select { |k, v| v > 3 }.inspect
-# => {:d=>4, :e=>5}
-
-# reject บน Hash
-puts hash.reject { |k, v| v.even? }.inspect
-# => {:a=>1, :c=>3, :e=>5}
-
-# any? / all? / none? บน Hash
-puts hash.any? { |k, v| v > 4 }    # => true
-puts hash.all? { |k, v| v > 0 }    # => true
-puts hash.none? { |k, v| v < 0 }   # => true
-
-# min_by / max_by บน Hash
-puts hash.min_by { |k, v| v }.inspect   # => [:a, 1]
-puts hash.max_by { |k, v| v }.inspect   # => [:e, 5]
-
-# sort_by บน Hash
-puts hash.sort_by { |k, v| -v }.to_h.inspect
-# => {:e=>5, :d=>4, :c=>3, :b=>2, :a=>1}
-
-# each_with_object บน Hash
-result = hash.each_with_object([]) do |(k, v), arr|
-  arr << "#{k}=#{v}" if v.odd?
-end
-puts result.inspect   # => ["a=1", "c=3", "e=5"]
-```
-
----
-
-## ขั้นตอนที่ 387: Custom Enumerable Class
+## Step 389: Custom Enumerable Class
 
 ```ruby
 # สร้าง class ที่ include Enumerable
-class WordCollection
-  include Enumerable
-  
-  def initialize
-    @words = []
-  end
-  
-  def add(word)
-    @words << word.downcase
-    self  # allow chaining
-  end
-  
-  # Method เดียวที่ต้องกำหนด
-  def each(&block)
-    @words.each(&block)
-  end
-  
-  def to_s
-    @words.join(", ")
-  end
-end
-
-wc = WordCollection.new
-wc.add("Ruby").add("Python").add("JavaScript").add("Go").add("Rust")
-
-# ได้ methods ทั้งหมดจาก Enumerable ฟรี!
-puts wc.sort.inspect
-puts wc.map(&:upcase).inspect
-puts wc.select { |w| w.length > 3 }.inspect
-puts wc.min
-puts wc.max
-puts wc.count
-puts wc.include?("ruby")   # => true
-puts wc.first
-puts wc.min_by(&:length)
-puts wc.max_by(&:length)
-
-# ตัวอย่างที่ซับซ้อนกว่า: NumberSet
 class NumberSet
   include Enumerable
-  include Comparable
-  
+
   def initialize(*numbers)
-    @numbers = numbers.uniq.sort
+    @numbers = numbers
   end
-  
+
+  # ต้อง implement each
   def each(&block)
     @numbers.each(&block)
   end
-  
-  def <=>(other)
-    to_a <=> other.to_a
-  end
-  
-  def +(other)
-    NumberSet.new(*(@numbers + other.to_a))
-  end
-  
-  def -(other)
-    NumberSet.new(*(@numbers - other.to_a))
-  end
-  
-  def &(other)
-    NumberSet.new(*(@numbers & other.to_a))
-  end
-  
+
   def to_s
-    "{#{@numbers.join(', ')}}"
-  end
-  
-  def inspect
-    "NumberSet#{to_s}"
+    "NumberSet(#{@numbers.join(', ')})"
   end
 end
 
-set1 = NumberSet.new(1, 2, 3, 4, 5)
-set2 = NumberSet.new(3, 4, 5, 6, 7)
+ns = NumberSet.new(5, 2, 8, 1, 9, 3, 7, 4, 6)
 
-puts (set1 + set2).to_s    # => {1, 2, 3, 4, 5, 6, 7}
-puts (set1 - set2).to_s    # => {1, 2}
-puts (set1 & set2).to_s    # => {3, 4, 5}
-puts set1.sum               # => 15
-puts set1.select(&:even?).inspect   # => [2, 4]
+# ได้รับ Enumerable methods ทั้งหมดฟรี!
+puts ns.sort.inspect         # [1, 2, 3, 4, 5, 6, 7, 8, 9]
+puts ns.min                  # 1
+puts ns.max                  # 9
+puts ns.sum                  # 45
+puts ns.select(&:odd?).inspect  # [5, 1, 9, 3, 7]
+puts ns.map { |n| n * 2 }.inspect  # [10, 4, 16, 2, 18, 6, 14, 8, 12]
+puts ns.include?(7)          # true
+puts ns.count                # 9
+
+# ตัวอย่างที่ซับซ้อนขึ้น: WordCollection
+class WordCollection
+  include Enumerable
+
+  def initialize(text)
+    @words = text.downcase.scan(/\w+/)
+  end
+
+  def each(&block)
+    @words.each(&block)
+  end
+
+  def word_frequencies
+    tally.sort_by { |_, v| -v }
+  end
+
+  def unique_words
+    uniq
+  end
+
+  def average_word_length
+    sum(&:length).to_f / count
+  end
+end
+
+text = "the quick brown fox jumps over the lazy dog the quick fox"
+wc = WordCollection.new(text)
+
+puts "Word count: #{wc.count}"
+puts "Unique words: #{wc.unique_words.sort.inspect}"
+puts "Average length: #{wc.average_word_length.round(2)}"
+puts "Top 3 words:"
+wc.word_frequencies.first(3).each { |word, freq| puts "  #{word}: #{freq}" }
+puts "Words longer than 4 chars: #{wc.select { |w| w.length > 4 }.uniq.sort.inspect}"
 ```
 
 ---
 
-## ขั้นตอนที่ 388: Enumerable Chaining
-
-```ruby
-# Chaining หลาย Enumerable methods
-employees = [
-  { name: "ก", dept: :engineering, salary: 80000, years: 5 },
-  { name: "ข", dept: :marketing, salary: 70000, years: 3 },
-  { name: "ค", dept: :engineering, salary: 95000, years: 8 },
-  { name: "ง", dept: :marketing, salary: 65000, years: 2 },
-  { name: "จ", dept: :engineering, salary: 75000, years: 4 },
-  { name: "ฉ", dept: :hr, salary: 60000, years: 6 }
-]
-
-# หาเงินเดือนเฉลี่ยของ Engineering
-eng_avg = employees
-  .select { |e| e[:dept] == :engineering }
-  .map { |e| e[:salary] }
-  .then { |salaries| salaries.sum.to_f / salaries.size }
-
-puts "Engineering average: ฿#{eng_avg.round(0)}"
-
-# หา top earner ในแต่ละ dept
-top_earners = employees
-  .group_by { |e| e[:dept] }
-  .transform_values { |dept_employees| dept_employees.max_by { |e| e[:salary] } }
-
-top_earners.each do |dept, emp|
-  puts "#{dept}: #{emp[:name]} (฿#{emp[:salary]})"
-end
-
-# Report: employees with 4+ years sorted by salary
-report = employees
-  .select { |e| e[:years] >= 4 }
-  .sort_by { |e| -e[:salary] }
-  .map.with_index(1) { |e, i| "#{i}. #{e[:name]}: ฿#{e[:salary]} (#{e[:years]} ปี)" }
-
-puts "\nพนักงานอาวุโส (4+ ปี) เรียงตามเงินเดือน:"
-report.each { |line| puts line }
-```
-
----
-
-## ขั้นตอนที่ 389: Performance Considerations
-
-```ruby
-require 'benchmark'
-
-n = 100_000
-numbers = (1..n).to_a
-
-Benchmark.bm(20) do |x|
-  # map + select vs filter_map
-  x.report("map + select:     ") { numbers.map { |n| n * 2 }.select { |n| n > 100000 } }
-  x.report("filter_map:       ") { numbers.filter_map { |n| n * 2 if n * 2 > 100000 } }
-  
-  # each_with_object vs reduce
-  x.report("each_with_object: ") { numbers.each_with_object([]) { |n, a| a << n * 2 } }
-  x.report("map:              ") { numbers.map { |n| n * 2 } }
-  
-  # any? short-circuits
-  x.report("any? (first):     ") { numbers.any? { |n| n == 1 } }
-  x.report("any? (last):      ") { numbers.any? { |n| n == n } }
-end
-
-# Lazy vs eager
-n = 1_000_000
-Benchmark.bm(15) do |x|
-  x.report("eager first(10):") { (1..n).select { |n| n.odd? }.first(10) }
-  x.report("lazy first(10): ") { (1..n).lazy.select { |n| n.odd? }.first(10) }
-end
-
-# Tips สำหรับ performance:
-# 1. ใช้ lazy สำหรับ large collections และ short-circuit operations
-# 2. ใช้ filter_map แทน map + select เมื่อทำได้
-# 3. ใช้ find แทน select.first
-# 4. ใช้ any? แทน select.empty? หรือ count > 0
-# 5. ใช้ tally แทน group_by + transform_values count
-```
-
----
-
-## ขั้นตอนที่ 390: Real-World Enumerable Patterns
+## Step 390: ตัวอย่างขั้นสูงและ Pattern ที่พบบ่อย
 
 ```ruby
 # Pattern 1: Data Pipeline
@@ -1224,8 +1097,8 @@ class DataPipeline
     DataPipeline.new(@data.map(&block))
   end
 
-  def aggregate(method = :to_a, &block)
-    block ? @data.send(method, &block) : @data.send(method)
+  def aggregate(&block)
+    @data.reduce(&block)
   end
 
   def result
@@ -1233,535 +1106,605 @@ class DataPipeline
   end
 end
 
-sales = [
-  { product: "A", amount: 1000, month: "Jan", region: "North" },
-  { product: "B", amount: 2500, month: "Jan", region: "South" },
-  { product: "A", amount: 1500, month: "Feb", region: "North" },
-  { product: "C", amount: 800,  month: "Feb", region: "East" },
-  { product: "B", amount: 3000, month: "Mar", region: "South" }
+orders = [
+  { id: 1, amount: 150, status: :completed, category: :food },
+  { id: 2, amount: 350, status: :pending,   category: :electronics },
+  { id: 3, amount: 250, status: :completed, category: :food },
+  { id: 4, amount: 500, status: :completed, category: :electronics },
+  { id: 5, amount: 75,  status: :cancelled, category: :food }
 ]
 
-# ยอดขายรวมของ Product A
-total_a = DataPipeline.new(sales)
-  .filter { |s| s[:product] == "A" }
-  .aggregate(:sum) { |s| s[:amount] }
-puts "Product A total: ฿#{total_a}"
+# Chain operations
+total_completed_food = DataPipeline.new(orders)
+  .filter { |o| o[:status] == :completed }
+  .filter { |o| o[:category] == :food }
+  .transform { |o| o[:amount] }
+  .aggregate(:+)
 
-# Pattern 2: Memoization with Enumerable
-class MemoizedCollection
-  include Enumerable
+puts "Total completed food orders: #{total_completed_food}"  # 400
 
-  def initialize(&generator)
-    @generator = generator
-    @cache = []
-    @enum = nil
-  end
+# Pattern 2: Chaining Enumerable methods
+result = (1..100)
+  .select { |n| n % 3 == 0 || n % 5 == 0 }
+  .map { |n| n * n }
+  .reject { |n| n > 500 }
+  .sum
 
-  def each
-    return to_enum(:each) unless block_given?
-    @cache.each { |item| yield item }
-    @enum ||= @generator.call
-    loop do
-      item = @enum.next
-      @cache << item
-      yield item
-    end
-  rescue StopIteration
-    # done
-  end
+puts "Result: #{result}"
+
+# Pattern 3: Lazy + Complex transforms
+def process_log_file(lines)
+  lines.lazy
+       .reject { |line| line.strip.empty? }
+       .reject { |line| line.start_with?("#") }
+       .map(&:strip)
+       .map { |line| line.split(":", 2) }
+       .select { |parts| parts.length == 2 }
+       .map { |key, value| [key.strip.to_sym, value.strip] }
+       .to_a
+       .to_h
 end
 
-# Pattern 3: Infinite sequence ด้วย Lazy
-class InfiniteSequence
-  include Enumerable
+config_lines = [
+  "# Configuration file",
+  "",
+  "host: localhost",
+  "port: 3000",
+  "# Database settings",
+  "db_host: 127.0.0.1",
+  "db_port: 5432"
+]
 
-  def each
-    return to_enum(:each) unless block_given?
-    n = 0
-    loop { yield generate(n); n += 1 }
-  end
-
-  def take(n)
-    lazy.first(n)
-  end
-
-  private
-
-  def generate(n)
-    raise NotImplementedError
-  end
-end
-
-class PrimeSequence < InfiniteSequence
-  def generate(n)
-    count = 0
-    candidate = 2
-    loop do
-      if prime?(candidate)
-        count += 1
-        return candidate if count > n
-      end
-      candidate += 1
-    end
-  end
-
-  private
-
-  def prime?(n)
-    return false if n < 2
-    (2..Math.sqrt(n).to_i).none? { |i| n % i == 0 }
-  end
-end
-
-primes = PrimeSequence.new
-puts primes.take(10).inspect
+config = process_log_file(config_lines)
+puts config.inspect
+# {:host=>"localhost", :port=>"3000", :db_host=>"127.0.0.1", :db_port=>"5432"}
 ```
 
 ---
 
-## แบบฝึกหัด 25 ข้อ
+## แบบฝึกหัด: Enumerables (25 ข้อ)
 
-### ข้อ 1-5: map และ select
+### ข้อที่ 1-5: map, select, reject
 
-**ข้อ 1:** แปลง array ของ temperatures จาก Celsius เป็น Fahrenheit
+**ข้อ 1:** สร้าง array ของ squared numbers สำหรับเลข 1-20 ที่เป็นจำนวนคี่เท่านั้น
+
 ```ruby
 # เฉลย
-celsius = [0, 20, 37, 100]
-fahrenheit = celsius.map { |c| (c * 9.0 / 5) + 32 }
-puts fahrenheit.inspect   # => [32.0, 68.0, 98.6, 212.0]
+result = (1..20).select(&:odd?).map { |n| n ** 2 }
+puts result.inspect
+# [1, 9, 25, 49, 81, 121, 169, 225, 289, 361]
 ```
 
-**ข้อ 2:** filter users ที่อายุ 18-60 และ active
+**ข้อ 2:** จาก array ของชื่อ ["Alice", "Bob", "Charlie", "David", "Eve"] ให้ map เป็น Hash ที่มี name และ name length
+
 ```ruby
 # เฉลย
-users = [
-  { name: "ก", age: 15, active: true },
-  { name: "ข", age: 25, active: true },
-  { name: "ค", age: 65, active: true },
-  { name: "ง", age: 30, active: false }
-]
-
-eligible = users.select { |u| (18..60).include?(u[:age]) && u[:active] }
-puts eligible.map { |u| u[:name] }.inspect   # => ["ข"]
+names = ["Alice", "Bob", "Charlie", "David", "Eve"]
+result = names.map { |name| { name: name, length: name.length } }
+result.each { |r| puts "#{r[:name]}: #{r[:length]}" }
 ```
 
-**ข้อ 3:** แปลง array ของ strings เป็น format title case
+**ข้อ 3:** กรองเฉพาะ positive numbers และหาผลรวม
+
 ```ruby
 # เฉลย
-titles = ["ruby on rails", "the art of war", "clean code"]
-title_cased = titles.map { |t| t.split.map(&:capitalize).join(' ') }
-puts title_cased.inspect
+numbers = [-5, 3, -2, 8, -1, 4, -7, 9, -3, 6]
+sum = numbers.select { |n| n > 0 }.sum
+puts "Sum of positives: #{sum}"  # 30
 ```
 
-**ข้อ 4:** หา products ที่มีส่วนลดและคำนวณราคาสุทธิ
+**ข้อ 4:** ใช้ filter_map เพื่อแปลง String เป็น Integer เฉพาะที่เป็นเลขเท่านั้น
+
 ```ruby
 # เฉลย
-products = [
-  { name: "A", price: 100, discount: 0 },
-  { name: "B", price: 200, discount: 10 },
-  { name: "C", price: 150, discount: 20 }
-]
-
-discounted = products
-  .select { |p| p[:discount] > 0 }
-  .map { |p| { name: p[:name], final_price: p[:price] * (1 - p[:discount] / 100.0) } }
-
-puts discounted.inspect
+inputs = ["42", "hello", "17", "abc", "99", "3.14", "0"]
+integers = inputs.filter_map { |s| Integer(s) rescue nil }
+puts integers.inspect  # [42, 17, 99, 0]
 ```
 
-**ข้อ 5:** flat_map เพื่อสร้าง word list จาก paragraph
+**ข้อ 5:** สร้าง method ที่ reject nil และ empty strings
+
 ```ruby
 # เฉลย
-paragraphs = [
-  "Ruby is elegant",
-  "Python is readable",
-  "Go is fast"
-]
-
-words = paragraphs.flat_map { |p| p.split }
-puts words.uniq.sort.inspect
-```
-
-### ข้อ 6-10: reduce และ group_by
-
-**ข้อ 6:** คำนวณ running total
-```ruby
-# เฉลย
-payments = [100, 250, 75, 300, 150]
-running_total = payments.each_with_object([0]) { |n, acc| acc << acc.last + n }
-puts running_total.inspect   # => [0, 100, 350, 425, 725, 875]
-```
-
-**ข้อ 7:** จัดกลุ่ม transactions ตามเดือนและหายอดรวม
-```ruby
-# เฉลย
-transactions = [
-  { month: 1, amount: 1000 },
-  { month: 1, amount: 500 },
-  { month: 2, amount: 800 },
-  { month: 2, amount: 1200 },
-  { month: 3, amount: 600 }
-]
-
-monthly = transactions.group_by { |t| t[:month] }
-  .transform_values { |txns| txns.sum { |t| t[:amount] } }
-
-puts monthly.inspect
-```
-
-**ข้อ 8:** สร้าง inverted index
-```ruby
-# เฉลย
-documents = {
-  1 => "ruby is great",
-  2 => "python is readable",
-  3 => "ruby and python"
-}
-
-index = documents.flat_map { |id, text|
-  text.split.map { |word| [word, id] }
-}.group_by { |word, _| word }
- .transform_values { |pairs| pairs.map { |_, id| id }.uniq.sort }
-
-puts index["ruby"].inspect    # => [1, 3]
-puts index["python"].inspect  # => [2, 3]
-```
-
-**ข้อ 9:** หา unique visitors per page
-```ruby
-# เฉลย
-visits = [
-  { page: "/home", user: "alice" },
-  { page: "/about", user: "bob" },
-  { page: "/home", user: "alice" },
-  { page: "/home", user: "charlie" },
-  { page: "/about", user: "alice" }
-]
-
-unique_visitors = visits.group_by { |v| v[:page] }
-  .transform_values { |vs| vs.map { |v| v[:user] }.uniq.count }
-
-puts unique_visitors.inspect
-```
-
-**ข้อ 10:** สร้าง matrix multiplication ด้วย Enumerable
-```ruby
-# เฉลย
-def matrix_multiply(a, b)
-  b_t = b.transpose
-  a.map { |row|
-    b_t.map { |col|
-      row.zip(col).sum { |x, y| x * y }
-    }
-  }
+def clean_array(arr)
+  arr.reject { |x| x.nil? || (x.is_a?(String) && x.strip.empty?) }
 end
 
-a = [[1, 2], [3, 4]]
-b = [[5, 6], [7, 8]]
-result = matrix_multiply(a, b)
-puts result.inspect   # => [[19, 22], [43, 50]]
+data = [1, nil, "hello", "", "  ", 2, nil, "world"]
+puts clean_array(data).inspect  # [1, "hello", 2, "world"]
 ```
 
-### ข้อ 11-15: Sorting และ Finding
+### ข้อที่ 6-10: reduce, group_by, sort_by
 
-**ข้อ 11:** เรียง students ตาม grade แล้ว name
+**ข้อ 6:** ใช้ reduce สร้าง word frequency count
+
+```ruby
+# เฉลย
+sentence = "apple banana apple cherry banana apple"
+freq = sentence.split.reduce(Hash.new(0)) { |h, w| h[w] += 1; h }
+puts freq.sort_by { |_, v| -v }.inspect
+```
+
+**ข้อ 7:** group_by เพื่อจัดกลุ่มนักศึกษาตามชั้นปี และคำนวณ average GPA ต่อปี
+
 ```ruby
 # เฉลย
 students = [
-  { name: "Zinc", grade: "B", score: 85 },
-  { name: "Alpha", grade: "A", score: 95 },
-  { name: "Beta", grade: "B", score: 88 },
-  { name: "Delta", grade: "A", score: 92 }
+  { name: "Alice", year: 1, gpa: 3.5 },
+  { name: "Bob",   year: 2, gpa: 3.2 },
+  { name: "Charlie", year: 1, gpa: 3.8 },
+  { name: "Diana",  year: 2, gpa: 3.6 },
+  { name: "Eve",    year: 3, gpa: 3.9 }
 ]
 
-sorted = students.sort_by { |s| [s[:grade], s[:name]] }
-sorted.each { |s| puts "#{s[:grade]} #{s[:name]}: #{s[:score]}" }
-```
-
-**ข้อ 12:** หา median ของ array
-```ruby
-# เฉลย
-def median(arr)
-  sorted = arr.sort
-  n = sorted.size
-  n.odd? ? sorted[n / 2] : (sorted[n/2 - 1] + sorted[n/2]) / 2.0
+by_year = students.group_by { |s| s[:year] }
+by_year.each do |year, group|
+  avg = group.sum { |s| s[:gpa] } / group.size
+  puts "Year #{year}: avg GPA = #{avg.round(2)}"
 end
-
-puts median([1, 3, 5, 7, 9])    # => 5
-puts median([1, 2, 3, 4])       # => 2.5
 ```
 
-**ข้อ 13:** หา mode (ค่าที่ปรากฏบ่อยที่สุด)
+**ข้อ 8:** sort_by multiple criteria: ราคาน้อยไปมาก ถ้าราคาเท่ากันให้เรียงตามชื่อ A-Z
+
 ```ruby
 # เฉลย
-def mode(arr)
-  tally = arr.tally
-  max_count = tally.values.max
-  tally.select { |_, count| count == max_count }.keys
+items = [
+  { name: "Pen",    price: 20 },
+  { name: "Apple",  price: 15 },
+  { name: "Book",   price: 20 },
+  { name: "Eraser", price: 10 },
+  { name: "Ruler",  price: 15 }
+]
+
+sorted = items.sort_by { |i| [i[:price], i[:name]] }
+sorted.each { |i| puts "#{i[:name]}: #{i[:price]}" }
+```
+
+**ข้อ 9:** ใช้ flat_map เพื่อ expand tag lists
+
+```ruby
+# เฉลย
+articles = [
+  { title: "Ruby basics",   tags: ["ruby", "programming", "beginner"] },
+  { title: "Web with Rails", tags: ["rails", "ruby", "web"] },
+  { title: "Testing guide",  tags: ["testing", "rspec", "ruby"] }
+]
+
+all_tags = articles.flat_map { |a| a[:tags] }.uniq.sort
+puts all_tags.inspect
+# ["beginner", "programming", "rails", "rspec", "ruby", "testing", "web"]
+```
+
+**ข้อ 10:** หา top 3 สินค้าที่ขายดีที่สุด
+
+```ruby
+# เฉลย
+sales = [
+  { product: "A", quantity: 150 },
+  { product: "B", quantity: 320 },
+  { product: "C", quantity: 89  },
+  { product: "D", quantity: 445 },
+  { product: "E", quantity: 201 }
+]
+
+top3 = sales.max_by(3) { |s| s[:quantity] }
+top3.each_with_index do |s, i|
+  puts "#{i + 1}. #{s[:product]}: #{s[:quantity]} units"
 end
-
-puts mode([1, 2, 2, 3, 3, 3, 4]).inspect   # => [3]
-puts mode([1, 2, 2, 3, 3]).inspect          # => [2, 3]
 ```
 
-**ข้อ 14:** หา consecutive sequences ใน array ด้วย chunk_while
+### ข้อที่ 11-15: each_slice, each_cons, chunk
+
+**ข้อ 11:** ส่ง email เป็น batch ทีละ 10 คน
+
 ```ruby
 # เฉลย
-numbers = [1, 2, 3, 7, 8, 9, 15, 16]
+subscribers = (1..47).map { |i| "user#{i}@example.com" }
 
-sequences = numbers.chunk_while { |a, b| b - a == 1 }.to_a
-puts sequences.inspect
-# => [[1, 2, 3], [7, 8, 9], [15, 16]]
+subscribers.each_slice(10).each_with_index do |batch, i|
+  puts "Sending batch #{i + 1} to #{batch.length} subscribers"
+  # ส่ง email จริงที่นี่
+end
+```
 
-# หา sequence ที่ยาวที่สุด
+**ข้อ 12:** หา maximum sum ของ window ขนาด 3 ใน array
+
+```ruby
+# เฉลย
+numbers = [4, 2, 7, 1, 8, 3, 5, 6]
+max_window_sum = numbers.each_cons(3).map(&:sum).max
+puts "Max window sum (size 3): #{max_window_sum}"
+
+# หาตำแหน่งด้วย
+windows = numbers.each_cons(3).to_a
+max_sum = windows.map(&:sum).max
+max_window = windows.find { |w| w.sum == max_sum }
+puts "Window: #{max_window.inspect}"
+```
+
+**ข้อ 13:** ใช้ chunk_while เพื่อหา longest increasing sequence
+
+```ruby
+# เฉลย
+numbers = [1, 2, 3, 2, 3, 4, 5, 1, 2, 3, 4, 5, 6]
+sequences = numbers.chunk_while { |a, b| b > a }.to_a
 longest = sequences.max_by(&:length)
-puts "Longest: #{longest.inspect}"
+puts "Longest increasing sequence: #{longest.inspect}"
+puts "Length: #{longest.length}"
 ```
 
-**ข้อ 15:** สร้าง top-N leaderboard
+**ข้อ 14:** chunk ข้อมูล log ตาม log level
+
 ```ruby
 # เฉลย
-scores = [
-  { player: "ก", score: 850 },
-  { player: "ข", score: 1200 },
-  { player: "ค", score: 750 },
-  { player: "ง", score: 1500 },
-  { player: "จ", score: 950 }
+logs = [
+  "INFO: Server started",
+  "INFO: Loading config",
+  "WARN: Memory high",
+  "WARN: Disk space low",
+  "ERROR: Connection failed",
+  "INFO: Reconnecting",
+  "INFO: Connected"
 ]
 
-def leaderboard(scores, top_n: 3)
-  scores.sort_by { |s| -s[:score] }
-        .first(top_n)
-        .map.with_index(1) { |s, rank| { rank: rank, **s } }
-end
-
-leaderboard(scores).each do |entry|
-  puts "##{entry[:rank]} #{entry[:player]}: #{entry[:score]}"
+chunked = logs.chunk { |line| line.split(":").first }.to_a
+chunked.each do |level, messages|
+  puts "#{level} (#{messages.length} messages):"
+  messages.each { |m| puts "  #{m}" }
 end
 ```
 
-### ข้อ 16-20: Custom Enumerable
+**ข้อ 15:** สร้าง sliding window average สำหรับ temperature readings
 
-**ข้อ 16:** สร้าง PlayList class ที่ใช้ Enumerable
 ```ruby
 # เฉลย
-class PlayList
-  include Enumerable
-  
-  Song = Struct.new(:title, :artist, :duration_secs)
-  
-  def initialize
-    @songs = []
-  end
+temps = [20, 22, 19, 23, 25, 24, 26, 28, 27, 25, 23, 22]
+window_size = 3
 
-  def add(title, artist, duration_secs)
-    @songs << Song.new(title, artist, duration_secs)
-    self
+moving_avg = temps.each_cons(window_size).map do |window|
+  (window.sum.to_f / window_size).round(1)
+end
+
+puts "Raw temperatures: #{temps.inspect}"
+puts "Moving average (#{window_size}-day): #{moving_avg.inspect}"
+```
+
+### ข้อที่ 16-20: any?, all?, none?, find, zip
+
+**ข้อ 16:** ตรวจสอบ password requirements
+
+```ruby
+# เฉลย
+def validate_password(password)
+  checks = {
+    length:     password.length >= 8,
+    uppercase:  password.match?(/[A-Z]/),
+    lowercase:  password.match?(/[a-z]/),
+    digit:      password.match?(/\d/),
+    special:    password.match?(/[^a-zA-Z\d]/)
+  }
+
+  failed = checks.reject { |_, v| v }.keys
+  if failed.empty?
+    puts "Password valid!"
+  else
+    puts "Password invalid. Missing: #{failed.join(', ')}"
+  end
+end
+
+validate_password("abc")           # too short, no upper, no digit, no special
+validate_password("Password1!")    # valid
+validate_password("password123")   # no uppercase, no special
+```
+
+**ข้อ 17:** ใช้ zip เพื่อสร้าง HTML table
+
+```ruby
+# เฉลย
+headers = ["ชื่อ", "อายุ", "เมือง"]
+rows = [
+  ["Alice", 30, "Bangkok"],
+  ["Bob",   25, "Chiang Mai"],
+  ["Charlie", 35, "Phuket"]
+]
+
+puts "<table>"
+puts "  <tr>#{headers.map { |h| "<th>#{h}</th>" }.join}</tr>"
+rows.each do |row|
+  cells = headers.zip(row).map { |_, val| "<td>#{val}</td>" }.join
+  puts "  <tr>#{cells}</tr>"
+end
+puts "</table>"
+```
+
+**ข้อ 18:** ใช้ lazy enumerable สร้าง prime numbers
+
+```ruby
+# เฉลย
+def prime?(n)
+  return false if n < 2
+  (2..Math.sqrt(n)).none? { |i| n % i == 0 }
+end
+
+first_20_primes = (2..Float::INFINITY).lazy.select { |n| prime?(n) }.first(20)
+puts first_20_primes.inspect
+```
+
+**ข้อ 19:** สร้าง DataAnalyzer class ด้วย Enumerable
+
+```ruby
+# เฉลย
+class DataAnalyzer
+  include Enumerable
+
+  def initialize(data)
+    @data = data
   end
 
   def each(&block)
-    @songs.each(&block)
+    @data.each(&block)
   end
 
-  def total_duration
-    sum(&:duration_secs)
+  def mean
+    sum.to_f / count
   end
 
-  def by_artist(name)
-    select { |s| s.artist == name }
-  end
-end
-
-pl = PlayList.new
-pl.add("Song A", "Artist 1", 210)
-  .add("Song B", "Artist 2", 185)
-  .add("Song C", "Artist 1", 240)
-
-puts "Total duration: #{pl.total_duration}s"
-puts "Artist 1 songs: #{pl.by_artist("Artist 1").map(&:title).inspect}"
-puts "Shortest: #{pl.min_by(&:duration_secs).title}"
-```
-
-**ข้อ 17:** สร้าง FamilyTree class
-```ruby
-# เฉลย
-class FamilyTree
-  include Enumerable
-  
-  Person = Struct.new(:name, :age, :generation)
-  
-  def initialize
-    @members = []
+  def median
+    sorted = sort
+    mid = sorted.length / 2
+    sorted.length.odd? ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2.0
   end
 
-  def add_member(name, age, generation)
-    @members << Person.new(name, age, generation)
-    self
+  def variance
+    m = mean
+    sum { |x| (x - m) ** 2 } / count
   end
 
-  def each(&block)
-    @members.each(&block)
+  def std_dev
+    Math.sqrt(variance)
   end
 
-  def by_generation(gen)
-    select { |p| p.generation == gen }
-  end
-
-  def oldest
-    max_by(&:age)
-  end
-
-  def youngest
-    min_by(&:age)
-  end
-end
-
-tree = FamilyTree.new
-tree.add_member("ปู่", 80, 1)
-    .add_member("ย่า", 75, 1)
-    .add_member("พ่อ", 55, 2)
-    .add_member("แม่", 52, 2)
-    .add_member("ฉัน", 25, 3)
-
-puts "ผู้เฒ่าที่สุด: #{tree.oldest.name}"
-puts "คนรุ่น 2: #{tree.by_generation(2).map(&:name).inspect}"
-```
-
-### ข้อ 18-25: Applications
-
-```ruby
-# ข้อ 18: Statistics class
-class Statistics
-  def self.analyze(data)
-    sorted = data.sort
-    n = data.size
-    
-    {
-      count:  n,
-      sum:    data.sum,
-      mean:   data.sum.to_f / n,
-      median: n.odd? ? sorted[n/2] : (sorted[n/2-1] + sorted[n/2]) / 2.0,
-      mode:   data.tally.max_by { |_, c| c }.first,
-      min:    sorted.first,
-      max:    sorted.last,
-      range:  sorted.last - sorted.first,
-      variance: data.sum { |x| (x - data.sum.to_f/n) ** 2 } / n
-    }.tap { |s| s[:std_dev] = Math.sqrt(s[:variance]).round(4) }
-  end
-end
-
-data = [23, 45, 12, 67, 23, 89, 34, 56, 23, 78]
-stats = Statistics.analyze(data)
-stats.each { |key, val| puts "#{key}: #{val}" }
-
-# ข้อ 19: ใช้ lazy สำหรับ infinite fibonacci
-def fibonacci_lazy
-  Enumerator.new do |y|
-    a, b = 0, 1
-    loop { y << a; a, b = b, a + b }
-  end.lazy
-end
-
-# หา fib ที่ < 1000
-puts fibonacci_lazy.select { |n| n < 1000 }.to_a.inspect
-
-# ข้อ 20-25: ฝึกเอง
-# สร้าง shopping cart ที่ใช้ Enumerable
-class ShoppingCart
-  include Enumerable
-  
-  Item = Struct.new(:name, :price, :qty)
-  
-  def initialize
-    @items = []
-  end
-  
-  def add(name, price, qty: 1)
-    existing = @items.find { |i| i.name == name }
-    if existing
-      existing.qty += qty
-    else
-      @items << Item.new(name, price, qty)
-    end
-    self
-  end
-  
-  def each(&block) = @items.each(&block)
-  
-  def subtotal = sum { |i| i.price * i.qty }
-  
-  def discount(pct)
-    subtotal * (1 - pct / 100.0)
-  end
-  
-  def tax(rate = 7)
-    subtotal * rate / 100.0
-  end
-  
-  def total(discount_pct: 0, tax_rate: 7)
-    base = subtotal * (1 - discount_pct / 100.0)
-    base + base * tax_rate / 100.0
-  end
-  
   def summary
-    map { |i| "#{i.name} x#{i.qty} = ฿#{(i.price * i.qty).round(2)}" }
+    {
+      count:   count,
+      sum:     sum,
+      min:     min,
+      max:     max,
+      mean:    mean.round(2),
+      median:  median,
+      std_dev: std_dev.round(2)
+    }
   end
 end
 
-cart = ShoppingCart.new
-cart.add("หนังสือ", 300, qty: 2)
-    .add("ปากกา", 50, qty: 5)
-    .add("สมุด", 120, qty: 3)
+analyzer = DataAnalyzer.new([4, 7, 13, 2, 1, 9, 5, 12, 8, 6])
+puts analyzer.summary.inspect
+```
 
-puts "รายการ:"
-cart.summary.each { |line| puts "  #{line}" }
-puts "รวม: ฿#{cart.subtotal}"
-puts "ภาษี 7%: ฿#{cart.tax.round(2)}"
-puts "ทั้งหมด: ฿#{cart.total.round(2)}"
-puts "กับส่วนลด 10%: ฿#{cart.total(discount_pct: 10).round(2)}"
-puts "สินค้าแพงที่สุด: #{cart.max_by(&:price).name}"
-puts "จำนวนสินค้า: #{cart.count} ชิ้น"
-puts "ทุกชิ้นราคา > 40: #{cart.all? { |i| i.price > 40 }}"
+**ข้อ 20:** Multi-step data transformation pipeline
+
+```ruby
+# เฉลย
+transactions = [
+  { id: 1, user: "alice", amount: 150, type: :purchase, date: "2024-01" },
+  { id: 2, user: "bob",   amount: 200, type: :purchase, date: "2024-01" },
+  { id: 3, user: "alice", amount: -50, type: :refund,   date: "2024-01" },
+  { id: 4, user: "charlie", amount: 300, type: :purchase, date: "2024-02" },
+  { id: 5, user: "bob",   amount: 150, type: :purchase, date: "2024-02" },
+  { id: 6, user: "alice", amount: 250, type: :purchase, date: "2024-02" }
+]
+
+# Monthly revenue (purchases only)
+monthly_revenue = transactions
+  .select { |t| t[:type] == :purchase }
+  .group_by { |t| t[:date] }
+  .transform_values { |ts| ts.sum { |t| t[:amount] } }
+puts "Monthly revenue: #{monthly_revenue.inspect}"
+
+# Top customers by total spend
+customer_spend = transactions
+  .select { |t| t[:type] == :purchase }
+  .group_by { |t| t[:user] }
+  .transform_values { |ts| ts.sum { |t| t[:amount] } }
+  .sort_by { |_, v| -v }
+puts "Top customers: #{customer_spend.inspect}"
+```
+
+### ข้อที่ 21-25: ขั้นสูง
+
+**ข้อ 21:** Implement Enumerable ใน custom LinkedList
+
+```ruby
+# เฉลย
+class LinkedList
+  include Enumerable
+
+  Node = Struct.new(:value, :next_node)
+
+  def initialize
+    @head = nil
+  end
+
+  def push(value)
+    @head = Node.new(value, @head)
+    self
+  end
+
+  def each
+    current = @head
+    while current
+      yield current.value
+      current = current.next_node
+    end
+  end
+end
+
+list = LinkedList.new
+list.push(5).push(3).push(8).push(1).push(9).push(2)
+
+puts "List: #{list.to_a.inspect}"
+puts "Sorted: #{list.sort.inspect}"
+puts "Sum: #{list.sum}"
+puts "Min: #{list.min}, Max: #{list.max}"
+puts "Evens: #{list.select(&:even?).inspect}"
+```
+
+**ข้อ 22:** สร้าง lazy pipeline สำหรับ log processing
+
+```ruby
+# เฉลย
+def analyze_logs(log_stream)
+  log_stream
+    .lazy
+    .map(&:strip)
+    .reject(&:empty?)
+    .map { |line| line.match(/\[(.*?)\] (.*?): (.*)/) }
+    .compact
+    .map { |m| { timestamp: m[1], level: m[2], message: m[3] } }
+    .select { |entry| entry[:level] == "ERROR" }
+    .first(10)
+end
+
+sample_logs = [
+  "[2024-01-15 09:00:01] INFO: Server started",
+  "[2024-01-15 09:00:05] ERROR: Database connection failed",
+  "[2024-01-15 09:00:10] WARN: High memory usage",
+  "[2024-01-15 09:00:15] ERROR: Timeout on request",
+  "[2024-01-15 09:00:20] INFO: Request processed",
+  ""
+]
+
+errors = analyze_logs(sample_logs)
+errors.each { |e| puts "[#{e[:timestamp]}] #{e[:message]}" }
+```
+
+**ข้อ 23:** ใช้ tally เพื่อวิเคราะห์ voting data
+
+```ruby
+# เฉลย
+votes = %w[Alice Bob Charlie Alice Alice Bob Charlie Alice Diana Bob]
+
+vote_counts = votes.tally
+total = votes.count
+
+puts "=== Election Results ==="
+vote_counts.sort_by { |_, v| -v }.each do |candidate, count|
+  percentage = (count.to_f / total * 100).round(1)
+  puts "#{candidate}: #{count} votes (#{percentage}%)"
+end
+
+winner = vote_counts.max_by { |_, v| v }
+puts "\nWinner: #{winner[0]} with #{winner[1]} votes"
+```
+
+**ข้อ 24:** สร้าง method chain ที่ reusable ด้วย lazy enumerator
+
+```ruby
+# เฉลย
+class QueryBuilder
+  def initialize(data)
+    @data = data.lazy
+  end
+
+  def where(&condition)
+    @data = @data.select(&condition)
+    self
+  end
+
+  def order_by(&key_fn)
+    # ต้อง force evaluation ก่อน sort
+    @data = @data.sort_by(&key_fn).lazy
+    self
+  end
+
+  def limit(n)
+    @data = @data.first(n).lazy
+    self
+  end
+
+  def to_a
+    @data.to_a
+  end
+end
+
+people = (1..100).map { |i| { id: i, name: "Person #{i}", age: rand(18..70) } }
+
+result = QueryBuilder.new(people)
+  .where { |p| p[:age] >= 30 }
+  .where { |p| p[:age] <= 40 }
+  .order_by { |p| p[:age] }
+  .limit(5)
+  .to_a
+
+result.each { |p| puts "#{p[:name]}: #{p[:age]}" }
+```
+
+**ข้อ 25:** Implement สถิติ descriptive statistics ด้วย Enumerable
+
+```ruby
+# เฉลย
+module Statistics
+  def self.describe(data)
+    sorted = data.sort
+    n = data.length
+
+    # Mode
+    freq = data.tally
+    max_freq = freq.values.max
+    modes = freq.select { |_, v| v == max_freq }.keys
+
+    # Percentiles
+    p25 = sorted[(n * 0.25).ceil - 1]
+    p75 = sorted[(n * 0.75).ceil - 1]
+
+    mean = data.sum.to_f / n
+    variance = data.sum { |x| (x - mean) ** 2 } / n
+    std_dev = Math.sqrt(variance)
+
+    {
+      count:   n,
+      mean:    mean.round(3),
+      std_dev: std_dev.round(3),
+      min:     sorted.first,
+      p25:     p25,
+      median:  sorted[n / 2],
+      p75:     p75,
+      max:     sorted.last,
+      mode:    modes
+    }
+  end
+end
+
+data = [4, 7, 13, 2, 1, 9, 5, 12, 8, 6, 7, 4, 7]
+stats = Statistics.describe(data)
+stats.each { |k, v| puts "#{k}: #{v}" }
 ```
 
 ---
 
-## สรุปบทที่ 18
+## สรุป
 
-ในบทนี้เราได้เรียนรู้ Enumerable module อย่างละเอียด:
+Enumerable เป็น module ที่ทรงพลังมาก มี methods สำคัญ:
 
-**Transformation:**
-- `map` / `collect` - แปลง elements
-- `flat_map` - map + flatten
-- `filter_map` - select + map ใน step เดียว
+| Method | ใช้เพื่อ |
+|--------|---------|
+| `map/collect` | แปลง element แต่ละตัว |
+| `select/filter` | กรองเฉพาะที่ตรงเงื่อนไข |
+| `reject` | ตรงข้าม select |
+| `reduce/inject` | สะสมค่าเป็น single value |
+| `flat_map` | map แล้ว flatten |
+| `group_by` | จัดกลุ่มตาม criteria |
+| `chunk` | จัดกลุ่ม consecutive elements |
+| `sort_by` | เรียงลำดับ |
+| `min_by/max_by` | หา min/max ตาม criteria |
+| `each_slice` | แบ่งเป็น groups ของ N |
+| `each_cons` | sliding window |
+| `find/detect` | หา element แรก |
+| `any?/all?/none?` | ตรวจสอบเงื่อนไข |
+| `tally` | นับ occurrences |
+| `zip` | รวม arrays |
+| `lazy` | lazy evaluation |
 
-**Filtering:**
-- `select` / `filter` - เลือก elements
-- `reject` - ตรงข้ามกับ select
+---
 
-**Aggregation:**
-- `reduce` / `inject` - สะสมค่า
-- `sum` - รวมค่า
-- `each_with_object` - accumulate ใน object
-
-**Grouping:**
-- `group_by` - จัดกลุ่ม
-- `chunk` / `chunk_while` - จัดกลุ่ม consecutive
-- `tally` - นับความถี่
-
-**Slicing:**
-- `each_slice` - แบ่ง chunks
-- `each_cons` - sliding window
-- `first` / `take` / `drop` - ตัด collection
-
-**Finding:**
-- `find` / `detect` - หา element แรก
-- `any?` / `all?` / `none?` / `one?` - boolean checks
-
-**Sorting:**
-- `sort_by` - เรียงด้วย key
-- `min_by` / `max_by` / `minmax_by` - หาค่าสุด
-
-**Advanced:**
-- `lazy` - lazy evaluation สำหรับ infinite sequences
-- Custom Enumerable classes
+*ตอนถัดไป: ตอนที่ 19 - Comparable และ Enumerable Modules*
