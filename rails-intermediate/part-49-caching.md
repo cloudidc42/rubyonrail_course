@@ -1,897 +1,975 @@
-# ตอนที่ 49: Caching (Steps 1081-1100)
+# Part 49: Caching ใน Rails
 
-## บทนำ
-
-Caching คือการเก็บข้อมูลที่คำนวณแล้วไว้ใน storage ที่เข้าถึงได้เร็ว เพื่อไม่ต้องคำนวณซ้ำในครั้งถัดไป Rails มีระบบ caching ที่ครอบคลุมหลายระดับตั้งแต่ HTTP caching จนถึง low-level fragment caching
+## ขั้นตอนที่ 1081-1100: การ Cache ข้อมูลเพื่อประสิทธิภาพ
 
 ---
 
-## Step 1081: ประเภทของ Cache ใน Rails
+## ขั้นตอนที่ 1081: ทำไมต้องใช้ Cache?
 
-### 1. Page Caching (เก่า, ไม่แนะนำใน Rails 7)
-เก็บ HTML ทั้งหน้าเป็น static file ไม่ผ่าน Rails stack
+Cache ช่วยลดเวลาในการตอบสนองโดย:
+- เก็บผลลัพธ์ที่คำนวณแล้ว
+- ลด database queries
+- ลด CPU usage
+- รองรับ traffic สูงขึ้น
 
-### 2. Action Caching (เก่า, ไม่แนะนำ)
-เก็บ output ของ controller action
+```
+Without caching:
+User Request → Controller → Database → Serialize → Response (500ms)
 
-### 3. Fragment Caching (แนะนำ)
-เก็บบางส่วนของ view
+With caching:
+User Request → Controller → Cache HIT → Response (10ms)
+                         → Cache MISS → Database → Cache SET → Response (510ms)
+```
 
-### 4. HTTP Caching
-ใช้ HTTP headers (ETags, Last-Modified, Cache-Control)
+## ขั้นตอนที่ 1082: Cache Types ใน Rails
 
-### 5. Low-level Caching
-`Rails.cache.fetch`, `read`, `write`, `delete`
-
----
-
-## Step 1082: Cache Store Options
-
-### Memory Store (Development default)
-
+### 1. Page Caching (ไม่มีใน Rails ตั้งแต่ v4)
 ```ruby
-# config/environments/development.rb
-config.cache_store = :memory_store, { size: 64.megabytes }
+# gem 'actionpack-page_caching'
+# cache ทั้งหน้าเป็น HTML file
 ```
 
-### File Store
-
+### 2. Action Caching (ไม่มีใน Rails ตั้งแต่ v4)
 ```ruby
-config.cache_store = :file_store, "/tmp/rails_cache"
+# gem 'actionpack-action_caching'
 ```
 
-### Redis Cache Store (Production recommended)
-
-```ruby
-# Gemfile
-gem 'redis'
-gem 'redis-client'
-
-# config/environments/production.rb
-config.cache_store = :redis_cache_store, {
-  url: ENV.fetch("REDIS_URL"),
-  expires_in: 1.hour,
-  namespace: "myapp_cache",
-  
-  # Connection pool
-  pool_size: 5,
-  pool_timeout: 5,
-  
-  # Error handling
-  error_handler: -> (method:, returning:, exception:) {
-    Sentry.capture_exception(exception, 
-      extra: { method: method, returning: returning }
-    )
-  }
-}
-```
-
-### Memcache Store
-
-```ruby
-# Gemfile
-gem 'dalli'
-
-config.cache_store = :mem_cache_store, 
-  "localhost:11211",
-  { expires_in: 1.hour, compress: true }
-```
-
-### Null Store (Testing)
-
-```ruby
-# ไม่ cache อะไรเลย - สำหรับ testing
-config.cache_store = :null_store
-```
-
----
-
-## Step 1083: เปิด Cache ใน Development
-
-```bash
-# เปิด caching ใน development mode
-rails dev:cache
-# => Development mode is now being cached.
-
-# ปิด caching
-rails dev:cache
-# => Development mode is no longer being cached.
-```
-
-```ruby
-# config/environments/development.rb
-if Rails.root.join("tmp/caching-dev.txt").exist?
-  config.action_controller.perform_caching = true
-  config.action_controller.enable_fragment_cache_logging = true
-  config.cache_store = :memory_store
-  config.public_file_server.headers = {
-    "Cache-Control" => "public, max-age=#{2.days.to_i}"
-  }
-else
-  config.action_controller.perform_caching = false
-  config.cache_store = :null_store
-end
-```
-
----
-
-## Step 1084: Rails.cache API
-
-### Basic Operations
-
-```ruby
-# Write to cache
-Rails.cache.write("key", "value")
-Rails.cache.write("key", "value", expires_in: 1.hour)
-Rails.cache.write("key", { data: complex_object }, expires_in: 30.minutes)
-
-# Read from cache
-Rails.cache.read("key")
-# => "value" หรือ nil ถ้าหมดอายุหรือไม่มี
-
-# Delete from cache
-Rails.cache.delete("key")
-
-# Check existence
-Rails.cache.exist?("key")
-
-# Fetch (Read or Write)
-Rails.cache.fetch("expensive_calculation") do
-  # Block นี้จะทำงานเฉพาะเมื่อ cache miss
-  perform_expensive_calculation()
-end
-
-# Fetch with expiry
-Rails.cache.fetch("user_stats_#{user.id}", expires_in: 30.minutes) do
-  calculate_user_statistics(user)
-end
-```
-
-### Cache Fetch Pattern
-
-```ruby
-# app/models/article.rb
-class Article < ApplicationRecord
-  def self.popular_articles
-    Rails.cache.fetch("popular_articles", expires_in: 15.minutes) do
-      includes(:user)
-        .where(published: true)
-        .order(views_count: :desc)
-        .limit(10)
-        .to_a  # .to_a สำคัญมาก! เพื่อ materialize query
-    end
-  end
-  
-  def statistics
-    Rails.cache.fetch("article_stats_#{id}_#{updated_at.to_i}", expires_in: 1.hour) do
-      {
-        views: views_count,
-        comments: comments.count,
-        likes: likes.count,
-        reading_time: calculate_reading_time,
-        share_count: social_shares.sum(:count)
-      }
-    end
-  end
-end
-```
-
-### Atomic Operations
-
-```ruby
-# Increment counter
-Rails.cache.increment("page_views")
-Rails.cache.increment("page_views", 5)  # เพิ่มทีละ 5
-
-# Decrement counter
-Rails.cache.decrement("stock_count")
-
-# Read Multiple
-values = Rails.cache.read_multi("key1", "key2", "key3")
-# => { "key1" => "v1", "key2" => nil, "key3" => "v3" }
-
-# Write Multiple
-Rails.cache.write_multi({
-  "key1" => "value1",
-  "key2" => "value2"
-}, expires_in: 1.hour)
-
-# Delete Multiple
-Rails.cache.delete_multi("key1", "key2")
-
-# Delete by Pattern (Redis only)
-Rails.cache.delete_matched("user_*")
-```
-
----
-
-## Step 1085: Fragment Caching ใน Views
-
-### Basic Fragment Cache
-
+### 3. Fragment Caching (ใช้บ่อยที่สุด)
 ```erb
-<%# app/views/articles/index.html.erb %>
-
-<% cache do %>
-  <%# Block นี้จะถูก cache %>
-  <% @articles.each do |article| %>
-    <%= render article %>
-  <% end %>
-<% end %>
-```
-
-### Cache with Key
-
-```erb
-<%# Cache ด้วย key ที่ specific %>
-<% cache "articles/all" do %>
-  ...
-<% end %>
-
-<%# Cache ด้วย object (ใช้ cache_key) %>
-<% cache @article do %>
-  <h1><%= @article.title %></h1>
-  <div><%= @article.body %></div>
-<% end %>
-```
-
-### cache_key ของ ActiveRecord
-
-```ruby
-# Rails สร้าง cache_key จาก model name + id + updated_at
-article.cache_key
-# => "articles/1-20240101120000000000"
-
-# Cache expires อัตโนมัติเมื่อ record update
-@article.touch  # อัปเดต updated_at → cache invalidate
-```
-
-### Fragment Cache ใน Partial
-
-```erb
-<%# app/views/articles/_article.html.erb %>
-<% cache article do %>
+<%# Cache ส่วนหนึ่งของ view %>
+<% cache @post do %>
   <article>
-    <h2><%= article.title %></h2>
-    <p><%= article.excerpt %></p>
-    <span>By <%= article.user.name %></span>
-    <time><%= article.created_at.strftime("%d %b %Y") %></time>
+    <h1><%= @post.title %></h1>
+    <p><%= @post.content %></p>
   </article>
 <% end %>
 ```
 
----
+### 4. Low-level Caching
+```ruby
+# Cache ข้อมูลใดๆ ใน Rails.cache
+value = Rails.cache.fetch("key") { compute_value }
+```
 
-## Step 1086: Russian Doll Caching
+### 5. HTTP Caching
+```ruby
+# ETag และ Last-Modified headers
+def show
+  @post = Post.find(params[:id])
+  if stale?(@post)
+    render :show
+  end
+end
+```
 
-### หลักการ
+## ขั้นตอนที่ 1083: Cache Store Configuration
 
-Russian Doll Caching คือการ nest cache ซ้อนกัน โดย inner cache จะ invalidate เมื่อ record update และจะ invalidate outer cache ด้วย
+```ruby
+# config/environments/development.rb
+config.cache_store = :memory_store, { size: 64.megabytes }
+
+# config/environments/test.rb
+config.cache_store = :null_store  # ไม่ cache ใน test
+
+# config/environments/production.rb
+# Memory store (single server)
+config.cache_store = :memory_store, { size: 256.megabytes }
+
+# File store
+config.cache_store = :file_store, "/path/to/cache/directory"
+
+# Redis cache store (recommended สำหรับ production)
+config.cache_store = :redis_cache_store, {
+  url: ENV['REDIS_URL'],
+  connect_timeout: 30,
+  read_timeout: 0.2,
+  write_timeout: 0.2,
+  reconnect_attempts: 1
+}
+
+# Memcache
+config.cache_store = :mem_cache_store, "cache-1.example.com", "cache-2.example.com", {
+  connect_timeout: 2,
+  read_timeout: 1,
+  write_timeout: 1
+}
+```
+
+```ruby
+# Redis cache store ขั้นสูง
+config.cache_store = :redis_cache_store, {
+  url: ENV['REDIS_URL'],
+  pool_size: 5,
+  pool_timeout: 5,
+  namespace: "myapp_cache",
+  expires_in: 1.day,
+  error_handler: ->(method:, returning:, exception:) {
+    Rails.logger.error "Redis cache error: #{exception.message}"
+    Sentry.capture_exception(exception)
+  }
+}
+```
+
+## ขั้นตอนที่ 1084: Rails.cache API
+
+```ruby
+# เขียน cache
+Rails.cache.write("user:1", user_data)
+Rails.cache.write("user:1", user_data, expires_in: 30.minutes)
+Rails.cache.write("user:1", user_data, namespace: "v2")
+
+# อ่าน cache
+value = Rails.cache.read("user:1")
+values = Rails.cache.read_multi("user:1", "user:2", "user:3")
+
+# fetch - อ่านหรือคำนวณถ้าไม่มี
+user_data = Rails.cache.fetch("user:#{user.id}", expires_in: 1.hour) do
+  # Block นี้จะทำงานเมื่อ cache miss
+  UserSerializer.new(user).serializable_hash
+end
+
+# delete
+Rails.cache.delete("user:1")
+Rails.cache.delete_matched("user:*")  # ลบตาม pattern
+
+# exist?
+Rails.cache.exist?("user:1")
+
+# increment/decrement (atomic)
+Rails.cache.increment("page_views:#{post.id}")
+Rails.cache.decrement("countdown")
+Rails.cache.increment("downloads", 1, expires_in: 1.day)
+
+# fetch_multi
+data = Rails.cache.fetch_multi(*user_ids.map { |id| "user:#{id}" }) do |key|
+  user_id = key.split(':').last
+  User.find(user_id).as_json
+end
+```
+
+## ขั้นตอนที่ 1085: Fragment Caching
 
 ```erb
-<%# Outer cache - article list %>
-<% cache ["articles/list", @articles.maximum(:updated_at)] do %>
-  
-  <% @articles.each do |article| %>
-    
-    <%# Inner cache - individual article %>
-    <% cache article do %>
-      <div class="article">
-        <h2><%= article.title %></h2>
-        
-        <%# Deeper cache - comments count %>
-        <% cache ["comments/count", article.id, article.comments.maximum(:updated_at)] do %>
-          <span><%= article.comments.count %> comments</span>
-        <% end %>
-      </div>
-    <% end %>
-    
-  <% end %>
-  
+<%# Cache ด้วย object key %>
+<% cache @post do %>
+  <article>
+    <h1><%= @post.title %></h1>
+    <%= @post.content %>
+  </article>
 <% end %>
 ```
 
-### Touch สำหรับ Propagation
-
 ```ruby
-# app/models/comment.rb
-class Comment < ApplicationRecord
-  belongs_to :article, touch: true  # อัปเดต article.updated_at เมื่อ comment เปลี่ยน
-end
-
-# app/models/article.rb
-class Article < ApplicationRecord
-  belongs_to :user, touch: true  # อัปเดต user.updated_at
-  has_many :comments
-end
+# cache key จะเป็น "posts/1-20240101120000"
+# ซึ่งจะ expire อัตโนมัติเมื่อ post.updated_at เปลี่ยน
 ```
 
-เมื่อ comment ถูกสร้าง → article.updated_at update → article cache invalidate → outer cache invalidate
+```erb
+<%# Cache collection %>
+<% cache @posts do %>
+  <% @posts.each do |post| %>
+    <%= render post %>
+  <% end %>
+<% end %>
+```
 
----
+```erb
+<%# Custom cache key %>
+<% cache ["user_nav", current_user] do %>
+  <nav>
+    <% current_user.menu_items.each do |item| %>
+      <%= link_to item.name, item.path %>
+    <% end %>
+  </nav>
+<% end %>
+```
 
-## Step 1087: Low-level Caching
+```erb
+<%# Cache with expiry %>
+<% cache @post, expires_in: 1.hour do %>
+  <%= render @post %>
+<% end %>
+```
 
-### Cache Expensive Queries
+## ขั้นตอนที่ 1086: Low-level Caching
 
 ```ruby
-# app/models/user.rb
-class User < ApplicationRecord
-  def self.leaderboard
-    Rails.cache.fetch("users/leaderboard", expires_in: 5.minutes) do
-      joins(:articles)
-        .group("users.id")
-        .select("users.*, COUNT(articles.id) as articles_count, SUM(articles.views_count) as total_views")
-        .order("total_views DESC")
-        .limit(20)
+# app/models/post.rb
+class Post < ApplicationRecord
+  def similar_posts
+    Rails.cache.fetch("#{cache_key}/similar_posts", expires_in: 1.hour) do
+      # Query ที่ expensive
+      Post.where(category: category)
+          .where.not(id: id)
+          .order(views_count: :desc)
+          .limit(5)
+          .to_a  # จำเป็นต้อง materialize array ก่อน cache
+    end
+  end
+  
+  def tag_cloud
+    Rails.cache.fetch("tag_cloud", expires_in: 30.minutes) do
+      Tag.joins(:posts)
+         .group('tags.id')
+         .select('tags.*, COUNT(posts.id) as posts_count')
+         .order('posts_count DESC')
+         .to_a
+    end
+  end
+  
+  def self.trending(period: 7.days, limit: 10)
+    cache_key = "trending_posts:#{period.to_i}:#{limit}"
+    
+    Rails.cache.fetch(cache_key, expires_in: 1.hour) do
+      joins(:post_views)
+        .where('post_views.created_at > ?', period.ago)
+        .group('posts.id')
+        .order('COUNT(post_views.id) DESC')
+        .limit(limit)
         .to_a
     end
   end
-  
-  def monthly_stats
-    key = "user/#{id}/monthly_stats/#{Date.today.strftime('%Y-%m')}"
-    Rails.cache.fetch(key, expires_in: 1.hour) do
-      articles_this_month = articles.where(created_at: Time.current.beginning_of_month..Time.current.end_of_month)
-      {
-        articles_count: articles_this_month.count,
-        total_views: articles_this_month.sum(:views_count),
-        avg_views: articles_this_month.average(:views_count).to_f.round(2),
-        top_article: articles_this_month.order(views_count: :desc).first
-      }
-    end
-  end
 end
 ```
 
-### Service Object Caching
-
 ```ruby
-# app/services/analytics_service.rb
-class AnalyticsService
-  CACHE_DURATION = 30.minutes
-  
-  def initialize(date_range = 30.days)
-    @date_range = date_range
-  end
-  
-  def overview
-    Rails.cache.fetch(cache_key("overview"), expires_in: CACHE_DURATION) do
-      {
-        total_users: User.count,
-        new_users: User.where("created_at > ?", @date_range.ago).count,
-        total_articles: Article.count,
-        published_articles: Article.published.count,
-        total_views: Article.sum(:views_count),
-        avg_views_per_article: Article.average(:views_count).to_f.round(2)
-      }
-    end
-  end
-  
-  def popular_articles
-    Rails.cache.fetch(cache_key("popular_articles"), expires_in: CACHE_DURATION) do
-      Article.published
-             .where("created_at > ?", @date_range.ago)
-             .order(views_count: :desc)
-             .limit(10)
-             .includes(:user)
-             .map { |a| { id: a.id, title: a.title, views: a.views_count, author: a.user.name } }
-    end
-  end
-  
-  def invalidate_all!
-    Rails.cache.delete_matched("analytics/*")
+# Caching ใน controller
+class HomeController < ApplicationController
+  def index
+    @featured_posts = cache_featured_posts
+    @recent_posts = cache_recent_posts
+    @statistics = cache_statistics
   end
   
   private
   
-  def cache_key(stat)
-    "analytics/#{stat}/#{@date_range.inspect}"
-  end
-end
-```
-
----
-
-## Step 1088: HTTP Caching
-
-### ETags
-
-```ruby
-# app/controllers/api/v1/articles_controller.rb
-def show
-  @article = Article.find(params[:id])
-  
-  # Fresh when: ETag matches (stale? returns false)
-  if stale?(etag: @article, last_modified: @article.updated_at)
-    render json: ArticleSerializer.new(@article).as_json
-  end
-  # ถ้า stale? returns false → Rails return 304 Not Modified อัตโนมัติ
-end
-
-# หรือใช้ fresh_when
-def show
-  @article = Article.find(params[:id])
-  fresh_when(etag: @article, last_modified: @article.updated_at, public: true)
-  # ยังคง render view ถ้า not cached
-end
-```
-
-### Cache-Control Headers
-
-```ruby
-# config/environments/production.rb
-
-# Public pages
-def show
-  @article = Article.find(params[:id])
-  expires_in 1.hour, public: true
-  render json: @article
-end
-
-# Private (per-user)
-def dashboard
-  expires_in 5.minutes, public: false
-  render json: current_user.dashboard_data
-end
-
-# No cache
-def real_time_data
-  expires_now
-  render json: @data
-end
-```
-
-```ruby
-# app/controllers/articles_controller.rb
-class ArticlesController < ApplicationController
-  def index
-    @articles = Article.published
-    
-    # Cache for 1 hour for all users
-    expires_in 1.hour, public: true
-    
-    # Vary ตาม Accept-Language header
-    response.headers['Vary'] = 'Accept-Language'
-    
-    render json: @articles.as_json
+  def cache_featured_posts
+    Rails.cache.fetch("featured_posts", expires_in: 30.minutes) do
+      Post.featured.published.includes(:user, :tags).limit(5).to_a
+    end
   end
   
-  def show
-    @article = Article.find(params[:id])
-    
-    # Cache-Control สำหรับ CDN
-    response.headers['Cache-Control'] = 'public, max-age=3600, s-maxage=86400'
-    response.headers['Surrogate-Key'] = "article-#{@article.id}"
-    
-    render json: @article
-  end
-end
-```
-
----
-
-## Step 1089: Cache Digests
-
-### Cache Digest คืออะไร
-
-Rails สร้าง digest (hash) ของ template file โดยอัตโนมัติ และรวมใน cache key ทำให้เมื่อ template เปลี่ยน → cache key เปลี่ยน → cache invalidate อัตโนมัติ
-
-```erb
-<%# Rails สร้าง cache key อัตโนมัติ เช่น %>
-<%# views/articles/show:abc123/articles/1-20240101 %>
-<% cache @article do %>
-  ...
-<% end %>
-```
-
-### ดู Cache Key ที่สร้าง
-
-```ruby
-# ใน rails console
-view_cache_dependencies = ActionView::Helpers::CacheHelper
-# หรือดูใน logs เมื่อ config.action_controller.enable_fragment_cache_logging = true
-```
-
----
-
-## Step 1090: Redis เป็น Cache Store
-
-### Setup Redis Cache
-
-```ruby
-# Gemfile
-gem 'redis', '~> 5.0'
-
-# config/environments/production.rb
-config.cache_store = :redis_cache_store, {
-  url: ENV.fetch('REDIS_CACHE_URL') { ENV.fetch('REDIS_URL') { 'redis://localhost:6379/1' } },
-  
-  # Separate DB number จาก Sidekiq (ที่ใช้ DB 0)
-  # Redis URLs: redis://localhost:6379/0 (Sidekiq), redis://localhost:6379/1 (Cache)
-  
-  expires_in: 1.hour,
-  namespace: "#{Rails.application.class.module_parent_name.downcase}_cache",
-  compress: true,
-  compress_threshold: 1.kilobyte,
-  
-  pool_size: ENV.fetch("RAILS_MAX_THREADS") { 5 }.to_i,
-  pool_timeout: 5
-}
-```
-
-### Cache Namespacing
-
-```ruby
-# ป้องกัน key collision ระหว่าง environments
-# Development cache keys: dev_myapp_cache:articles/1
-# Production cache keys: prod_myapp_cache:articles/1
-
-config.cache_store = :redis_cache_store, {
-  url: ENV['REDIS_URL'],
-  namespace: "#{Rails.env}_myapp_cache"
-}
-```
-
----
-
-## Step 1091: Cache Performance
-
-### Monitoring Cache
-
-```ruby
-# config/initializers/cache_monitoring.rb
-ActiveSupport::Notifications.subscribe("cache_read.active_support") do |*args|
-  event = ActiveSupport::Notifications::Event.new(*args)
-  
-  if event.payload[:hit]
-    StatsD.increment('cache.hit', tags: ["key:#{event.payload[:key]}"])
-  else
-    StatsD.increment('cache.miss', tags: ["key:#{event.payload[:key]}"])
-  end
-end
-```
-
-### Cache Hit Rate
-
-```ruby
-# ใน rails console
-# ดู Redis info
-redis = Redis.new
-info = redis.info
-
-puts "Used memory: #{info['used_memory_human']}"
-puts "Keyspace hits: #{info['keyspace_hits']}"
-puts "Keyspace misses: #{info['keyspace_misses']}"
-
-total = info['keyspace_hits'].to_i + info['keyspace_misses'].to_i
-hit_rate = total > 0 ? (info['keyspace_hits'].to_f / total * 100).round(2) : 0
-puts "Hit rate: #{hit_rate}%"
-```
-
----
-
-## Step 1092: Cache Invalidation Strategies
-
-### Time-based Expiration
-
-```ruby
-# Expire หลัง 30 นาที
-Rails.cache.write("data", value, expires_in: 30.minutes)
-```
-
-### Event-based Invalidation
-
-```ruby
-# app/models/article.rb
-class Article < ApplicationRecord
-  after_save :invalidate_cache
-  after_destroy :invalidate_cache
-  
-  def invalidate_cache
-    Rails.cache.delete("article/#{id}/stats")
-    Rails.cache.delete("articles/popular")
-    Rails.cache.delete("articles/recent")
-    Rails.cache.delete("users/#{user_id}/stats")
-  end
-end
-```
-
-### Cache Versioning
-
-```ruby
-# แทนที่จะ delete, ใช้ version key
-class Article < ApplicationRecord
-  def cache_version
-    "v#{updated_at.to_i}"
+  def cache_recent_posts
+    Rails.cache.fetch("recent_posts", expires_in: 10.minutes) do
+      Post.published.order(created_at: :desc).limit(10).to_a
+    end
   end
   
-  def cached_stats
-    Rails.cache.fetch("article/#{id}/stats/#{cache_version}", expires_in: 24.hours) do
-      calculate_stats
+  def cache_statistics
+    Rails.cache.fetch("site_stats", expires_in: 1.hour) do
+      {
+        total_posts: Post.published.count,
+        total_users: User.active.count,
+        total_comments: Comment.approved.count
+      }
     end
   end
 end
 ```
 
----
+## ขั้นตอนที่ 1087: Russian Doll Caching
 
-## Step 1093: Rack Mini Profiler Integration
+Russian Doll Caching คือการ cache ซ้อนกันหลายชั้น
+
+```erb
+<%# app/views/posts/index.html.erb %>
+<% cache @posts do %>
+  <% @posts.each do |post| %>
+    <% cache post do %>
+      <%# Inner cache - expire เมื่อ post เปลี่ยน %>
+      <article>
+        <h2><%= post.title %></h2>
+        
+        <% cache [post, "comments"] do %>
+          <%# Innermost cache - expire เมื่อ comments เปลี่ยน %>
+          <p><%= post.comments.approved.count %> ความเห็น</p>
+          
+          <% post.comments.approved.each do |comment| %>
+            <% cache comment do %>
+              <div>
+                <strong><%= comment.user.name %>:</strong>
+                <%= comment.body %>
+              </div>
+            <% end %>
+          <% end %>
+        <% end %>
+      </article>
+    <% end %>
+  <% end %>
+<% end %>
+```
 
 ```ruby
-# Gemfile (development)
-gem 'rack-mini-profiler'
-gem 'flamegraph'  # optional - for flame graphs
-gem 'stackprof'   # optional
-gem 'memory_profiler' # optional
+# touch: true - update parent เมื่อ child เปลี่ยน
+class Comment < ApplicationRecord
+  belongs_to :post, touch: true  # อัพเดท post.updated_at เมื่อ comment เปลี่ยน
+  belongs_to :user
+end
 
-# config/initializers/profiler.rb (development only)
-if Rails.env.development?
-  require 'rack-mini-profiler'
-  
-  Rack::MiniProfiler.config.position = 'bottom-right'
-  Rack::MiniProfiler.config.start_hidden = false
-  Rack::MiniProfiler.config.skip_paths = ['/assets']
+class Post < ApplicationRecord
+  belongs_to :category, touch: true  # อัพเดท category.updated_at
 end
 ```
 
----
-
-## Step 1094: Complete Caching Example
-
-### Full Application Caching Setup
+## ขั้นตอนที่ 1088: HTTP Caching
 
 ```ruby
-# app/controllers/articles_controller.rb
-class ArticlesController < ApplicationController
+# ETag-based caching
+class PostsController < ApplicationController
+  def show
+    @post = Post.find(params[:id])
+    
+    # ตรวจสอบว่า client มี version ล่าสุดหรือไม่
+    if stale?(@post, public: false)
+      render :show
+    end
+    # ถ้า not stale จะ return 304 Not Modified อัตโนมัติ
+  end
+  
   def index
-    # Level 1: HTTP Cache
-    if stale?(etag: Article.maximum(:updated_at), last_modified: Article.maximum(:updated_at), public: true)
-      
-      # Level 2: Fragment Cache
-      @articles = Rails.cache.fetch("articles/published/page/#{params[:page]}", expires_in: 10.minutes) do
-        Article.published.includes(:user).order(created_at: :desc).page(params[:page]).to_a
-      end
-      
+    @posts = Post.published.order(updated_at: :desc)
+    
+    if stale?(last_modified: @posts.maximum(:updated_at), etag: @posts)
       render :index
     end
   end
-  
+end
+```
+
+```ruby
+# Manual ETags
+class ApiPostsController < ApplicationController
   def show
-    @article = Article.find(params[:id])
+    @post = Post.find(params[:id])
     
-    # Conditional GET support
-    if stale?(etag: @article, last_modified: @article.updated_at, public: @article.published?)
-      @article.increment_views!
-      render :show
+    # Custom ETag
+    etag = Digest::MD5.hexdigest("#{@post.updated_at}-#{current_user&.id}")
+    
+    if request.fresh?(etag: etag)
+      head :not_modified
+    else
+      response.headers['ETag'] = etag
+      response.headers['Last-Modified'] = @post.updated_at.httpdate
+      response.headers['Cache-Control'] = 'private, max-age=0, must-revalidate'
+      
+      render json: PostSerializer.new(@post).serializable_hash
     end
   end
 end
 ```
 
-```erb
-<%# app/views/articles/index.html.erb %>
-<%# Level 3: View Fragment Cache %>
-
-<% cache ["articles/list", @articles.map(&:cache_key_with_version).join] do %>
-  <div class="articles">
-    <% @articles.each do |article| %>
-      <%# Russian Doll - inner cache %>
-      <% cache article do %>
-        <%= render 'article', article: article %>
-      <% end %>
-    <% end %>
-  </div>
-<% end %>
-```
-
----
-
-## แบบฝึกหัด (20 ข้อ)
-
-### ระดับพื้นฐาน
-
-**ข้อ 1:** เปิด caching ใน development และ verify ว่าทำงาน
-```bash
-# เฉลย
-rails dev:cache
-# สังเกต log: "Cache read: articles/all"
-```
-
-**ข้อ 2:** เขียน code ที่ cache ผลลัพธ์ของ query ที่ใช้เวลานาน
 ```ruby
-# เฉลย
-def expensive_data
-  Rails.cache.fetch("expensive_data", expires_in: 1.hour) do
-    User.joins(:articles).where(articles: { published: true })
-        .select("users.*, COUNT(*) as article_count")
-        .group("users.id")
-        .order("article_count DESC")
-        .to_a
+# Public cache headers
+def show
+  @post = Post.find(params[:id])
+  
+  if @post.published?
+    # Public content - CDN สามารถ cache ได้
+    expires_in 1.hour, public: true
+    fresh_when @post, public: true
+  else
+    # Private content - เฉพาะ browser
+    expires_in 0, must_revalidate: true
+    fresh_when @post, public: false
   end
+  
+  render :show
 end
 ```
 
-**ข้อ 3:** เพิ่ม Fragment caching ใน article list view
-```erb
-<%# เฉลย %>
-<% cache ["articles", @articles.maximum(:updated_at)] do %>
-  <% @articles.each do |article| %>
-    <% cache article do %>
-      <%= render article %>
-    <% end %>
-  <% end %>
-<% end %>
+## ขั้นตอนที่ 1089: Cache Expiration Strategies
+
+```ruby
+# 1. Time-based expiration
+Rails.cache.write("key", value, expires_in: 30.minutes)
+
+# 2. Version-based expiration (Russian Doll)
+cache_key = "post/#{post.id}/#{post.updated_at.to_i}"
+Rails.cache.fetch(cache_key) { compute_value }
+
+# 3. Manual expiration
+# หลัง update ให้ expire cache
+after_save :expire_caches
+
+def expire_caches
+  Rails.cache.delete("post/#{id}/similar")
+  Rails.cache.delete("post/#{id}/tags")
+  ActionController::Base.new.expire_fragment("post_#{id}")
+end
+
+# 4. Counter-based expiration
+def cache_key_with_version
+  "#{super}/#{comments_count}"
+end
 ```
 
-**ข้อ 4:** ตั้งค่า Redis เป็น cache store ใน production
 ```ruby
-# เฉลย
-config.cache_store = :redis_cache_store, {
-  url: ENV['REDIS_URL'],
-  expires_in: 1.hour,
-  namespace: "myapp_cache"
-}
-```
-
-**ข้อ 5:** เขียน model callback ที่ invalidate cache เมื่อ record update
-```ruby
-# เฉลย
-class Product < ApplicationRecord
-  after_save :bust_cache
-  after_destroy :bust_cache
+# app/models/concerns/cacheable.rb
+module Cacheable
+  extend ActiveSupport::Concern
+  
+  included do
+    after_commit :expire_cache
+  end
+  
+  def cache_fragment(name = nil, **options, &block)
+    key = cache_key_for(name)
+    Rails.cache.fetch(key, **options, &block)
+  end
+  
+  def expire_cache
+    Rails.cache.delete_matched("#{cache_key_prefix}*")
+  end
   
   private
   
-  def bust_cache
-    Rails.cache.delete("product_#{id}")
-    Rails.cache.delete("products_all")
-    Rails.cache.delete("products_featured")
+  def cache_key_for(name)
+    parts = [cache_key_prefix, name].compact
+    parts.join('/')
+  end
+  
+  def cache_key_prefix
+    "#{self.class.name.underscore}/#{id}"
   end
 end
 ```
 
-### ระดับกลาง
+## ขั้นตอนที่ 1090: Redis Cache Store
 
-**ข้อ 6:** implement Russian Doll caching สำหรับ article กับ comments
+```ruby
+# config/environments/production.rb
+config.cache_store = :redis_cache_store, {
+  url: ENV['REDIS_URL'],
+  
+  # Connection pool
+  pool_size: ActiveRecord::Base.connection_pool.size,
+  pool_timeout: 5,
+  
+  # Expiration
+  expires_in: 1.day,
+  
+  # Compression
+  compress: true,
+  compress_threshold: 1.kilobyte,
+  
+  # Error handling
+  error_handler: ->(method:, returning:, exception:) {
+    Rails.logger.error "Redis cache error on #{method}: #{exception}"
+  },
+  
+  # SSL (สำหรับ production)
+  ssl_params: { verify_mode: OpenSSL::SSL::VERIFY_NONE }
+}
+```
+
+```ruby
+# Redis-specific operations
+redis = Redis.new(url: ENV['REDIS_URL'])
+
+# Lists
+redis.rpush("queue", "item1")
+redis.lpop("queue")
+
+# Sets
+redis.sadd("users_online", user_id)
+redis.smembers("users_online")
+
+# Sorted sets (leaderboard)
+redis.zadd("leaderboard", score, user_id)
+redis.zrevrange("leaderboard", 0, 9, with_scores: true)
+
+# Pub/Sub
+redis.publish("channel", { event: "new_post", id: post.id }.to_json)
+```
+
+## ขั้นตอนที่ 1091: Cache Keys Best Practices
+
+```ruby
+# ❌ Bad: cache key ที่อาจ conflict
+Rails.cache.write("posts", posts_data)  # ไม่ระบุ version
+
+# ✅ Good: cache key ที่มี version และ scope
+Rails.cache.write("v2/posts/index/page_1", posts_data, expires_in: 5.minutes)
+
+# ✅ ใช้ cache_key method ของ model
+post.cache_key
+# => "posts/1-20240101120000000"
+
+post.cache_key_with_version
+# => "posts/1-20240101120000000/5"
+
+# ✅ Namespace
+cache_key = [
+  "api", "v2",
+  "posts",
+  "user", current_user&.id || "guest",
+  "locale", I18n.locale,
+  @post.cache_key
+].join("/")
+```
+
+```ruby
+# Auto-expiring keys
+def cache_key_for_user(user)
+  [
+    "user",
+    user.id,
+    user.updated_at.to_i,
+    "profile"
+  ].join("/")
+end
+
+# Versioned keys
+def cache_key_v2(resource)
+  "v2/#{resource.class.name.underscore}/#{resource.id}/#{resource.updated_at.to_i}"
+end
+```
+
+## ขั้นตอนที่ 1092: Cache Warming
+
+```ruby
+# app/jobs/warm_cache_job.rb
+class WarmCacheJob < ApplicationJob
+  queue_as :low
+  
+  def perform
+    warm_homepage_cache
+    warm_popular_posts_cache
+    warm_tag_cloud_cache
+  end
+  
+  private
+  
+  def warm_homepage_cache
+    featured = Post.featured.published.includes(:user, :tags).limit(5).to_a
+    Rails.cache.write("featured_posts", featured, expires_in: 1.hour)
+    
+    recent = Post.published.order(created_at: :desc).limit(10).to_a
+    Rails.cache.write("recent_posts", recent, expires_in: 30.minutes)
+  end
+  
+  def warm_popular_posts_cache
+    Post.popular.limit(20).each do |post|
+      Rails.cache.fetch("post/#{post.id}/similar", expires_in: 2.hours) do
+        post.similar_posts
+      end
+    end
+  end
+  
+  def warm_tag_cloud_cache
+    Rails.cache.fetch("tag_cloud", expires_in: 1.hour) do
+      Tag.with_posts_count.order(posts_count: :desc).limit(50).to_a
+    end
+  end
+end
+
+# Warm cache หลัง deploy
+# config/deploy/after_deploy.rb
+after :publishing do
+  WarmCacheJob.perform_later
+end
+```
+
+## ขั้นตอนที่ 1093: Conditional Caching
+
+```ruby
+# Cache เฉพาะเมื่อเหมาะสม
+def show
+  @post = Post.find(params[:id])
+  
+  if should_cache?
+    @related_posts = Rails.cache.fetch("post/#{@post.id}/related", expires_in: 1.hour) do
+      @post.related_posts.to_a
+    end
+  else
+    @related_posts = @post.related_posts
+  end
+end
+
+private
+
+def should_cache?
+  # ไม่ cache ถ้า admin อาจจะเห็น draft posts
+  !current_user&.admin? && 
+  # ไม่ cache ถ้า preview mode
+  !params[:preview] &&
+  # ไม่ cache ใน development
+  !Rails.env.development?
+end
+```
+
+## ขั้นตอนที่ 1094: Cache Performance Monitoring
+
+```ruby
+# config/initializers/cache_monitoring.rb
+ActiveSupport::Notifications.subscribe(/cache_(.*)\.active_support/) do |event|
+  name = event.name.split('.').first.split('_').last
+  
+  case name
+  when 'read'
+    StatsD.increment("cache.read.#{event.payload[:hit] ? 'hit' : 'miss'}")
+  when 'write'
+    StatsD.increment("cache.write")
+  when 'delete'
+    StatsD.increment("cache.delete")
+  end
+  
+  StatsD.timing("cache.#{name}.duration", event.duration)
+end
+
+# Cache stats endpoint
+class Admin::CacheController < AdminController
+  def stats
+    render json: {
+      memory_size: Rails.cache.instance_variable_get(:@data)&.size,
+      hit_rate: CacheStats.hit_rate,
+      top_keys: CacheStats.top_accessed_keys
+    }
+  end
+  
+  def clear
+    Rails.cache.clear
+    redirect_to admin_cache_path, notice: "Cache ล้างแล้ว"
+  end
+  
+  def delete_key
+    Rails.cache.delete(params[:key])
+    redirect_to admin_cache_path, notice: "ลบ key แล้ว"
+  end
+end
+```
+
+## ขั้นตอนที่ 1095: Caching Strategies ขั้นสูง
+
+```ruby
+# Read-through cache
+class UserRepository
+  def find(id)
+    Rails.cache.fetch("user/#{id}", expires_in: 30.minutes) do
+      User.includes(:roles, :settings).find(id)
+    end
+  end
+  
+  def update(user, attributes)
+    user.update!(attributes)
+    Rails.cache.delete("user/#{user.id}")
+    user
+  end
+end
+
+# Write-through cache
+class PostService
+  def create(user, attributes)
+    post = user.posts.create!(attributes)
+    cache_post(post)
+    expire_related_caches(post)
+    post
+  end
+  
+  private
+  
+  def cache_post(post)
+    Rails.cache.write(
+      "post/#{post.id}",
+      PostSerializer.new(post).serializable_hash,
+      expires_in: 1.hour
+    )
+  end
+  
+  def expire_related_caches(post)
+    Rails.cache.delete("user/#{post.user_id}/posts")
+    Rails.cache.delete("category/#{post.category_id}/posts")
+    Rails.cache.delete("featured_posts") if post.featured?
+    Rails.cache.delete_matched("tag_cloud*")
+  end
+end
+```
+
+## ขั้นตอนที่ 1096: View Caching Best Practices
+
 ```erb
-<%# เฉลย %>
-<% cache ["article", article, article.comments.maximum(:updated_at)] do %>
-  <h1><%= article.title %></h1>
-  <% article.comments.each do |comment| %>
-    <% cache comment do %>
-      <p><%= comment.body %></p>
-    <% end %>
+<%# เพิ่ม version ใน cache key %>
+<% cache ["v2", @post] do %>
+  <%# ... %>
+<% end %>
+
+<%# Cache ตาม role %>
+<% cache ["post", @post, current_user&.role || "guest"] do %>
+  <%# content ที่แตกต่างตาม role %>
+<% end %>
+
+<%# Cache ตาม locale %>
+<% cache [@post, I18n.locale] do %>
+  <%# translated content %>
+<% end %>
+
+<%# ไม่ cache เมื่อ logged in (personalized content) %>
+<% if user_signed_in? %>
+  <%# Personalized - ไม่ cache %>
+  <%= render "personalized_post", post: @post %>
+<% else %>
+  <%# Public - cache ได้ %>
+  <% cache @post do %>
+    <%= render "public_post", post: @post %>
   <% end %>
 <% end %>
 ```
 
-**ข้อ 7:** สร้าง HTTP caching ด้วย ETags สำหรับ articles API
-```ruby
-# เฉลย
-def show
-  @article = Article.find(params[:id])
-  if stale?(etag: @article, last_modified: @article.updated_at, public: true)
-    render json: ArticleSerializer.new(@article).as_json
-  end
-end
-```
+## ขั้นตอนที่ 1097: Counter Caches
 
-**ข้อ 8:** เพิ่ม touch: true ใน association เพื่อ propagate cache invalidation
 ```ruby
-# เฉลย
+# Counter cache ใน database
 class Comment < ApplicationRecord
-  belongs_to :article, touch: true
+  belongs_to :post, counter_cache: true  # อัพเดท posts.comments_count
 end
 
-class Article < ApplicationRecord
-  belongs_to :user, touch: true
-end
-```
-
-**ข้อ 9:** implement cache warming ด้วย background job
-```ruby
-# เฉลย
-class WarmCacheJob < ApplicationJob
-  def perform
-    # Pre-load popular pages
-    Article.popular.each do |article|
-      Rails.cache.fetch("article_#{article.id}", expires_in: 2.hours) do
-        ArticleSerializer.new(article).as_json
-      end
-    end
-  end
-end
-```
-
-**ข้อ 10:** สร้าง counter cache สำหรับ comments count
-```ruby
-# เฉลย
-# migration
-add_column :articles, :comments_count, :integer, default: 0, null: false
-
-class Comment < ApplicationRecord
-  belongs_to :article, counter_cache: true
-end
-
-# ใช้ใน serializer
-def comments_count
-  object.comments_count  # ไม่ query database
-end
-```
-
-### ระดับสูง
-
-**ข้อ 11-20:** (แบบฝึกหัดเพิ่มเติม)
-
-**ข้อ 11:** implement cache stampede prevention (dog-pile effect)
-**ข้อ 12:** สร้าง distributed cache invalidation system
-**ข้อ 13:** implement conditional caching ตาม user role
-**ข้อ 14:** เพิ่ม cache monitoring และ alerting
-**ข้อ 15:** implement multi-level caching (memory + Redis)
-
-```ruby
-# เฉลย ข้อ 11 - Cache Stampede Prevention
-class CacheService
-  LOCK_TIMEOUT = 10.seconds
-  
-  def self.fetch(key, expires_in:, &block)
-    # ลอง read ก่อน
-    cached = Rails.cache.read(key)
-    return cached if cached
+class Migration < ActiveRecord::Migration[7.0]
+  def change
+    add_column :posts, :comments_count, :integer, default: 0, null: false
     
-    # ถ้า miss, lock และ compute
-    lock_key = "#{key}_lock"
-    if $redis.set(lock_key, 1, nx: true, ex: LOCK_TIMEOUT.to_i)
-      begin
-        value = block.call
-        Rails.cache.write(key, value, expires_in: expires_in)
-        value
-      ensure
-        $redis.del(lock_key)
-      end
-    else
-      # รอ lock release แล้ว read
-      sleep(0.1)
-      Rails.cache.read(key) || block.call
+    # Reset existing counters
+    Post.reset_column_information
+    Post.pluck(:id).each do |id|
+      Post.reset_counters(id, :comments)
     end
   end
 end
 ```
 
 ```ruby
-# เฉลย ข้อ 13 - Conditional Caching
-class ArticlesCachingStrategy
-  def self.cache_key_for(article, user = nil)
-    if user&.admin?
-      "article/#{article.id}/admin/#{article.cache_key_with_version}"
-    elsif user&.premium?
-      "article/#{article.id}/premium/#{article.cache_key_with_version}"
-    else
-      "article/#{article.id}/public/#{article.cache_key_with_version}"
+# Custom counter cache ด้วย Redis
+class Post < ApplicationRecord
+  def increment_views!
+    Redis.current.incr("post:#{id}:views")
+    
+    # Sync ไปยัง database ทุกๆ 100 views
+    views = Redis.current.get("post:#{id}:views").to_i
+    if views % 100 == 0
+      update_column(:views_count, views)
     end
   end
   
-  def self.fetch(article, user = nil, &block)
-    key = cache_key_for(article, user)
-    ttl = user&.admin? ? 5.minutes : 1.hour
-    Rails.cache.fetch(key, expires_in: ttl, &block)
+  def views_count
+    Redis.current.get("post:#{id}:views").to_i
+  end
+end
+```
+
+## ขั้นตอนที่ 1098: Cache Testing
+
+```ruby
+# spec/support/cache_helpers.rb
+module CacheHelpers
+  def with_caching
+    original = ActionController::Base.perform_caching
+    ActionController::Base.perform_caching = true
+    yield
+  ensure
+    ActionController::Base.perform_caching = original
+    Rails.cache.clear
+  end
+end
+
+RSpec.configure do |config|
+  config.include CacheHelpers
+end
+```
+
+```ruby
+# spec/models/post_spec.rb
+RSpec.describe Post do
+  describe "#similar_posts" do
+    let(:post) { create(:post, :published) }
+    
+    it "caches result" do
+      # First call - cache miss
+      expect(Rails.cache).to receive(:fetch).and_call_original
+      post.similar_posts
+      
+      # Second call - cache hit
+      expect(Rails.cache).not_to receive(:fetch)
+      post.similar_posts
+    end
+    
+    it "expires cache when post updated" do
+      post.similar_posts  # cache it
+      
+      # Update the post
+      post.touch
+      
+      # Should re-fetch
+      expect(Rails.cache).to receive(:fetch).and_call_original
+      post.similar_posts
+    end
+  end
+end
+```
+
+## ขั้นตอนที่ 1099: Full-page Caching Alternative
+
+```ruby
+# ใช้ Rack::Cache หรือ Varnish สำหรับ full-page cache
+# config/environments/production.rb
+config.action_dispatch.rack_cache = {
+  metastore: "redis://localhost:6379/cache/meta",
+  entitystore: "redis://localhost:6379/cache/entity"
+}
+
+# ใน controller
+def index
+  @posts = Post.published.order(created_at: :desc).limit(20)
+  
+  expires_in 10.minutes, public: true
+  
+  fresh_when last_modified: @posts.maximum(:updated_at),
+             etag: Digest::MD5.hexdigest(@posts.map(&:cache_key).join)
+end
+```
+
+## ขั้นตอนที่ 1100: Cache Management
+
+```ruby
+# lib/tasks/cache.rake
+namespace :cache do
+  desc "ล้าง cache ทั้งหมด"
+  task clear: :environment do
+    Rails.cache.clear
+    puts "Cache ถูกล้างแล้ว"
+  end
+  
+  desc "ล้าง fragment cache"
+  task clear_fragments: :environment do
+    ActionController::Base.new.expire_fragment('*')
+    puts "Fragment cache ถูกล้างแล้ว"
+  end
+  
+  desc "อุ่น cache"
+  task warm: :environment do
+    WarmCacheJob.perform_now
+    puts "Cache ถูกอุ่นแล้ว"
+  end
+  
+  desc "ดู cache stats"
+  task stats: :environment do
+    if Rails.cache.respond_to?(:redis)
+      info = Rails.cache.redis.info
+      puts "Memory used: #{info['used_memory_human']}"
+      puts "Hit rate: #{info['keyspace_hits'].to_f / (info['keyspace_hits'].to_f + info['keyspace_misses'].to_f) * 100}%"
+    end
   end
 end
 ```
 
 ---
 
-## สรุป
+## แบบฝึกหัด: Caching (20 ข้อ)
 
-ในบทนี้เราได้เรียนรู้:
+### ข้อที่ 1: ตั้งค่า Redis Cache Store
+```ruby
+config.cache_store = :redis_cache_store, { url: ENV['REDIS_URL'] }
+```
 
-1. **Cache Types** - page, action, fragment, HTTP
-2. **Cache Store** - memory, Redis, memcache
-3. **Rails.cache API** - fetch, read, write, delete
-4. **Fragment Caching** - cache blocks ใน views
-5. **Russian Doll Caching** - nested caches
-6. **HTTP Caching** - ETags, Last-Modified
-7. **Cache Digests** - automatic expiry on template change
-8. **Redis Cache Store** - production setup
+### ข้อที่ 2: Fragment Caching
+```
+Cache post card ใน index view
+```
 
-**กฎทอง:** Cache ข้อมูลที่คำนวณแล้วและไม่เปลี่ยนบ่อย แต่ระวัง stale data ที่อาจแสดงข้อมูลเก่าให้ users
+**เฉลย:**
+```erb
+<% cache post do %>
+  <%= render partial: 'post_card', locals: { post: post } %>
+<% end %>
+```
+
+### ข้อที่ 3: Low-level Caching
+```
+Cache การ query Posts ที่ trending
+```
+
+**เฉลย:**
+```ruby
+def trending_posts
+  Rails.cache.fetch("trending_posts", expires_in: 1.hour) do
+    Post.trending.limit(10).to_a
+  end
+end
+```
+
+### ข้อที่ 4: Russian Doll Caching
+```
+สร้าง nested cache: post → comments → each comment
+```
+
+### ข้อที่ 5: touch: true
+```
+เพิ่ม touch: true ใน Comment model
+เพื่อ expire post cache เมื่อ comment เปลี่ยน
+```
+
+### ข้อที่ 6: HTTP Caching
+```
+เพิ่ม ETag caching ใน API endpoint
+```
+
+**เฉลย:**
+```ruby
+def show
+  @post = Post.find(params[:id])
+  if stale?(@post, public: true)
+    render json: PostSerializer.new(@post).serializable_hash
+  end
+end
+```
+
+### ข้อที่ 7: Counter Cache
+```
+เพิ่ม counter_cache สำหรับ comments_count ใน Post
+```
+
+### ข้อที่ 8: Cache Expiration
+```
+เขียน after_commit callback ที่ expire caches ที่เกี่ยวข้อง
+```
+
+### ข้อที่ 9: Testing Cache
+```
+เขียน test ที่ verify ว่า cache ทำงานถูกต้อง
+```
+
+### ข้อที่ 10: Cache Warming Job
+```
+สร้าง job ที่ warm cache ส่วนสำคัญของ app
+```
+
+### ข้อที่ 11-20 (แบบสรุป)
+
+**ข้อ 11:** Cache API responses ด้วย ETag
+**ข้อ 12:** Conditional caching ตาม user role
+**ข้อ 13:** Cache key versioning
+**ข้อ 14:** Rake task สำหรับ cache management
+**ข้อ 15:** Cache monitoring
+**ข้อ 16:** Redis counter increment
+**ข้อ 17:** Multi-level cache (memory + Redis)
+**ข้อ 18:** Cache ด้วย namespace
+**ข้อ 19:** Expire cache ด้วย events
+**ข้อ 20:** Performance testing ก่อน/หลัง caching
+
+---
+
+## สรุป: Caching
+
+| Cache Type | ใช้เมื่อ |
+|-----------|---------|
+| Fragment cache | ส่วนของ view ที่ expensive |
+| Low-level cache | Computed values |
+| Russian Doll | Nested objects |
+| HTTP cache | API responses |
+| Counter cache | Count queries |
+| Page cache | Static content |
+
+**Key Takeaways:**
+1. Cache เฉพาะสิ่งที่ expensive จริงๆ
+2. Russian Doll caching ช่วยให้ cache fine-grained
+3. ใช้ Redis สำหรับ production
+4. Cache key ต้องรวม version/timestamp
+5. ทดสอบ cache behavior เสมอ

@@ -1,249 +1,221 @@
-# ตอนที่ 29: Security ใน Ruby (Steps 626-645)
+# ตอนที่ 29: Security ใน Ruby (ขั้นตอนที่ 626-645)
 
-## บทนำ
-
-Security เป็นสิ่งที่ต้องคำนึงถึงตั้งแต่เริ่มพัฒนา ไม่ใช่แค่ "เพิ่มทีหลัง" บทนี้จะครอบคลุมการรักษาความปลอดภัยใน Ruby และ Rails อย่างละเอียด
+Security เป็นหนึ่งในเรื่องที่สำคัญที่สุดในการพัฒนาซอฟต์แวร์ การไม่ให้ความสำคัญกับ Security อาจนำไปสู่การรั่วไหลของข้อมูล การถูก Hack หรือความเสียหายทางธุรกิจ
 
 ---
 
-## Step 626: Input Validation Patterns
+## ขั้นตอนที่ 626: Input Validation
 
-### หลักการ Input Validation
+### การตรวจสอบ Input อย่างปลอดภัย
 
 ```ruby
-# Never trust user input!
-# ตรวจสอบ input ทุกครั้งก่อนใช้งาน
-
+# Input Validation พื้นฐาน
 class UserValidator
-  def initialize(params)
-    @params = params
-    @errors = []
+  def self.validate_email(email)
+    return nil unless email.is_a?(String)
+    
+    email = email.strip.downcase
+    
+    unless email.match?(/\A[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}\z/)
+      raise ArgumentError, "Email ไม่ถูกต้อง"
+    end
+    
+    email
   end
-
-  def valid?
-    validate_name
-    validate_email
-    validate_age
-    validate_phone
-    @errors.empty?
+  
+  def self.validate_phone(phone)
+    return nil unless phone.is_a?(String)
+    
+    phone = phone.gsub(/[\s\-\(\)]/, '')
+    
+    unless phone.match?(/\A(\+66|0)\d{8,9}\z/)
+      raise ArgumentError, "เบอร์โทรศัพท์ไม่ถูกต้อง"
+    end
+    
+    phone
   end
-
-  def errors
-    @errors
+  
+  def self.validate_age(age)
+    age = Integer(age)  # Strict conversion
+    raise ArgumentError, "อายุต้องเป็น 0-150" unless (0..150).include?(age)
+    age
+  rescue ArgumentError, TypeError
+    raise ArgumentError, "อายุไม่ถูกต้อง"
   end
-
-  private
-
-  def validate_name
-    name = @params[:name].to_s.strip
-    @errors << "ชื่อต้องไม่ว่าง" if name.empty?
-    @errors << "ชื่อต้องไม่เกิน 100 ตัวอักษร" if name.length > 100
-    # ป้องกัน XSS และ injection ด้วยการ whitelist characters
-    @errors << "ชื่อมีอักขระที่ไม่อนุญาต" unless name.match?(/\A[\p{L}\s\-'.]+\z/)
+  
+  def self.validate_username(username)
+    return nil unless username.is_a?(String)
+    
+    username = username.strip
+    
+    if username.length < 3 || username.length > 30
+      raise ArgumentError, "Username ต้องมี 3-30 ตัวอักษร"
+    end
+    
+    unless username.match?(/\A[a-zA-Z0-9_\-]+\z/)
+      raise ArgumentError, "Username ใช้ได้เฉพาะ a-z, 0-9, _, -"
+    end
+    
+    username.downcase
   end
+end
 
-  def validate_email
-    email = @params[:email].to_s.strip.downcase
-    @errors << "Email ต้องไม่ว่าง" if email.empty?
-    unless email.match?(/\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/)
-      @errors << "รูปแบบ Email ไม่ถูกต้อง"
+# Whitelist vs Blacklist
+# Whitelist (ดีกว่า): กำหนดสิ่งที่อนุญาต
+ALLOWED_SORT_COLUMNS = %w[name email created_at updated_at].freeze
+
+def safe_sort_column(column)
+  ALLOWED_SORT_COLUMNS.include?(column) ? column : 'created_at'
+end
+
+# Blacklist (อันตราย): กำหนดสิ่งที่ไม่อนุญาต
+FORBIDDEN_CHARS = ['<', '>', '"', "'", '\\', '/'].freeze
+
+def blacklist_filter(input)  # ไม่แนะนำ - มีช่องโหว่
+  FORBIDDEN_CHARS.each { |char| input.delete!(char) }
+  input
+end
+```
+
+### Strong Parameters ใน Rails
+
+```ruby
+class UsersController < ApplicationController
+  def create
+    @user = User.new(user_params)
+    
+    if @user.save
+      redirect_to @user
+    else
+      render :new
     end
   end
-
-  def validate_age
-    age = @params[:age]
-    return @errors << "อายุต้องเป็นตัวเลข" unless age.is_a?(Integer) || age.to_s.match?(/\A\d+\z/)
-    age = age.to_i
-    @errors << "อายุต้องระหว่าง 0-150" unless (0..150).include?(age)
+  
+  def update
+    @user = User.find(params[:id])
+    
+    if @user.update(user_update_params)
+      redirect_to @user
+    else
+      render :edit
+    end
   end
-
-  def validate_phone
-    return unless @params[:phone]
-    phone = @params[:phone].to_s.gsub(/[\s\-\(\)]/, '')
-    @errors << "เบอร์โทรไม่ถูกต้อง" unless phone.match?(/\A(0[0-9]{9}|(\+66)[0-9]{9})\z/)
+  
+  private
+  
+  # กรอง Parameters อย่างเข้มงวด
+  def user_params
+    params.require(:user).permit(
+      :name,
+      :email,
+      :password,
+      :password_confirmation,
+      :phone,
+      address: [:street, :city, :province, :postcode]
+    )
+  end
+  
+  # Update อาจมีบาง Field ที่ต่างออกไป
+  def user_update_params
+    params.require(:user).permit(
+      :name,
+      :phone,
+      :avatar,
+      address: [:street, :city, :province, :postcode]
+    )
+    # ไม่อนุญาต :email, :password ใน Update ปกติ
   end
 end
+```
 
-validator = UserValidator.new({
-  name: "สมชาย ใจดี",
-  email: "somchai@example.com",
-  age: "25",
-  phone: "0812345678"
+---
+
+## ขั้นตอนที่ 627: SQL Injection Prevention
+
+### SQL Injection คืออะไร
+
+```ruby
+# VULNERABLE: SQL Injection!
+def find_user_vulnerable(email)
+  User.find_by("email = '#{email}'")
+  # ถ้า email = "' OR '1'='1"
+  # SQL จะเป็น: email = '' OR '1'='1' (เข้าถึงได้ทั้งหมด!)
+end
+
+# SAFE: Parameterized Query
+def find_user_safe(email)
+  User.find_by("email = ?", email)
+  # หรือ
+  User.where(email: email).first
+  # หรือ
+  User.find_by(email: email)
+end
+
+# More Examples
+# VULNERABLE
+query = "SELECT * FROM orders WHERE user_id = #{params[:user_id]}"
+ActiveRecord::Base.connection.execute(query)
+
+# SAFE
+Order.where(user_id: params[:user_id])
+# หรือ
+Order.where("user_id = ?", params[:user_id].to_i)
+
+# Named Parameters
+User.where("created_at > :start_date AND status = :status", {
+  start_date: 1.month.ago,
+  status: 'active'
 })
 
-if validator.valid?
-  puts "ข้อมูลถูกต้อง"
-else
-  puts validator.errors.inspect
-end
-```
+# LIKE Query - ต้องระวัง
+# VULNERABLE
+User.where("name LIKE '%#{search_term}%'")
 
-### Whitelist vs Blacklist
+# SAFE
+escaped_term = ActiveRecord::Base.sanitize_sql_like(search_term)
+User.where("name LIKE ?", "%#{escaped_term}%")
 
-```ruby
-# Whitelist - ระบุสิ่งที่อนุญาต (ปลอดภัยกว่า)
-ALLOWED_SORT_COLUMNS = %w[name email created_at updated_at].freeze
-ALLOWED_SORT_DIRECTIONS = %w[asc desc].freeze
-
-def safe_sort(column, direction)
-  column = ALLOWED_SORT_COLUMNS.include?(column) ? column : "name"
-  direction = ALLOWED_SORT_DIRECTIONS.include?(direction) ? direction : "asc"
-  "#{column} #{direction}"
-end
-
-# Blacklist - ระบุสิ่งที่ห้าม (ไม่ปลอดภัย เพราะอาจขาด)
-# BAD:
-def unsafe_sort(column, direction)
-  # อาจลืม block บาง cases
-  column = "name" if column.include?(";") || column.include?("--")
-  "#{column} #{direction}"  # ยังอันตราย!
-end
-```
-
----
-
-## Step 627: SQL Injection Prevention
-
-### SQL Injection คืออะไร?
-
-```ruby
-# DANGER - SQL Injection vulnerability!
-def find_user_unsafe(email)
-  User.where("email = '#{email}'")
-end
-
-# ถ้า email = "' OR '1'='1"
-# SQL: SELECT * FROM users WHERE email = '' OR '1'='1'
-# ได้ users ทั้งหมด!
-
-# อันตรายยิ่งกว่า:
-# email = "'; DROP TABLE users; --"
-# SQL: SELECT * FROM users WHERE email = ''; DROP TABLE users; --'
-```
-
-### วิธีป้องกัน SQL Injection
-
-```ruby
-# 1. Parameterized queries (วิธีที่ดีที่สุด)
-def find_user_safe(email)
-  User.where("email = ?", email)
-  # หรือ
-  User.where(email: email)
-end
-
-# 2. Named parameters
-def search_users(name, min_age, max_age)
-  User.where(
-    "name LIKE :name AND age BETWEEN :min AND :max",
-    name: "%#{name}%",
-    min: min_age,
-    max: max_age
+# Raw SQL (ต้องใช้ด้วยความระมัดระวัง)
+ActiveRecord::Base.connection.execute(
+  ActiveRecord::Base.sanitize_sql(
+    ["SELECT * FROM users WHERE email = ?", email]
   )
-end
-
-# 3. Arel สำหรับ complex queries
-users = User.arel_table
-query = users[:email].eq(email).and(users[:active].eq(true))
-User.where(query)
-
-# 4. sanitize_sql_like สำหรับ LIKE queries
-def search_by_name(name)
-  sanitized = ActiveRecord::Base.sanitize_sql_like(name)
-  User.where("name LIKE ?", "%#{sanitized}%")
-end
-```
-
-### Dynamic Column Names
-
-```ruby
-# DANGER - Dynamic column names!
-def sort_users_unsafe(column)
-  User.order(column)  # อันตราย ถ้า column มาจาก user input!
-end
-
-# SAFE - Whitelist columns
-SORTABLE_COLUMNS = {
-  "name" => :name,
-  "email" => :email,
-  "created_at" => :created_at
-}.freeze
-
-def sort_users_safe(column)
-  sort_column = SORTABLE_COLUMNS[column] || :name
-  User.order(sort_column)
-end
+)
 ```
 
 ---
 
-## Step 628: XSS Prevention
+## ขั้นตอนที่ 628: XSS Prevention
 
-### XSS คืออะไร?
-
-Cross-Site Scripting (XSS) คือการแทรก JavaScript ที่เป็นอันตรายลงในหน้าเว็บ
+### Cross-Site Scripting
 
 ```ruby
-# XSS Attack example
-# ถ้าผู้ใช้ส่ง: name = "<script>alert('hacked!')</script>"
-# แล้วแสดงใน HTML โดยตรง จะรัน JavaScript!
-```
+# XSS ใน Rails
+# Rails auto-escape HTML ใน Views โดยค่าเริ่มต้น
 
-### html_escape
+# SAFE: Rails escape โดยอัตโนมัติ
+# <%= @user.name %>
+# แสดง: &lt;script&gt;alert('XSS')&lt;/script&gt;
 
-```ruby
-require 'cgi'
+# UNSAFE: ใช้ html_safe หรือ raw
+# <%= @user.name.html_safe %>  # อันตราย!
+# <%= raw @user.description %> # อันตราย!
 
-# ป้องกัน XSS ด้วย html_escape
-user_input = "<script>alert('xss')</script>"
-safe_output = CGI.escapeHTML(user_input)
-puts safe_output
-# => &lt;script&gt;alert(&#39;xss&#39;)&lt;/script&gt;
+# ใช้ sanitize เมื่อต้องการ HTML
+# <%= sanitize @article.body %>
+# เก็บเฉพาะ HTML Tags ที่ปลอดภัย
 
-# ใน Rails helpers
-include ActionView::Helpers::OutputSafetyHelper
+# กำหนด Allowed Tags
+allowed_tags = %w[p br b i strong em a ul ol li blockquote]
+allowed_attrs = %w[href title class]
 
-user_input = "<script>alert('xss')</script>"
-safe_output = html_escape(user_input)
-puts safe_output
-# => &lt;script&gt;alert(&#39;xss&#39;)&lt;/script&gt;
-```
+sanitized = ActionView::Helpers::SanitizeHelper.sanitize(
+  user_content,
+  tags: allowed_tags,
+  attributes: allowed_attrs
+)
 
-### Rails Auto-escaping
-
-```erb
-<!-- Rails auto-escapes ERB output ด้วย <%= %> -->
-<!-- ปลอดภัย -->
-<p><%=  @user.name %></p>
-
-<!-- อันตราย! - ปิด auto-escape -->
-<p><%= @user.name.html_safe %></p>    <!-- อย่าทำ! -->
-<p><%== @user.name %></p>              <!-- อย่าทำ! (alias html_safe) -->
-<p><%= raw(@user.name) %></p>          <!-- อย่าทำ! -->
-```
-
-### sanitize Helper
-
-```ruby
-# ใน Rails
-require 'action_view'
-include ActionView::Helpers::SanitizeHelper
-
-html = "<p>Hello <b>World</b> <script>alert('xss')</script></p>"
-
-# อนุญาตเฉพาะ tags ที่ระบุ
-safe_html = sanitize(html, tags: %w[p b i em strong], attributes: %w[href class])
-puts safe_html
-# => <p>Hello <b>World</b> </p>
-
-# ลบ HTML ทั้งหมด
-plain_text = strip_tags(html)
-puts plain_text
-# => Hello World alert('xss')
-```
-
-### Content Security Policy
-
-```ruby
+# Content Security Policy (CSP)
 # config/initializers/content_security_policy.rb
 Rails.application.config.content_security_policy do |policy|
   policy.default_src :self, :https
@@ -251,1310 +223,675 @@ Rails.application.config.content_security_policy do |policy|
   policy.img_src     :self, :https, :data
   policy.object_src  :none
   policy.script_src  :self, :https
-  policy.style_src   :self, :https
-
-  # ใช้ nonce สำหรับ inline scripts
-  policy.script_src :self, :https, :unsafe_inline if Rails.env.development?
+  policy.style_src   :self, :https, :unsafe_inline
+  
+  # Add nonce support for inline scripts
+  policy.script_src :self, :https, -> { "'nonce-#{SecureRandom.base64(16)}'" }
 end
+
+# Ruby String Escaping
+require 'cgi'
+CGI.escapeHTML("<script>alert('xss')</script>")
+# => "&lt;script&gt;alert('xss')&lt;/script&gt;"
+
+require 'erb'
+ERB::Util.html_escape("<script>")
+# => "&lt;script&gt;"
 ```
 
 ---
 
-## Step 629: CSRF Basics
-
-### CSRF คืออะไร?
-
-Cross-Site Request Forgery คือการหลอกให้ผู้ใช้ส่ง request ที่ไม่ต้องการ
+## ขั้นตอนที่ 629: CSRF Protection
 
 ```ruby
-# Rails CSRF Protection (built-in)
+# Rails CSRF Protection (Auto-enabled)
+# ApplicationController มี protect_from_forgery โดยค่าเริ่มต้น
+
 class ApplicationController < ActionController::Base
-  protect_from_forgery with: :exception  # เปิด CSRF protection
-
+  protect_from_forgery with: :exception
   # หรือ
-  protect_from_forgery with: :reset_session  # สำหรับ API
-  protect_from_forgery with: :null_session   # สำหรับ JSON API
+  protect_from_forgery with: :null_session  # สำหรับ API
 end
 
-# ใน Form (auto-included ด้วย form_with/form_for)
-# <%= form_with(model: @user) do |f| %>
-#   <%= hidden_field_tag :authenticity_token, form_authenticity_token %>
-# <% end %>
-
-# ข้ามสำหรับ API controllers
-class Api::V1::BaseController < ApplicationController
-  skip_before_action :verify_authenticity_token
-end
-```
-
-### CSRF Token Management
-
-```ruby
-# ตรวจสอบ CSRF token ด้วยตนเอง
-def verify_csrf
-  unless valid_authenticity_token?(session, params[:authenticity_token] || request.headers["X-CSRF-Token"])
-    raise ActionController::InvalidAuthenticityToken
+# สำหรับ API Endpoints
+class ApiController < ActionController::Base
+  protect_from_forgery with: :null_session
+  
+  before_action :authenticate_api_token!
+  
+  private
+  
+  def authenticate_api_token!
+    token = request.headers['X-API-Token'] || request.headers['Authorization']&.split(' ')&.last
+    
+    unless valid_token?(token)
+      render json: { error: 'Unauthorized' }, status: :unauthorized
+    end
+  end
+  
+  def valid_token?(token)
+    return false unless token
+    ApiToken.active.find_by(token: token).present?
   end
 end
 
-# สำหรับ SPA (ใช้ cookie)
-# config/initializers/cors.rb
-Rails.application.config.middleware.insert_before 0, Rack::Cors do
-  allow do
-    origins 'https://my-spa.com'
-    resource '*',
-      headers: :any,
-      methods: [:get, :post, :put, :patch, :delete, :options, :head],
-      credentials: true
-  end
-end
+# CSRF Token ใน HTML Forms
+# Rails เพิ่ม Token อัตโนมัติ:
+# <input type="hidden" name="authenticity_token" value="<token>">
+
+# ใน JavaScript (Axios)
+# axios.defaults.headers.common['X-CSRF-Token'] = 
+#   document.querySelector('meta[name="csrf-token"]').getAttribute('content')
 ```
 
 ---
 
-## Step 630: Secure Random Tokens
-
-### SecureRandom
+## ขั้นตอนที่ 630: Secure Random Tokens
 
 ```ruby
 require 'securerandom'
 
-# UUID - unique identifier
-token = SecureRandom.uuid
-puts token  # => "550e8400-e29b-41d4-a716-446655440000"
+# Generate Secure Random Tokens
+SecureRandom.hex(32)       # 64 char hex string
+SecureRandom.base64(32)    # Base64 string
+SecureRandom.urlsafe_base64(32)  # URL-safe Base64
+SecureRandom.uuid          # UUID v4
+SecureRandom.alphanumeric(20)   # Alphanumeric string
 
-# Hex string
-token = SecureRandom.hex(32)    # 64 hex chars
-puts token  # => "a1b2c3d4..."
-
-# Base64 URL-safe
-token = SecureRandom.urlsafe_base64(32)
-puts token  # => "abc123..."
-
-# Random bytes
-bytes = SecureRandom.bytes(16)  # binary
-
-# Random number
-puts SecureRandom.random_number(1000)  # 0 - 999
-```
-
-### สร้าง Secure Token สำหรับ Applications
-
-```ruby
-# Password Reset Token
+# Token สำหรับ Password Reset
 class User < ApplicationRecord
-  def generate_password_reset_token!
-    token = SecureRandom.urlsafe_base64(32)
-    update!(
-      reset_password_token: Digest::SHA256.hexdigest(token),
-      reset_password_sent_at: Time.current
-    )
-    token  # คืน raw token (ส่งให้ user)
+  before_create :generate_confirmation_token
+  
+  def generate_reset_password_token!
+    raw_token = SecureRandom.urlsafe_base64(32)
+    self.reset_password_token      = Digest::SHA256.hexdigest(raw_token)
+    self.reset_password_sent_at    = Time.current
+    save!
+    raw_token  # ส่ง raw token ให้ User, เก็บ hashed version ใน DB
   end
-
-  def reset_password_token_valid?(token, expiry: 2.hours)
-    return false if reset_password_sent_at < expiry.ago
-    hashed = Digest::SHA256.hexdigest(token)
-    ActiveSupport::SecurityUtils.secure_compare(reset_password_token, hashed)
+  
+  def reset_password_token_valid?
+    reset_password_sent_at > 2.hours.ago
   end
-end
-
-# API Token
-class ApiKey < ApplicationRecord
-  before_create :generate_key
-
+  
+  def self.find_by_reset_token(raw_token)
+    hashed = Digest::SHA256.hexdigest(raw_token)
+    find_by(reset_password_token: hashed)
+  end
+  
   private
-
-  def generate_key
-    self.token = SecureRandom.hex(32)
-    self.prefix = token.first(8)  # สำหรับ lookup
+  
+  def generate_confirmation_token
+    self.confirmation_token = SecureRandom.urlsafe_base64(32)
   end
 end
+
+# Timing-safe Comparison (ป้องกัน Timing Attack)
+def secure_compare(a, b)
+  return false if a.bytesize != b.bytesize
+  
+  l = a.unpack("C#{a.bytesize}")
+  r = 0
+  
+  b.each_byte { |byte| r |= byte ^ l.shift }
+  r == 0
+end
+
+# หรือใช้ ActiveSupport::SecurityUtils
+require 'active_support/security_utils'
+ActiveSupport::SecurityUtils.secure_compare(a, b)
 ```
 
 ---
 
-## Step 631: Password Hashing ด้วย bcrypt
-
-### bcrypt คืออะไร?
-
-bcrypt เป็น cryptographic hash function ที่ออกแบบมาสำหรับ passwords โดยเฉพาะ มีคุณสมบัติ:
-- **Slow by design** - ป้องกัน brute force
-- **Salted** - ป้องกัน rainbow table attacks
-- **Adaptive** - ปรับ cost factor ได้
+## ขั้นตอนที่ 631: Password Hashing
 
 ```ruby
-# gem 'bcrypt'
+# ใช้ bcrypt สำหรับ Hash Password
+gem 'bcrypt'
+
 require 'bcrypt'
 
-# Hash password
-password = "my_secret_password"
-hashed = BCrypt::Password.create(password)
-puts hashed
-# => $2a$12$abc123...  (BCrypt hash)
-
-# ตรวจสอบ password
-bcrypt_password = BCrypt::Password.new(hashed)
-puts bcrypt_password == password  # => true
-puts bcrypt_password == "wrong"   # => false
-
-# Cost factor (default 12)
-# ยิ่งสูง ยิ่งช้า ยิ่งปลอดภัย
-fast_hash = BCrypt::Password.create("password", cost: 4)   # เร็ว (สำหรับ test)
-slow_hash = BCrypt::Password.create("password", cost: 14)  # ช้า (สำหรับ production)
-```
-
-### bcrypt-ruby Gem Usage
-
-```ruby
-class User
-  attr_accessor :email
-  attr_reader :password_digest
-
-  def password=(plain_password)
-    @password_digest = BCrypt::Password.create(plain_password)
+class UserAccount
+  attr_reader :email
+  
+  def initialize(email, plain_password)
+    @email          = email
+    @password_digest = BCrypt::Password.create(plain_password, cost: 12)
   end
-
+  
   def authenticate(plain_password)
     BCrypt::Password.new(@password_digest) == plain_password
   end
-end
-
-user = User.new
-user.email = "user@example.com"
-user.password = "SecurePass123!"
-
-puts user.authenticate("SecurePass123!")  # => true
-puts user.authenticate("wrongpass")       # => false
-```
-
-### has_secure_password ใน Rails
-
-```ruby
-# Migration
-class CreateUsers < ActiveRecord::Migration[7.0]
-  def change
-    create_table :users do |t|
-      t.string :email, null: false
-      t.string :password_digest, null: false  # ต้องมี column นี้
-      t.timestamps
-    end
+  
+  def password_digest
+    @password_digest.to_s
   end
 end
 
-# Model
+# การใช้งาน
+user = UserAccount.new('test@example.com', 'MySecureP@ssw0rd!')
+
+puts user.authenticate('MySecureP@ssw0rd!')  # true
+puts user.authenticate('wrong_password')       # false
+
+# Rails has_secure_password
 class User < ApplicationRecord
-  has_secure_password  # ใช้ bcrypt อัตโนมัติ
-
-  validates :email, presence: true, uniqueness: true,
-            format: { with: /\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/i }
-  validates :password, length: { minimum: 8 }, if: :password_required?
-
-  private
-
-  def password_required?
-    new_record? || password.present?
-  end
+  has_secure_password  # ต้องมี password_digest column
+  
+  validates :password, 
+    length: { minimum: 8 },
+    format: { 
+      with: /\A(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])/,
+      message: "ต้องมีตัวพิมพ์ใหญ่ พิมพ์เล็ก ตัวเลข และอักขระพิเศษ"
+    }
 end
 
 # ใช้งาน
-user = User.create!(email: "user@example.com", password: "SecurePass123!", password_confirmation: "SecurePass123!")
+user = User.new(email: 'test@example.com', password: 'SecureP@ss1')
+user.save
 
-# Authenticate
-user.authenticate("SecurePass123!")  # => user object (truthy)
-user.authenticate("wrong")           # => false
+user.authenticate('SecureP@ss1')   # คืน user object
+user.authenticate('wrong')          # คืน false
 
-# ใน Sessions Controller
-def create
-  user = User.find_by(email: params[:email])
-  if user&.authenticate(params[:password])
-    session[:user_id] = user.id
-    redirect_to dashboard_path
-  else
-    flash[:alert] = "Email หรือ Password ไม่ถูกต้อง"
-    render :new
-  end
-end
+# Argon2 (แนะนำมากกว่า bcrypt)
+gem 'argon2'
+
+require 'argon2'
+
+password_hasher = Argon2::Password.new(t_cost: 2, m_cost: 16)
+hashed = password_hasher.create("my_password")
+
+puts Argon2::Password.verify_password("my_password", hashed)  # true
+puts Argon2::Password.verify_password("wrong", hashed)         # false
 ```
 
 ---
 
-## Step 632: Storing Secrets - Environment Variables
-
-### ทำไมต้องใช้ Environment Variables?
-
-```ruby
-# BAD - อย่า hardcode secrets ใน code!
-DATABASE_PASSWORD = "my_secret_password"  # จะถูก commit ขึ้น Git!
-
-API_KEY = "sk-abc123..."  # อันตราย!
-```
-
-### dotenv gem
-
-```ruby
-# Gemfile
-gem 'dotenv-rails', groups: [:development, :test]
-
-# .env file (ไม่ commit ขึ้น Git!)
-DATABASE_URL=postgres://localhost/myapp
-SECRET_KEY=abc123...
-STRIPE_SECRET_KEY=sk_test_...
-SENDGRID_API_KEY=SG.abc...
-AWS_ACCESS_KEY_ID=AKIA...
-AWS_SECRET_ACCESS_KEY=abc...
-
-# .gitignore
-.env
-.env.local
-.env.*.local
-
-# ใช้งาน
-database_url = ENV['DATABASE_URL']
-secret_key = ENV.fetch('SECRET_KEY') { raise "SECRET_KEY ต้องตั้งค่า!" }
-```
+## ขั้นตอนที่ 632: Secrets Management
 
 ### Rails Credentials
 
+```bash
+# สร้าง/แก้ไข Credentials
+rails credentials:edit
+
+# แก้ไขสำหรับ Environment เฉพาะ
+rails credentials:edit --environment production
+rails credentials:edit --environment staging
+```
+
+```yaml
+# config/credentials.yml.enc (หลัง decrypt)
+aws:
+  access_key_id: "AKIAIOSFODNN7EXAMPLE"
+  secret_access_key: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+
+stripe:
+  publishable_key: "pk_test_xxx"
+  secret_key: "sk_test_xxx"
+  webhook_secret: "whsec_xxx"
+
+sendgrid:
+  api_key: "SG.xxx"
+
+jwt_secret: "super_secret_key_for_jwt"
+
+database:
+  password: "secure_db_password"
+```
+
 ```ruby
-# Rails built-in encrypted credentials
-# config/credentials.yml.enc (encrypted, ปลอดภัย commit ได้)
-# config/master.key (ไม่ commit ขึ้น Git!)
+# ใช้งาน Credentials ใน Code
+class PaymentService
+  def self.stripe_client
+    Stripe.api_key = Rails.application.credentials.stripe[:secret_key]
+    Stripe
+  end
+end
 
-# แก้ไข credentials
-# EDITOR=vim rails credentials:edit
+# Environment Variables ทางเลือก
+class Config
+  def self.stripe_secret_key
+    ENV['STRIPE_SECRET_KEY'] || 
+      Rails.application.credentials.dig(:stripe, :secret_key)
+  end
+  
+  def self.jwt_secret
+    ENV['JWT_SECRET'] || 
+      Rails.application.credentials.jwt_secret ||
+      raise("JWT_SECRET ไม่ได้ตั้งค่า!")
+  end
+end
 
-# credentials.yml.enc content:
-# secret_key_base: abc123...
-# database:
-#   password: my_db_password
-# stripe:
-#   publishable_key: pk_test_...
-#   secret_key: sk_test_...
+# .env file (ไม่ควร Commit ใน Git!)
+# .gitignore
+# .env
+# .env.*
 
-# ใช้งาน
-Rails.application.credentials.secret_key_base
-Rails.application.credentials.dig(:stripe, :secret_key)
+# ใช้ dotenv gem
+require 'dotenv'
+Dotenv.load
 
-# Per-environment credentials
-# rails credentials:edit --environment production
+stripe_key = ENV['STRIPE_SECRET_KEY']
 ```
 
 ---
 
-## Step 633: bundler-audit
+## ขั้นตอนที่ 633: SSL/TLS Basics
 
-### ตรวจสอบ Vulnerable Gems
+```ruby
+# Force HTTPS ใน Rails
+class ApplicationController < ActionController::Base
+  force_ssl if Rails.env.production?
+end
+
+# config/environments/production.rb
+config.force_ssl = true
+
+# SSL/TLS Configuration ใน Nginx
+# server {
+#   listen 80;
+#   server_name example.com;
+#   return 301 https://$server_name$request_uri;
+# }
+#
+# server {
+#   listen 443 ssl http2;
+#   server_name example.com;
+#   ssl_certificate     /etc/ssl/example.com.crt;
+#   ssl_certificate_key /etc/ssl/example.com.key;
+#   ssl_protocols       TLSv1.2 TLSv1.3;
+#   ssl_ciphers         HIGH:!aNULL:!MD5;
+# }
+
+# HSTS (HTTP Strict Transport Security)
+# config/environments/production.rb
+config.force_ssl = true
+# Rails จะเพิ่ม Strict-Transport-Security Header โดยอัตโนมัติ
+
+# Verify SSL Certificate ใน HTTP Requests
+require 'net/https'
+
+uri  = URI('https://api.example.com')
+http = Net::HTTP.new(uri.host, uri.port)
+http.use_ssl = true
+http.verify_mode = OpenSSL::SSL::VERIFY_PEER  # Default
+# ห้ามใช้ VERIFY_NONE ใน Production!
+
+# Certificate Pinning
+http.ca_file = '/path/to/cert-bundle.crt'
+```
+
+---
+
+## ขั้นตอนที่ 634: Bundler-audit
 
 ```bash
 # ติดตั้ง
 gem install bundler-audit
 
-# อัปเดต vulnerability database
+# อัพเดท Advisory Database
 bundle-audit update
 
-# ตรวจสอบ Gemfile.lock
+# ตรวจสอบ
 bundle-audit check
 
-# ผลลัพธ์ตัวอย่าง:
-# Name: rails
-# Version: 5.2.0
-# Advisory: CVE-2019-5418
-# Criticality: High
-# URL: https://groups.google.com/forum/#!topic/rubyonrails-security/pFRKI96Sm8Q
-# Title: File Content Disclosure in Action View
-# Solution: upgrade to >= 5.2.2.1
-```
+# Example Output:
+# Name: rack
+# Version: 2.2.6
+# Advisory: CVE-2022-44570
+# Criticality: Medium
+# URL: https://github.com/advisories/GHSA-65f5-mfpf-vfhj
+# Title: Denial of Service Vulnerability in Rack multipart
+# Solution: upgrade to >= 2.2.6.3
 
-### ใน CI/CD Pipeline
+# แก้ไขโดยอัพเดท Gem
+bundle update rack
 
-```yaml
+# เพิ่มใน CI/CD
 # .github/workflows/security.yml
-name: Security
-
+name: Security Audit
 on: [push, pull_request]
-
 jobs:
-  bundle-audit:
+  audit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: 3.2
-          bundler-cache: true
-      - name: Bundle Audit
-        run: |
-          gem install bundler-audit
-          bundle-audit update
-          bundle-audit check --ignore CVE-2022-XXXX  # ignore ที่จัดการแล้ว
+      - run: gem install bundler-audit
+      - run: bundle-audit check --update
 ```
 
-### Brakeman - Static Analysis Security Scanner
+### Brakeman (Static Analysis)
 
 ```bash
-# ติดตั้ง
 gem install brakeman
 
-# สแกน Rails app
+# วิเคราะห์ Rails App
 brakeman
 
-# สแกนพร้อม output formats
-brakeman -o report.html  # HTML report
-brakeman -o report.json  # JSON report
-brakeman -A             # สแกนทุก checks
+# Output HTML
+brakeman -o brakeman.html
 
-# ผลลัพธ์
-# == Warnings ==
-# Confidence: High
-# Category: SQL Injection
-# Message: Possible SQL injection
-# File: app/models/user.rb
-# Line: 25
+# ตรวจสอบเฉพาะ
+brakeman --checks SqlInjection,XSS,CSRF
 ```
 
 ---
 
-## Step 634: Mass Assignment Risks
+## ขั้นตอนที่ 635-640: Security Best Practices
 
-### Mass Assignment คืออะไร?
-
-```ruby
-# DANGER - Mass assignment
-class User < ApplicationRecord
-  # ถ้าไม่มี protection
-end
-
-# ผู้ใช้ส่ง params:
-# { user: { name: "สมชาย", email: "test@test.com", admin: true } }
-
-User.create(params[:user])  # admin: true จะถูก set!
-```
-
-### Strong Parameters
+### Secure Headers
 
 ```ruby
-# Rails Strong Parameters - whitelist approach
-class UsersController < ApplicationController
-  def create
-    @user = User.new(user_params)
-    if @user.save
-      redirect_to @user
-    else
-      render :new
-    end
-  end
-
-  def update
-    if @user.update(user_params)
-      redirect_to @user
-    else
-      render :edit
-    end
-  end
-
-  private
-
-  def user_params
-    # ระบุเฉพาะ fields ที่อนุญาต
-    params.require(:user).permit(:name, :email, :password, :password_confirmation)
-    # ไม่อนุญาต: admin, role, balance, etc.
-  end
-
-  # Admin สามารถตั้งค่า role
-  def admin_user_params
-    if current_user.admin?
-      params.require(:user).permit(:name, :email, :role)
-    else
-      user_params
-    end
-  end
-end
-```
-
-### Nested Attributes
-
-```ruby
-class UsersController < ApplicationController
-  private
-
-  def user_params
-    params.require(:user).permit(
-      :name,
-      :email,
-      :password,
-      # nested
-      address_attributes: [:street, :city, :zip, :_destroy],
-      # array
-      tag_ids: [],
-      # nested array
-      posts_attributes: [:title, :body, :_destroy, :id]
-    )
-  end
-end
-```
-
----
-
-## Step 635: Timing Attacks
-
-### Timing Attack คืออะไร?
-
-```ruby
-# DANGER - Timing attack vulnerable
-def authenticate(provided_token, actual_token)
-  provided_token == actual_token  # String comparison short-circuits!
-  # ถ้า first character ตรง จะใช้เวลานานกว่า
-  # ผู้โจมตีวัดเวลาได้!
-end
-
-# SAFE - Constant-time comparison
-require 'active_support/security_utils'
-
-def authenticate_safe(provided_token, actual_token)
-  ActiveSupport::SecurityUtils.secure_compare(provided_token, actual_token)
-  # ใช้เวลาเท่ากันเสมอ ไม่ว่า token จะตรงหรือไม่
-end
-
-# หรือ
-require 'openssl'
-def secure_compare(a, b)
-  return false unless a.length == b.length
-  OpenSSL.fixed_length_secure_compare(a, b)
-end
-```
-
-### Timing Attack ใน Password Reset
-
-```ruby
-class PasswordResetsController < ApplicationController
-  def update
-    # SAFE: ค้นหาด้วย token hash (ไม่ใช่ raw token)
-    token_hash = Digest::SHA256.hexdigest(params[:token])
-    @user = User.find_by(reset_password_token: token_hash)
-
-    # SAFE: ตรวจสอบด้วย secure_compare
-    if @user && @user.reset_password_token_valid?(params[:token])
-      @user.update!(
-        password: params[:password],
-        reset_password_token: nil,
-        reset_password_sent_at: nil
-      )
-      redirect_to login_path, notice: "รีเซ็ตรหัสผ่านสำเร็จ"
-    else
-      # IMPORTANT: ใช้เวลาเดียวกันสำหรับ invalid cases
-      render :new, alert: "Token ไม่ถูกต้องหรือหมดอายุ"
-    end
-  end
-end
-```
-
----
-
-## Step 636: SSL/TLS Basics
-
-### HTTPS ใน Rails
-
-```ruby
-# config/environments/production.rb
-config.force_ssl = true  # บังคับ HTTPS
-
-# HSTS (HTTP Strict Transport Security)
-config.force_ssl = true
-config.ssl_options = {
-  hsts: {
-    expires: 1.year,
-    subdomains: true,
-    preload: true
-  }
-}
-```
-
-### SSL Certificate Verification
-
-```ruby
-require 'net/http'
-require 'openssl'
-
-# GOOD - ตรวจสอบ SSL certificate
-def secure_http_request(url)
-  uri = URI(url)
-  http = Net::HTTP.new(uri.host, uri.port)
-  http.use_ssl = true
-  http.verify_mode = OpenSSL::SSL::VERIFY_PEER  # default, ดีอยู่แล้ว
-  http.get(uri.path)
-end
-
-# BAD - ปิด SSL verification (อย่าทำ!)
-def insecure_http_request(url)
-  uri = URI(url)
-  http = Net::HTTP.new(uri.host, uri.port)
-  http.use_ssl = true
-  http.verify_mode = OpenSSL::SSL::VERIFY_NONE  # อันตราย! MITM attacks!
-  http.get(uri.path)
-end
-```
-
-### Faraday ด้วย SSL
-
-```ruby
-# gem 'faraday'
-require 'faraday'
-
-# GOOD
-conn = Faraday.new(url: 'https://api.example.com') do |f|
-  f.adapter Faraday.default_adapter
-  # SSL verification เปิดอัตโนมัติ
-end
-
-# ตั้งค่า SSL options ถ้าจำเป็น
-conn = Faraday.new(url: 'https://api.example.com') do |f|
-  f.ssl[:verify] = true
-  f.ssl[:ca_file] = '/path/to/ca.crt'  # custom CA certificate
-end
-```
-
----
-
-## Step 637: Secure Headers
-
-```ruby
-# gem 'secure_headers'
+# Gemfile
+gem 'secure_headers'
 
 # config/initializers/secure_headers.rb
 SecureHeaders::Configuration.default do |config|
-  config.x_frame_options = "DENY"
-  config.x_content_type_options = "nosniff"
-  config.x_xss_protection = "1; mode=block"
-  config.x_download_options = "noopen"
+  config.cookies = {
+    secure: true,
+    httponly: true,
+    samesite: {
+      lax: true
+    }
+  }
+  
+  config.x_frame_options          = "SAMEORIGIN"
+  config.x_content_type_options   = "nosniff"
+  config.x_xss_protection         = "1; mode=block"
+  config.x_download_options       = "noopen"
   config.x_permitted_cross_domain_policies = "none"
-  config.referrer_policy = "origin-when-cross-origin"
-
+  
+  config.referrer_policy          = "strict-origin-when-cross-origin"
+  
   config.csp = {
-    default_src: %w['self'],
-    script_src: %w['self' 'nonce-abc123'],
-    style_src: %w['self' https://fonts.googleapis.com],
-    img_src: %w['self' data: https:],
-    font_src: %w['self' https://fonts.gstatic.com],
-    connect_src: %w['self' https://api.example.com],
-    object_src: %w['none'],
-    frame_ancestors: %w['none']
+    default_src: %w('self'),
+    script_src:  %w('self' https://cdn.jsdelivr.net),
+    style_src:   %w('self' 'unsafe-inline' https://fonts.googleapis.com),
+    img_src:     %w('self' data: https:),
+    font_src:    %w('self' https://fonts.gstatic.com),
+    connect_src: %w('self' https://api.example.com),
+    frame_src:   %w('none'),
+    object_src:  %w('none')
   }
 end
 ```
 
----
-
-## Step 638: Common Vulnerabilities
-
-### Directory Traversal
+### Authorization
 
 ```ruby
-# DANGER - Directory traversal
-def serve_file(filename)
-  File.read("public/#{filename}")
-  # filename = "../../etc/passwd" → อ่าน system files!
-end
+# Pundit สำหรับ Authorization
+gem 'pundit'
 
-# SAFE
-def serve_file_safe(filename)
-  # ตรวจสอบว่าอยู่ใน allowed directory
-  base_dir = Rails.root.join("public", "uploads")
-  requested = base_dir.join(filename).expand_path
-
-  unless requested.to_s.start_with?(base_dir.to_s)
-    raise SecurityError, "Access denied"
-  end
-
-  File.read(requested)
-end
-```
-
-### Command Injection
-
-```ruby
-# DANGER - Command injection
-def resize_image_unsafe(filename, width)
-  system("convert #{filename} -resize #{width}x output.jpg")
-  # filename = "input.jpg; rm -rf /"  → อันตรายมาก!
-end
-
-# SAFE - ใช้ array form (ไม่ผ่าน shell)
-def resize_image_safe(filename, width)
-  # ตรวจสอบ filename
-  raise ArgumentError, "Invalid filename" unless filename.match?(/\A[\w\-\.]+\z/)
-  raise ArgumentError, "Invalid width" unless width.to_s.match?(/\A\d+\z/)
-
-  system("convert", filename, "-resize", "#{width}x", "output.jpg")
-end
-
-# หรือใช้ shellwords
-require 'shellwords'
-def resize_image_shellwords(filename, width)
-  safe_filename = Shellwords.escape(filename)
-  safe_width = width.to_i.to_s
-  `convert #{safe_filename} -resize #{safe_width}x output.jpg`
-end
-```
-
----
-
-## แบบฝึกหัด 20 ข้อ
-
-### ข้อที่ 1: SQL Injection Prevention
-```ruby
-# โจทย์: แก้ SQL injection vulnerability นี้
-def find_users_unsafe(search_term)
-  User.where("name = '#{search_term}'")
-end
-
-# เฉลย
-def find_users_safe(search_term)
-  User.where("name = ?", search_term)
-  # หรือ
-  User.where(name: search_term)
-end
-
-# Test
-find_users_safe("'; DROP TABLE users; --")
-# จะ query: WHERE name = '''; DROP TABLE users; --'
-# ปลอดภัย! ไม่ execute SQL injection
-```
-
-### ข้อที่ 2: Password Hashing
-```ruby
-# เฉลย
-require 'bcrypt'
-
-class PasswordManager
-  def self.hash_password(plain_password)
-    raise ArgumentError, "Password ต้องมีอย่างน้อย 8 ตัวอักษร" if plain_password.length < 8
-    BCrypt::Password.create(plain_password, cost: 12)
-  end
-
-  def self.verify_password(plain_password, hashed)
-    BCrypt::Password.new(hashed) == plain_password
-  end
-
-  def self.strong_password?(password)
-    return false if password.length < 8
-    return false unless password.match?(/[A-Z]/)  # uppercase
-    return false unless password.match?(/[a-z]/)  # lowercase
-    return false unless password.match?(/\d/)      # digit
-    return false unless password.match?(/[!@#$%^&*]/)  # special char
-    true
+class ApplicationController < ActionController::Base
+  include Pundit::Authorization
+  
+  rescue_from Pundit::NotAuthorizedError do |exception|
+    redirect_to root_path, alert: "ไม่มีสิทธิ์เข้าถึง"
   end
 end
 
-password = "MyStr0ng!Pass"
-hash = PasswordManager.hash_password(password)
-puts PasswordManager.verify_password(password, hash)  # => true
-puts PasswordManager.strong_password?(password)        # => true
-```
-
-### ข้อที่ 3: Secure Token Generation
-```ruby
-# เฉลย
-class TokenService
-  TOKEN_EXPIRY = 24.hours
-
-  def self.generate
-    SecureRandom.urlsafe_base64(32)
+class OrderPolicy < ApplicationPolicy
+  def show?
+    user == record.user || user.admin?
   end
-
-  def self.generate_with_expiry
-    {
-      token: generate,
-      expires_at: TOKEN_EXPIRY.from_now
-    }
+  
+  def update?
+    user == record.user && record.pending?
   end
-
-  def self.hash_token(raw_token)
-    Digest::SHA256.hexdigest(raw_token)
+  
+  def destroy?
+    user.admin? || (user == record.user && record.pending?)
   end
-
-  def self.valid_token?(raw_token, hashed_token, expires_at)
-    return false if Time.current > expires_at
-    ActiveSupport::SecurityUtils.secure_compare(
-      hash_token(raw_token),
-      hashed_token
-    )
-  end
-end
-```
-
-### ข้อที่ 4: Input Validation
-```ruby
-# เฉลย
-class PostValidator
-  attr_reader :errors
-
-  def initialize(params)
-    @params = params
-    @errors = []
-  end
-
-  def valid?
-    validate_title
-    validate_body
-    validate_tags
-    @errors.empty?
-  end
-
-  private
-
-  def validate_title
-    title = @params[:title].to_s.strip
-    @errors << "หัวข้อต้องไม่ว่าง" if title.empty?
-    @errors << "หัวข้อต้องไม่เกิน 200 ตัวอักษร" if title.length > 200
-  end
-
-  def validate_body
-    body = @params[:body].to_s.strip
-    @errors << "เนื้อหาต้องไม่ว่าง" if body.empty?
-    @errors << "เนื้อหาต้องไม่เกิน 50000 ตัวอักษร" if body.length > 50_000
-  end
-
-  def validate_tags
-    tags = @params[:tags]
-    return unless tags
-    @errors << "Tags ต้องเป็น array" unless tags.is_a?(Array)
-    @errors << "Tags ต้องไม่เกิน 10 รายการ" if tags.length > 10
-    tags.each do |tag|
-      @errors << "Tag '#{tag}' มีอักขระไม่ถูกต้อง" unless tag.to_s.match?(/\A[\w\-]+\z/)
-    end
-  end
-end
-```
-
-### ข้อที่ 5: XSS Prevention
-```ruby
-# เฉลย
-module HtmlSanitizer
-  ALLOWED_TAGS = %w[p b i em strong a ul ol li br h1 h2 h3 h4 h5 h6 blockquote].freeze
-  ALLOWED_ATTRS = { "a" => ["href", "title"], "p" => ["class"] }.freeze
-
-  def self.sanitize(html)
-    # ใช้ Loofah สำหรับ sanitization
-    Loofah.fragment(html).scrub!(:strip).to_s
-  end
-
-  def self.sanitize_strict(html)
-    ActionView::Base.full_sanitizer.sanitize(html)
-  end
-
-  def self.escape(text)
-    CGI.escapeHTML(text.to_s)
-  end
-end
-
-unsafe_html = "<p>Hello <b>World</b> <script>alert('xss')</script></p>"
-puts HtmlSanitizer.sanitize(unsafe_html)
-# => <p>Hello <b>World</b> </p>
-```
-
-### ข้อที่ 6: CSRF Token Verification
-```ruby
-# เฉลย - Custom CSRF implementation
-class CSRFProtection
-  def self.generate_token
-    SecureRandom.base64(32)
-  end
-
-  def self.store_in_session(session)
-    session[:csrf_token] = generate_token
-    session[:csrf_token]
-  end
-
-  def self.verify(session, params_token)
-    session_token = session[:csrf_token]
-    return false unless session_token && params_token
-    ActiveSupport::SecurityUtils.secure_compare(session_token, params_token)
-  end
-end
-```
-
-### ข้อที่ 7: Rate Limiting
-```ruby
-# เฉลย
-class RateLimiter
-  def initialize(redis, limit: 100, window: 60)
-    @redis = redis
-    @limit = limit
-    @window = window
-  end
-
-  def allow?(identifier)
-    key = "rate_limit:#{identifier}:#{Time.current.to_i / @window}"
-    count = @redis.incr(key)
-    @redis.expire(key, @window * 2) if count == 1
-    count <= @limit
-  end
-
-  def remaining(identifier)
-    key = "rate_limit:#{identifier}:#{Time.current.to_i / @window}"
-    count = @redis.get(key).to_i
-    [@limit - count, 0].max
-  end
-end
-```
-
-### ข้อที่ 8: Secure File Upload
-```ruby
-# เฉลย
-class SecureFileUploader
-  ALLOWED_TYPES = %w[image/jpeg image/png image/gif application/pdf].freeze
-  MAX_SIZE = 10.megabytes
-
-  def self.validate!(file)
-    raise "ไม่มีไฟล์" unless file
-    raise "ไฟล์ใหญ่เกินไป (max #{MAX_SIZE / 1.megabyte}MB)" if file.size > MAX_SIZE
-    raise "ประเภทไฟล์ไม่อนุญาต" unless ALLOWED_TYPES.include?(file.content_type)
-    validate_filename!(file.original_filename)
-    validate_file_magic_bytes!(file)
-  end
-
-  def self.safe_filename(original_filename)
-    extension = File.extname(original_filename).downcase
-    "#{SecureRandom.hex(16)}#{extension}"
-  end
-
-  private
-
-  def self.validate_filename!(filename)
-    raise "ชื่อไฟล์ไม่ถูกต้อง" unless filename.match?(/\A[\w\-. ]+\z/)
-    raise "ชื่อไฟล์ต้องไม่เริ่มด้วย ." if filename.start_with?(".")
-  end
-
-  def self.validate_file_magic_bytes!(file)
-    file.rewind
-    header = file.read(4)
-    file.rewind
-
-    jpeg_magic = "\xFF\xD8\xFF"
-    png_magic = "\x89PNG"
-    gif_magic = "GIF8"
-    pdf_magic = "%PDF"
-
-    valid = header.start_with?(jpeg_magic) ||
-            header.start_with?(png_magic) ||
-            header.start_with?(gif_magic) ||
-            header.start_with?(pdf_magic)
-
-    raise "ไฟล์ไม่ตรงกับ content type" unless valid
-  end
-end
-```
-
-### ข้อที่ 9: Environment Variables Security
-```ruby
-# เฉลย
-class AppConfig
-  REQUIRED_VARS = %w[
-    DATABASE_URL
-    SECRET_KEY_BASE
-    REDIS_URL
-  ].freeze
-
-  OPTIONAL_VARS = {
-    "LOG_LEVEL" => "info",
-    "MAX_CONNECTIONS" => "10",
-    "CACHE_TTL" => "3600"
-  }.freeze
-
-  def self.load!
-    missing = REQUIRED_VARS.reject { |var| ENV[var] }
-    if missing.any?
-      raise "Missing required environment variables: #{missing.join(', ')}"
-    end
-    puts "Config loaded successfully"
-  end
-
-  def self.[](key)
-    ENV[key] || OPTIONAL_VARS[key]
-  end
-
-  def self.database_url
-    ENV.fetch('DATABASE_URL')
-  end
-end
-
-# config/application.rb
-# AppConfig.load! ใน initializer
-```
-
-### ข้อที่ 10: Audit Logging
-```ruby
-# เฉลย
-class AuditLogger
-  def self.log(action, user:, resource: nil, details: {})
-    entry = {
-      timestamp: Time.current.utc.iso8601,
-      action: action,
-      user_id: user&.id,
-      user_email: user&.email,
-      resource_type: resource&.class&.name,
-      resource_id: resource&.id,
-      ip_address: Current.request&.remote_ip,
-      details: details
-    }
-
-    AuditLog.create!(entry)
-    Rails.logger.info("[AUDIT] #{entry.to_json}")
-  end
-end
-
-# ใน Controller
-class UsersController < ApplicationController
-  def destroy
-    @user = User.find(params[:id])
-    @user.destroy
-    AuditLogger.log("user.deleted",
-      user: current_user,
-      resource: @user,
-      details: { email: @user.email }
-    )
-    redirect_to users_path
-  end
-end
-```
-
-### ข้อที่ 11-20: Additional Security Exercises
-
-**ข้อที่ 11:** Implement API Key Authentication
-```ruby
-# เฉลย
-class ApiKeyMiddleware
-  def initialize(app)
-    @app = app
-  end
-
-  def call(env)
-    request = Rack::Request.new(env)
-    api_key = request.env['HTTP_X_API_KEY']
-
-    unless valid_api_key?(api_key)
-      return [401, { 'Content-Type' => 'application/json' },
-              ['{"error":"Unauthorized"}']]
-    end
-
-    @app.call(env)
-  end
-
-  private
-
-  def valid_api_key?(key)
-    return false unless key
-    ApiKey.find_by_token(key)&.active?
-  end
-end
-```
-
-**ข้อที่ 12:** Secure Session Management
-```ruby
-# เฉลย
-class SessionManager
-  SESSION_EXPIRY = 24.hours
-
-  def self.create(user, request)
-    token = SecureRandom.hex(32)
-    Session.create!(
-      user: user,
-      token: Digest::SHA256.hexdigest(token),
-      user_agent: request.user_agent,
-      ip_address: request.remote_ip,
-      expires_at: SESSION_EXPIRY.from_now
-    )
-    token  # คืน raw token
-  end
-
-  def self.find_user(raw_token)
-    token_hash = Digest::SHA256.hexdigest(raw_token)
-    session = Session.find_by(token: token_hash)
-    return nil unless session
-    return nil if session.expired?
-    return nil if session.revoked?
-    session.user
-  end
-
-  def self.revoke(raw_token)
-    token_hash = Digest::SHA256.hexdigest(raw_token)
-    Session.find_by(token: token_hash)&.update!(revoked_at: Time.current)
-  end
-end
-```
-
-**ข้อที่ 13:** Encryption/Decryption
-```ruby
-# เฉลย
-require 'openssl'
-require 'base64'
-
-class Encryptor
-  def initialize(key = Rails.application.credentials.encryption_key)
-    @key = key
-  end
-
-  def encrypt(data)
-    cipher = OpenSSL::Cipher.new('AES-256-GCM')
-    cipher.encrypt
-    cipher.key = Digest::SHA256.digest(@key)
-    iv = cipher.random_iv
-
-    cipher.auth_data = ""
-    encrypted = cipher.update(data) + cipher.final
-    tag = cipher.auth_tag
-
-    Base64.strict_encode64(iv + tag + encrypted)
-  end
-
-  def decrypt(encoded)
-    raw = Base64.strict_decode64(encoded)
-    iv = raw[0, 12]
-    tag = raw[12, 16]
-    encrypted = raw[28..]
-
-    cipher = OpenSSL::Cipher.new('AES-256-GCM')
-    cipher.decrypt
-    cipher.key = Digest::SHA256.digest(@key)
-    cipher.iv = iv
-    cipher.auth_tag = tag
-    cipher.auth_data = ""
-
-    cipher.update(encrypted) + cipher.final
-  end
-end
-```
-
-**ข้อที่ 14:** Prevent Path Traversal
-```ruby
-# เฉลย
-class SafeFileServer
-  def initialize(base_dir)
-    @base_dir = Pathname.new(base_dir).expand_path
-  end
-
-  def read_file(requested_path)
-    full_path = @base_dir.join(requested_path).expand_path
-
-    unless full_path.to_s.start_with?(@base_dir.to_s + '/')
-      raise SecurityError, "Access denied: path traversal detected"
-    end
-
-    raise "File not found" unless full_path.file?
-    full_path.read
-  end
-end
-
-server = SafeFileServer.new("/var/www/uploads")
-server.read_file("images/photo.jpg")     # OK
-server.read_file("../../etc/passwd")     # => SecurityError!
-```
-
-**ข้อที่ 15:** JWT Token Validation
-```ruby
-# เฉลย
-# gem 'jwt'
-require 'jwt'
-
-class JwtService
-  SECRET_KEY = Rails.application.credentials.secret_key_base.first(32)
-  ALGORITHM = 'HS256'
-  EXPIRY = 24.hours
-
-  def self.encode(payload)
-    payload = payload.merge(exp: EXPIRY.from_now.to_i)
-    JWT.encode(payload, SECRET_KEY, ALGORITHM)
-  end
-
-  def self.decode(token)
-    decoded = JWT.decode(token, SECRET_KEY, true, algorithm: ALGORITHM)
-    HashWithIndifferentAccess.new(decoded.first)
-  rescue JWT::ExpiredSignature
-    raise "Token หมดอายุ"
-  rescue JWT::DecodeError => e
-    raise "Token ไม่ถูกต้อง: #{e.message}"
-  end
-end
-```
-
-**ข้อที่ 16:** Prevent XML/JSON Injection
-```ruby
-# เฉลย
-class SafeJsonBuilder
-  def self.build_response(user_data)
-    # ใช้ JSON.generate แทน string interpolation
-    {
-      id: user_data[:id].to_i,
-      name: user_data[:name].to_s,
-      email: user_data[:email].to_s
-    }.to_json
-  end
-
-  def self.parse_safely(json_string)
-    JSON.parse(json_string, max_nesting: 10)
-  rescue JSON::ParserError => e
-    raise "JSON ไม่ถูกต้อง: #{e.message}"
-  end
-end
-```
-
-**ข้อที่ 17:** Two-Factor Authentication
-```ruby
-# เฉลย
-# gem 'rotp'
-require 'rotp'
-
-class TotpService
-  def self.generate_secret
-    ROTP::Base32.random
-  end
-
-  def self.provisioning_uri(user, secret)
-    totp = ROTP::TOTP.new(secret, issuer: "MyApp")
-    totp.provisioning_uri(user.email)
-  end
-
-  def self.verify(secret, token)
-    totp = ROTP::TOTP.new(secret)
-    totp.verify(token, drift_behind: 15, drift_ahead: 15)
-  end
-end
-```
-
-**ข้อที่ 18:** IP Whitelist Middleware
-```ruby
-# เฉลย
-class IpWhitelistMiddleware
-  ALLOWED_IPS = Set.new(ENV.fetch('ALLOWED_IPS', '127.0.0.1').split(',').map(&:strip)).freeze
-
-  def initialize(app, paths: ['/admin'])
-    @app = app
-    @paths = paths
-  end
-
-  def call(env)
-    request = Rack::Request.new(env)
-
-    if @paths.any? { |p| request.path.start_with?(p) }
-      ip = request.ip
-      unless ALLOWED_IPS.include?(ip)
-        return [403, { 'Content-Type' => 'text/plain' }, ['Access Denied']]
+  
+  class Scope < Scope
+    def resolve
+      if user.admin?
+        scope.all
+      else
+        scope.where(user: user)
       end
     end
+  end
+end
 
-    @app.call(env)
+class OrdersController < ApplicationController
+  def show
+    @order = Order.find(params[:id])
+    authorize @order  # Check OrderPolicy#show?
+  end
+  
+  def index
+    @orders = policy_scope(Order)  # ใช้ OrderPolicy::Scope
   end
 end
 ```
 
-**ข้อที่ 19:** Secure Random Password Generator
+### Mass Assignment Protection
+
 ```ruby
-# เฉลย
-class PasswordGenerator
-  LOWERCASE = ('a'..'z').to_a
-  UPPERCASE = ('A'..'Z').to_a
-  DIGITS = ('0'..'9').to_a
-  SPECIAL = %w[! @ # $ % ^ & * ( ) _ + = { } [ ] | ; : , . ?].freeze
-
-  def self.generate(length: 16)
-    raise ArgumentError, "Length ต้องอย่างน้อย 12" if length < 12
-
-    # ต้องมีอย่างน้อย 1 ของแต่ละ category
-    password_chars = [
-      LOWERCASE.sample,
-      UPPERCASE.sample,
-      DIGITS.sample,
-      SPECIAL.sample
-    ]
-
-    # เติมจนครบ length
-    all_chars = LOWERCASE + UPPERCASE + DIGITS + SPECIAL
-    (length - 4).times { password_chars << all_chars.sample }
-
-    # สับตำแหน่ง (Fisher-Yates shuffle)
-    password_chars.each_index do |i|
-      j = i + SecureRandom.random_number(password_chars.length - i)
-      password_chars[i], password_chars[j] = password_chars[j], password_chars[i]
-    end
-
-    password_chars.join
+# ป้องกัน Mass Assignment Attack
+class User < ApplicationRecord
+  # attr_accessible เดิม (Rails 3)
+  # ใน Rails 4+ ใช้ Strong Parameters แทน
+  
+  # Internal คือไม่ผ่าน Strong Parameters
+  def promote_to_admin!
+    update_column(:role, 'admin')
   end
+  
+  # User ไม่สามารถ Set role โดยตรงผ่าน Web Form
+  # ต้องใช้ Method ที่กำหนดแล้ว
 end
 
-puts PasswordGenerator.generate         # => "xK3!mP9@qL7#nR2$"
-puts PasswordGenerator.generate(length: 20)
-```
-
-**ข้อที่ 20:** Security Headers Checker
-```ruby
-# เฉลย - ตรวจสอบ security headers ของ app ตัวเอง
-require 'net/http'
-
-class SecurityHeadersChecker
-  RECOMMENDED_HEADERS = {
-    'X-Content-Type-Options' => 'nosniff',
-    'X-Frame-Options' => ['DENY', 'SAMEORIGIN'],
-    'X-XSS-Protection' => '1; mode=block',
-    'Strict-Transport-Security' => /max-age=\d+/,
-    'Content-Security-Policy' => /.+/,
-    'Referrer-Policy' => /.+/
-  }.freeze
-
-  def self.check(url)
-    uri = URI(url)
-    response = Net::HTTP.get_response(uri)
-    results = {}
-
-    RECOMMENDED_HEADERS.each do |header, expected|
-      value = response[header.downcase]
-      results[header] = {
-        present: !value.nil?,
-        value: value,
-        ok: check_value(value, expected)
-      }
-    end
-
-    results
-  end
-
-  def self.report(url)
-    results = check(url)
-    puts "Security Headers Report for #{url}"
-    puts "=" * 50
-    results.each do |header, data|
-      status = data[:ok] ? "✓" : "✗"
-      puts "#{status} #{header}: #{data[:value] || 'MISSING'}"
+class UsersController < ApplicationController
+  def create
+    @user = User.new(user_params)  # user_params ไม่มี :role
+    
+    if @user.save
+      redirect_to @user
     end
   end
-
+  
   private
-
-  def self.check_value(value, expected)
-    return false unless value
-    case expected
-    when Array then expected.any? { |e| value.include?(e) }
-    when Regexp then expected.match?(value)
-    when String then value.include?(expected)
-    end
+  
+  def user_params
+    params.require(:user).permit(:name, :email, :password)
+    # ไม่ include :role!
   end
 end
 ```
 
 ---
 
-## สรุป
+## แบบฝึกหัดบทที่ 29 (20 ข้อ)
 
-Security ใน Ruby/Rails:
+**ข้อ 1:** สร้าง Input Validator สำหรับ Thai National ID (13 หลัก)
 
-1. **Input Validation** - ตรวจสอบ input ทุกอย่างจาก user
-2. **SQL Injection** - ใช้ parameterized queries เสมอ
-3. **XSS** - Rails auto-escapes แต่ระวัง html_safe
-4. **Password Security** - bcrypt เสมอ, ห้าม MD5/SHA1
-5. **Secrets Management** - Environment variables หรือ Rails credentials
-6. **Dependency Security** - bundler-audit และ Brakeman สม่ำเสมอ
-7. **HTTPS** - บังคับใช้ใน production เสมอ
+**ข้อ 2:** Implement SQL Injection Test ด้วย Malicious Inputs และแก้ให้ปลอดภัย
+
+**ข้อ 3:** สร้าง XSS Test ใน Rails View และใช้ sanitize อย่างถูกต้อง
+
+**ข้อ 4:** Implement CSRF Token Validation สำหรับ API Endpoint
+
+**ข้อ 5:** สร้าง Password Strength Validator ที่ตรวจสอบความซับซ้อน
+
+**ข้อ 6:** ใช้ bcrypt Hash Password และ Verify อย่างถูกต้อง
+
+**ข้อ 7:** Setup Rails Credentials สำหรับ API Keys ต่างๆ
+
+**ข้อ 8:** สร้าง Rate Limiter สำหรับ Login Attempts
+
+**ข้อ 9:** ใช้ bundler-audit ตรวจสอบโปรเจกต์และแก้ไข Vulnerabilities
+
+**ข้อ 10:** Implement Secure File Upload ด้วย Whitelist ของ File Types
+
+**ข้อ 11:** สร้าง JWT Authentication ที่ปลอดภัย
+
+**ข้อ 12:** Implement Secure Password Reset Flow
+
+**ข้อ 13:** ตั้งค่า Content Security Policy (CSP) ใน Rails
+
+**ข้อ 14:** สร้าง Authorization System ด้วย Pundit
+
+**ข้อ 15:** Implement Audit Log สำหรับ Sensitive Operations
+
+**ข้อ 16:** ป้องกัน Directory Traversal Attack ใน File Operations
+
+**ข้อ 17:** สร้าง Secure Token Generation และ Comparison
+
+**ข้อ 18:** ใช้ brakeman วิเคราะห์ Rails App และแก้ไข Warnings
+
+**ข้อ 19:** Implement 2FA (Two-Factor Authentication) ด้วย TOTP
+
+**ข้อ 20:** ทำ Security Audit สำหรับ Rails App ขนาดเล็ก
 
 ---
 
-*ต่อไป: ตอนที่ 30 - Best Practices และ Code Quality*
+### เฉลยตัวอย่าง ข้อ 8: Rate Limiter สำหรับ Login
+
+```ruby
+# Rate Limiter ใน Rails ด้วย Redis
+
+class LoginRateLimiter
+  MAX_ATTEMPTS = 5
+  LOCKOUT_TIME = 30.minutes
+  WINDOW_SIZE  = 1.hour
+  
+  def initialize(redis: Redis.new)
+    @redis = redis
+  end
+  
+  def allow_attempt?(identifier)
+    !locked?(identifier)
+  end
+  
+  def record_failure!(identifier)
+    key = failure_key(identifier)
+    
+    @redis.multi do
+      @redis.incr(key)
+      @redis.expire(key, WINDOW_SIZE.to_i)
+    end
+    
+    if failure_count(identifier) >= MAX_ATTEMPTS
+      lock!(identifier)
+    end
+  end
+  
+  def record_success!(identifier)
+    @redis.del(failure_key(identifier))
+    @redis.del(lock_key(identifier))
+  end
+  
+  def failure_count(identifier)
+    @redis.get(failure_key(identifier)).to_i
+  end
+  
+  def locked?(identifier)
+    @redis.exists(lock_key(identifier)) > 0
+  end
+  
+  def remaining_lockout_time(identifier)
+    ttl = @redis.ttl(lock_key(identifier))
+    ttl > 0 ? ttl : 0
+  end
+  
+  private
+  
+  def failure_key(identifier)
+    "login_failures:#{identifier}"
+  end
+  
+  def lock_key(identifier)
+    "login_lock:#{identifier}"
+  end
+  
+  def lock!(identifier)
+    @redis.setex(lock_key(identifier), LOCKOUT_TIME.to_i, '1')
+  end
+end
+
+# Controller
+class SessionsController < ApplicationController
+  def create
+    identifier = login_identifier
+    limiter    = LoginRateLimiter.new
+    
+    unless limiter.allow_attempt?(identifier)
+      remaining = limiter.remaining_lockout_time(identifier)
+      
+      render json: {
+        error: "บัญชีถูกล็อค กรุณารอ #{remaining / 60} นาที"
+      }, status: :too_many_requests
+      return
+    end
+    
+    user = User.find_by(email: params[:email])
+    
+    if user&.authenticate(params[:password])
+      limiter.record_success!(identifier)
+      
+      session[:user_id] = user.id
+      redirect_to dashboard_path
+    else
+      limiter.record_failure!(identifier)
+      
+      attempts = limiter.failure_count(identifier)
+      remaining_attempts = LoginRateLimiter::MAX_ATTEMPTS - attempts
+      
+      flash.now[:error] = if remaining_attempts > 0
+        "Email หรือ Password ไม่ถูกต้อง (เหลือ #{remaining_attempts} ครั้ง)"
+      else
+        "บัญชีถูกล็อค กรุณารอ 30 นาที"
+      end
+      
+      render :new, status: :unprocessable_entity
+    end
+  end
+  
+  private
+  
+  def login_identifier
+    # ใช้ IP + Email เพื่อป้องกัน Brute Force
+    "#{request.ip}:#{params[:email]&.downcase}"
+  end
+end
+
+# Rack Middleware สำหรับ Rate Limiting (Rack::Attack)
+gem 'rack-attack'
+
+# config/initializers/rack_attack.rb
+class Rack::Attack
+  # Throttle: 10 requests per minute per IP
+  throttle('req/ip', limit: 10, period: 1.minute) do |req|
+    req.ip
+  end
+  
+  # Throttle: Login Attempts
+  throttle('logins/ip', limit: 5, period: 20.seconds) do |req|
+    if req.path == '/session' && req.post?
+      req.ip
+    end
+  end
+  
+  # Block Known Attackers
+  blocklist('block bad actors') do |req|
+    BlockedIP.exists?(ip: req.ip)
+  end
+  
+  # Custom Response
+  self.throttled_responder = lambda do |req|
+    [
+      429,
+      { 'Content-Type' => 'application/json' },
+      [{ error: 'Too Many Requests' }.to_json]
+    ]
+  end
+end
+```
+
+---
+
+*สรุปบทที่ 29: Security เป็นเรื่องที่ไม่สามารถมองข้ามได้ การใช้ Input Validation, Parameterized Queries, Secure Password Hashing, CSRF Protection และ Rate Limiting เป็นพื้นฐานที่ต้องทำ bundler-audit และ brakeman ช่วยตรวจสอบ Vulnerabilities โดยอัตโนมัติ ควรทำ Security Audit เป็นประจำ*
