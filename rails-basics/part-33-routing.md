@@ -1,1727 +1,1332 @@
-# Part 33: Routing (ขั้นตอนที่ 706-730)
+# ตอนที่ 33: Routing (Steps 706-730)
 
 ## บทนำ
 
-Routing ใน Rails คือระบบที่แมป HTTP requests ไปยัง controller actions ถ้า application เปรียบเป็นอาคาร routing ก็คือแผนผังที่บอกว่า request ไหนควรไปห้องไหน
+Routing เป็นส่วนที่กำหนดว่า URL ไหนจะถูก handle โดย controller และ action ไหน ใน Rails routing ถูกกำหนดในไฟล์ `config/routes.rb` ซึ่งเป็น Ruby DSL (Domain Specific Language) ที่อ่านง่ายและทรงพลัง
 
 ---
 
-## ขั้นตอนที่ 706: routes.rb Basics
-
-### โครงสร้างพื้นฐาน
+## Step 706: routes.rb - ไฟล์หลักของ Routing
 
 ```ruby
 # config/routes.rb
 Rails.application.routes.draw do
-  # ทุก routes จะอยู่ในบล็อกนี้
-
-  # GET /articles → ArticlesController#index
-  get "/articles", to: "articles#index"
-
-  # GET /articles/new → ArticlesController#new
-  get "/articles/new", to: "articles#new", as: :new_article
-
-  # POST /articles → ArticlesController#create
-  post "/articles", to: "articles#create"
-
-  # GET /articles/:id → ArticlesController#show
-  get "/articles/:id", to: "articles#show", as: :article
-
-  # GET /articles/:id/edit → ArticlesController#edit
-  get "/articles/:id/edit", to: "articles#edit", as: :edit_article
-
-  # PATCH /articles/:id → ArticlesController#update
-  patch "/articles/:id", to: "articles#update"
-
-  # PUT /articles/:id → ArticlesController#update (Rails support ทั้งคู่)
-  put "/articles/:id", to: "articles#update"
-
-  # DELETE /articles/:id → ArticlesController#destroy
-  delete "/articles/:id", to: "articles#destroy"
+  # Routes ทั้งหมดถูกกำหนดใน block นี้
+  
+  # RESTful resources
+  resources :posts
+  
+  # Root route
+  root "pages#home"
+  
+  # Custom route
+  get "/about", to: "pages#about"
 end
 ```
 
-### HTTP Verbs ใน Rails
+### ดู Routes ทั้งหมด
 
-```ruby
-# config/routes.rb
-Rails.application.routes.draw do
-  # GET - อ่านข้อมูล
-  get "/profile", to: "profiles#show"
+```bash
+# ดู routes ทั้งหมด
+rails routes
 
-  # POST - สร้างข้อมูลใหม่
-  post "/articles", to: "articles#create"
+# ดูเฉพาะ routes ที่เกี่ยวกับ posts
+rails routes -c posts
 
-  # PUT - อัพเดทข้อมูลทั้งหมด (replace)
-  put "/articles/:id", to: "articles#update"
+# ดู routes ที่ match pattern
+rails routes | grep post
 
-  # PATCH - อัพเดทข้อมูลบางส่วน (partial update)
-  patch "/articles/:id", to: "articles#update"
-
-  # DELETE - ลบข้อมูล
-  delete "/articles/:id", to: "articles#destroy"
-
-  # HEAD - เหมือน GET แต่ไม่มี body
-  # (Rails handle ให้อัตโนมัติเมื่อมี GET route)
-
-  # OPTIONS - ตรวจสอบ CORS
-  # (จัดการผ่าน rack-cors middleware)
-end
+# ดูใน browser (development เท่านั้น)
+# http://localhost:3000/rails/info/routes
 ```
 
 ---
 
-## ขั้นตอนที่ 707: RESTful Routes (resources)
-
-### resources helper
+## Step 707: resources :posts (7 RESTful Routes)
 
 ```ruby
 # config/routes.rb
-Rails.application.routes.draw do
-  resources :articles
-end
+resources :posts
 ```
 
-คำสั่งเดียวนี้สร้าง 7 routes:
+คำสั่งนี้สร้าง routes 7 เส้นทาง:
 
-```
-GET    /articles          articles#index   articles_path
-GET    /articles/new      articles#new     new_article_path
-POST   /articles          articles#create  articles_path
-GET    /articles/:id      articles#show    article_path(id)
-GET    /articles/:id/edit articles#edit    edit_article_path(id)
-PATCH  /articles/:id      articles#update  article_path(id)
-DELETE /articles/:id      articles#destroy article_path(id)
+| HTTP Method | Path | Controller#Action | Named Route | ความหมาย |
+|------------|------|-------------------|-------------|----------|
+| GET | /posts | posts#index | posts_path | แสดงรายการ posts ทั้งหมด |
+| GET | /posts/new | posts#new | new_post_path | แสดงฟอร์มสร้าง post ใหม่ |
+| POST | /posts | posts#create | posts_path | สร้าง post ใหม่ |
+| GET | /posts/:id | posts#show | post_path | แสดง post เฉพาะ |
+| GET | /posts/:id/edit | posts#edit | edit_post_path | แสดงฟอร์มแก้ไข post |
+| PATCH/PUT | /posts/:id | posts#update | post_path | อัปเดต post เฉพาะ |
+| DELETE | /posts/:id | posts#destroy | post_path | ลบ post เฉพาะ |
+
+```bash
+# Output จาก rails routes
+   Prefix  Verb    URI Pattern                 Controller#Action
+    posts  GET     /posts(.:format)            posts#index
+           POST    /posts(.:format)            posts#create
+ new_post  GET     /posts/new(.:format)        posts#new
+edit_post  GET     /posts/:id/edit(.:format)   posts#edit
+     post  GET     /posts/:id(.:format)        posts#show
+           PATCH   /posts/:id(.:format)        posts#update
+           PUT     /posts/:id(.:format)        posts#update
+           DELETE  /posts/:id(.:format)        posts#destroy
 ```
 
-### only และ except
+### ใช้ Named Routes ใน Views
+
+```erb
+<!-- app/views/posts/index.html.erb -->
+
+<!-- Link to index -->
+<%= link_to "All Posts", posts_path %>
+<!-- => <a href="/posts">All Posts</a> -->
+
+<!-- Link to show -->
+<%= link_to "Show", post_path(@post) %>
+<%= link_to "Show", post_path(id: @post.id) %>
+<!-- => <a href="/posts/1">Show</a> -->
+
+<!-- Link to new -->
+<%= link_to "New Post", new_post_path %>
+<!-- => <a href="/posts/new">New Post</a> -->
+
+<!-- Link to edit -->
+<%= link_to "Edit", edit_post_path(@post) %>
+<!-- => <a href="/posts/1/edit">Edit</a> -->
+
+<!-- Delete -->
+<%= link_to "Delete", post_path(@post), 
+    data: { turbo_method: :delete, turbo_confirm: "แน่ใจ?" } %>
+```
+
+### ใช้ Named Routes ใน Controllers
 
 ```ruby
-Rails.application.routes.draw do
-  # เฉพาะ actions ที่ระบุ
-  resources :articles, only: [:index, :show]
-  # สร้างเฉพาะ:
-  # GET /articles        → index
-  # GET /articles/:id    → show
-
-  # ยกเว้น actions ที่ระบุ
-  resources :categories, except: [:destroy]
-  # สร้างทุก route ยกเว้น DELETE
-
-  # Read-only resources
-  resources :tags, only: [:index, :show]
-
-  # Write-only resources (ไม่ค่อยใช้)
-  resources :events, only: [:create, :update, :destroy]
-end
-```
-
-### resource (singular)
-
-```ruby
-Rails.application.routes.draw do
-  # resource (singular) - ไม่มี :id
-  # ใช้เมื่อ resource มีแค่ 1 ต่อ user เช่น profile
-  resource :profile
-  # สร้าง:
-  # GET    /profile/new   → new
-  # POST   /profile       → create
-  # GET    /profile       → show (ไม่มี :id!)
-  # GET    /profile/edit  → edit
-  # PATCH  /profile       → update
-  # DELETE /profile       → destroy
-
-  # ตัวอย่างการใช้:
-  # current_user.profile → แค่ 1 profile ต่อ user
-end
-```
-
----
-
-## ขั้นตอนที่ 708: Named Routes
-
-### การตั้งชื่อ Routes
-
-```ruby
-Rails.application.routes.draw do
-  # as: กำหนดชื่อ route helper
-  get "/about", to: "pages#about", as: :about_us
-  # สร้าง: about_us_path, about_us_url
-
-  get "/contact", to: "pages#contact", as: :contact_page
-  # สร้าง: contact_page_path, contact_page_url
-
-  # Default names จาก resources:
-  resources :articles
-  # articles_path, article_path(id), new_article_path, edit_article_path(id)
-
-  # Custom names ด้วย as:
-  resources :blog_posts, as: :posts
-  # posts_path, post_path(id), new_post_path, edit_post_path(id)
-end
-```
-
-### การใช้ Route Helpers
-
-```ruby
-# ใน Controllers
-class ArticlesController < ApplicationController
+class PostsController < ApplicationController
   def create
-    @article = Article.create!(article_params)
-    redirect_to article_path(@article)  # หรือ redirect_to @article
-    # หรือ
-    redirect_to articles_path  # ไปที่ index
+    @post = Post.new(post_params)
+    if @post.save
+      redirect_to @post         # => /posts/:id
+      redirect_to post_path(@post)  # เหมือนกัน
+      redirect_to posts_path    # => /posts
+    end
   end
-end
-
-# ใน Views
-# _path → relative path (แนะนำสำหรับ links ใน app)
-# _url  → absolute URL (ต้องใช้ในอีเมล, external links)
-
-# link_to helpers
-link_to "Articles", articles_path
-link_to "New Article", new_article_path
-link_to "Show", article_path(@article)
-link_to "Edit", edit_article_path(@article)
-
-# Form action
-form_with(url: articles_path, method: :post)
-form_with(url: article_path(@article), method: :patch)
-
-# ใน Mailers (ต้องใช้ _url)
-article_url(@article)  # https://myapp.com/articles/1
-```
-
-### url_for
-
-```ruby
-# url_for เป็น flexible way สร้าง URL
-url_for(controller: "articles", action: "show", id: 1)
-# => "/articles/1"
-
-url_for(@article)
-# => "/articles/1"
-
-url_for(action: :new)
-# => "/articles/new" (ถ้าอยู่ใน ArticlesController)
-
-# ใน models (ต้องการ Rails.application.routes.url_helpers)
-class Article < ApplicationRecord
-  include Rails.application.routes.url_helpers
-
-  def share_url
-    article_url(self, host: "myapp.com")
+  
+  def destroy
+    @post.destroy
+    redirect_to posts_path, notice: "ลบสำเร็จ"
   end
 end
 ```
 
 ---
 
-## ขั้นตอนที่ 709: Nested Routes
+## Step 708: resources with only/except
 
-### Basic Nesting
+### only: - ระบุ actions ที่ต้องการ
 
 ```ruby
-Rails.application.routes.draw do
-  resources :articles do
-    resources :comments
-  end
-end
+# config/routes.rb
+# สร้างเฉพาะ routes ที่ระบุ
+resources :posts, only: [:index, :show]
+# สร้าง:
+# GET /posts       => posts#index
+# GET /posts/:id   => posts#show
 
-# สร้าง routes:
-# GET    /articles/:article_id/comments          comments#index
-# GET    /articles/:article_id/comments/new      comments#new
-# POST   /articles/:article_id/comments          comments#create
-# GET    /articles/:article_id/comments/:id      comments#show
-# GET    /articles/:article_id/comments/:id/edit comments#edit
-# PATCH  /articles/:article_id/comments/:id      comments#update
-# DELETE /articles/:article_id/comments/:id      comments#destroy
-
-# Route helpers:
-# article_comments_path(@article)
-# new_article_comment_path(@article)
-# article_comment_path(@article, @comment)
-# edit_article_comment_path(@article, @comment)
+resources :articles, only: :index
+# สร้าง:
+# GET /articles    => articles#index
 ```
 
-### Controller สำหรับ Nested Routes
+### except: - ระบุ actions ที่ไม่ต้องการ
+
+```ruby
+# ยกเว้น actions ที่ระบุ
+resources :posts, except: [:destroy]
+# สร้างทุก routes ยกเว้น DELETE /posts/:id
+
+resources :tags, except: [:new, :edit, :create, :update, :destroy]
+# เหมือนกับ only: [:index, :show]
+```
+
+### ตัวอย่างการใช้งานจริง
+
+```ruby
+# config/routes.rb
+Rails.application.routes.draw do
+  # Blog - ผู้ใช้อ่านได้อย่างเดียว
+  resources :posts, only: [:index, :show]
+  
+  # Comments - สร้างและลบได้ แต่ไม่ edit
+  resources :comments, except: [:edit, :update]
+  
+  # Tags - เฉพาะ list
+  resources :tags, only: :index
+  
+  # Admin can do everything
+  namespace :admin do
+    resources :posts  # ทุก actions
+  end
+end
+```
+
+---
+
+## Step 709: Named Routes (as:)
+
+```ruby
+# config/routes.rb
+Rails.application.routes.draw do
+  # กำหนดชื่อ route
+  get "/home", to: "pages#home", as: :homepage
+  # => homepage_path, homepage_url
+  
+  get "/about-us", to: "pages#about", as: :about_us
+  # => about_us_path, about_us_url
+  
+  get "/contact", to: "contacts#new", as: :contact_form
+  # => contact_form_path
+  
+  post "/contact", to: "contacts#create"
+  
+  # Login/Logout routes
+  get "/login", to: "sessions#new", as: :login
+  delete "/logout", to: "sessions#destroy", as: :logout
+  
+  # Profile
+  get "/profile", to: "users#profile", as: :profile
+  patch "/profile", to: "users#update_profile"
+}
+```
+
+### ใช้ named routes
+
+```ruby
+# ใน controller
+redirect_to homepage_path
+redirect_to login_url  # full URL รวม host
+
+# ใน views
+<%= link_to "Home", homepage_path %>
+<%= link_to "Login", login_path %>
+<%= link_to "Contact Us", contact_form_path %>
+
+# ใน mailers (ต้องใช้ _url)
+link = homepage_url  # http://example.com/home
+```
+
+---
+
+## Step 710: Nested Resources
+
+```ruby
+# config/routes.rb
+resources :posts do
+  resources :comments
+end
+```
+
+สร้าง routes:
+
+```
+                      Prefix  Verb    URI Pattern                                   Controller#Action
+         post_comments  GET     /posts/:post_id/comments(.:format)                  comments#index
+                        POST    /posts/:post_id/comments(.:format)                  comments#create
+      new_post_comment  GET     /posts/:post_id/comments/new(.:format)              comments#new
+     edit_post_comment  GET     /posts/:post_id/comments/:id/edit(.:format)         comments#edit
+          post_comment  GET     /posts/:post_id/comments/:id(.:format)              comments#show
+                        PATCH   /posts/:post_id/comments/:id(.:format)              comments#update
+                        PUT     /posts/:post_id/comments/:id(.:format)              comments#update
+                        DELETE  /posts/:post_id/comments/:id(.:format)              comments#destroy
+```
+
+### ใช้ nested routes
 
 ```ruby
 # app/controllers/comments_controller.rb
 class CommentsController < ApplicationController
-  before_action :set_article
-  before_action :set_comment, only: [:show, :edit, :update, :destroy]
-
+  before_action :set_post
+  
   def index
-    @comments = @article.comments.includes(:user).order(created_at: :asc)
+    @comments = @post.comments
   end
-
-  def new
-    @comment = @article.comments.build
-  end
-
+  
   def create
-    @comment = @article.comments.build(comment_params)
-    @comment.user = current_user
-
+    @comment = @post.comments.new(comment_params)
     if @comment.save
-      redirect_to article_path(@article), notice: "Comment added!"
-    else
-      render :new, status: :unprocessable_entity
+      redirect_to post_comments_path(@post)
     end
   end
-
-  def edit
-  end
-
-  def update
-    if @comment.update(comment_params)
-      redirect_to article_path(@article), notice: "Comment updated!"
-    else
-      render :edit, status: :unprocessable_entity
-    end
-  end
-
-  def destroy
-    @comment.destroy
-    redirect_to article_path(@article), notice: "Comment deleted!"
-  end
-
+  
   private
-
-  def set_article
-    @article = Article.find(params[:article_id])
-  end
-
-  def set_comment
-    @comment = @article.comments.find(params[:id])
-  end
-
-  def comment_params
-    params.require(:comment).permit(:body)
+  
+  def set_post
+    @post = Post.find(params[:post_id])
   end
 end
 ```
 
-### Shallow Nesting
+```erb
+<!-- ใน views -->
+<%= link_to "Comments", post_comments_path(@post) %>
+<%= link_to "New Comment", new_post_comment_path(@post) %>
+<%= link_to "Show", post_comment_path(@post, @comment) %>
+```
+
+### หลายระดับของ Nesting
 
 ```ruby
-Rails.application.routes.draw do
-  # Shallow nesting - ลด URL complexity
-  resources :articles do
-    resources :comments, shallow: true
-  end
-end
-
-# สร้าง routes:
-# GET    /articles/:article_id/comments      comments#index
-# GET    /articles/:article_id/comments/new  comments#new
-# POST   /articles/:article_id/comments      comments#create
-# GET    /comments/:id                       comments#show     (shallow!)
-# GET    /comments/:id/edit                  comments#edit     (shallow!)
-# PATCH  /comments/:id                       comments#update   (shallow!)
-# DELETE /comments/:id                       comments#destroy  (shallow!)
-
-# หรือใช้ shallow block:
-resources :articles do
-  shallow do
+# config/routes.rb
+resources :blogs do
+  resources :posts do
     resources :comments
-    resources :likes
   end
 end
+
+# สร้าง routes เช่น:
+# /blogs/:blog_id/posts/:post_id/comments
+# blog_post_comments_path(blog, post)
 ```
 
-### Deep Nesting (ไม่แนะนำ)
+**แนะนำ:** อย่า nest เกิน 2 ระดับ เพราะจะทำให้ URL ยาวและ code ซับซ้อน
+
+---
+
+## Step 711: Shallow Nested Resources
+
+Shallow nested routes ช่วยลดความซับซ้อนของ URLs ที่ไม่จำเป็น
 
 ```ruby
-# ❌ ไม่แนะนำ - nested มากกว่า 2 ระดับ
-resources :users do
-  resources :articles do
-    resources :comments do
-      resources :likes  # URL ยาวเกินไป: /users/1/articles/2/comments/3/likes/4
-    end
-  end
-end
-
-# ✅ แนะนำ - ใช้ shallow หรือ restructure
-resources :articles do
+# config/routes.rb
+resources :posts do
   resources :comments, shallow: true
 end
-
-resources :comments do
-  resources :likes, shallow: true
-end
 ```
 
----
-
-## ขั้นตอนที่ 710: Namespace และ Scope
-
-### Namespace
-
-```ruby
-Rails.application.routes.draw do
-  namespace :admin do
-    root "dashboard#index"
-    resources :articles
-    resources :users
-    resources :categories
-  end
-end
-
-# สร้าง routes:
-# GET /admin/articles → Admin::ArticlesController#index
-# URL prefix: /admin/
-# Module prefix: Admin::
-# Helper prefix: admin_articles_path
-
-# Controller:
-# app/controllers/admin/articles_controller.rb
-module Admin
-  class ArticlesController < ApplicationController
-    # ...
-  end
-end
-
-# หรือ:
-class Admin::ArticlesController < ApplicationController
-  # ...
-end
-```
-
-### Scope
+สร้าง:
+- `/posts/:post_id/comments` => comments#index (ต้องการ post_id)
+- `/posts/:post_id/comments/new` => comments#new (ต้องการ post_id)
+- `/posts/:post_id/comments` (POST) => comments#create (ต้องการ post_id)
+- `/comments/:id` => comments#show (ไม่ต้องการ post_id)
+- `/comments/:id/edit` => comments#edit (ไม่ต้องการ post_id)
+- `/comments/:id` (PATCH) => comments#update (ไม่ต้องการ post_id)
+- `/comments/:id` (DELETE) => comments#destroy (ไม่ต้องการ post_id)
 
 ```ruby
-Rails.application.routes.draw do
-  # scope - เพิ่ม URL prefix เท่านั้น (ไม่เปลี่ยน module/helper)
-  scope "/admin" do
-    resources :articles  # URL: /admin/articles
-    # Controller: ArticlesController (ไม่มี Admin::)
-    # Helper: articles_path (ไม่มี admin_)
-  end
-
-  # scope :module - เปลี่ยน module เท่านั้น (ไม่เปลี่ยน URL)
-  scope module: :admin do
-    resources :articles  # URL: /articles
-    # Controller: Admin::ArticlesController
-    # Helper: articles_path
-  end
-
-  # scope :as - เปลี่ยน helper prefix เท่านั้น
-  scope as: :admin do
-    resources :articles  # URL: /articles
-    # Controller: ArticlesController
-    # Helper: admin_articles_path
-  end
-
-  # รวมทั้งหมด = namespace
-  scope "/admin", module: :admin, as: :admin do
-    resources :articles
-    # URL: /admin/articles
-    # Controller: Admin::ArticlesController
-    # Helper: admin_articles_path
-  end
-end
-```
-
-### ตัวอย่าง Namespace ใน Production App
-
-```ruby
-Rails.application.routes.draw do
-  # Public routes
-  root "home#index"
-  resources :articles, only: [:index, :show]
-
-  # Authentication
-  devise_for :users, controllers: {
-    sessions: "users/sessions",
-    registrations: "users/registrations",
-    passwords: "users/passwords"
-  }
-
-  # User dashboard
-  namespace :dashboard do
-    root "overview#index"
-    resources :articles
-    resources :profile, only: [:show, :edit, :update]
-    resources :notifications, only: [:index, :update]
-  end
-
-  # Admin panel
-  namespace :admin do
-    root "dashboard#index"
-    resources :articles
-    resources :users
-    resources :categories
-    resources :tags
-    resources :settings, only: [:index, :update]
-
-    namespace :reports do
-      get :traffic
-      get :revenue
-      get :users
-    end
-  end
-
-  # API
-  namespace :api do
-    namespace :v1 do
-      resources :articles, only: [:index, :show, :create, :update, :destroy]
-      resources :users, only: [:show]
-
-      namespace :auth do
-        post :login
-        post :logout
-        post :refresh
-      end
-    end
-
-    namespace :v2 do
-      resources :articles
-    end
-  end
-end
-```
-
----
-
-## ขั้นตอนที่ 711: Custom Routes
-
-### Collection Routes
-
-```ruby
-Rails.application.routes.draw do
-  resources :articles do
-    # Collection routes - ไม่ต้องการ :id
-    collection do
-      get :search        # GET /articles/search
-      get :popular       # GET /articles/popular
-      get :trending      # GET /articles/trending
-      post :bulk_delete  # POST /articles/bulk_delete
-      patch :bulk_update # PATCH /articles/bulk_update
-    end
-  end
-end
-
-# Controller:
-class ArticlesController < ApplicationController
-  def search
-    @articles = Article.search(params[:q])
-    render :index
-  end
-
-  def popular
-    @articles = Article.popular.limit(20)
-    render :index
-  end
-
-  def bulk_delete
-    Article.where(id: params[:ids]).destroy_all
-    redirect_to articles_path, notice: "Articles deleted"
-  end
-end
-```
-
-### Member Routes
-
-```ruby
-Rails.application.routes.draw do
-  resources :articles do
-    # Member routes - ต้องการ :id
-    member do
-      post :publish      # POST /articles/:id/publish
-      post :unpublish    # POST /articles/:id/unpublish
-      post :archive      # POST /articles/:id/archive
-      get  :preview      # GET /articles/:id/preview
-      post :duplicate    # POST /articles/:id/duplicate
-    end
-  end
-end
-
-# Short form:
-resources :articles do
-  post :publish, on: :member
-  post :unpublish, on: :member
-  get :preview, on: :member
-  get :search, on: :collection
-end
-
-# Controller:
-class ArticlesController < ApplicationController
-  before_action :set_article, only: [:publish, :unpublish, :archive, :preview, :duplicate]
-
-  def publish
-    @article.publish!
-    redirect_to @article, notice: "Article published!"
-  end
-
-  def unpublish
-    @article.update!(status: "draft")
-    redirect_to @article, notice: "Article unpublished"
-  end
-
-  def preview
-    render :show  # แสดง preview โดยไม่ต้อง publish
-  end
-
-  def duplicate
-    new_article = @article.dup
-    new_article.title = "Copy of #{@article.title}"
-    new_article.status = "draft"
-    new_article.save!
-    redirect_to edit_article_path(new_article), notice: "Article duplicated!"
-  end
-end
-```
-
----
-
-## ขั้นตอนที่ 712: Root Route
-
-```ruby
-Rails.application.routes.draw do
-  # Root route
-  root "home#index"
-  # GET / → HomeController#index
-  # root_path, root_url
-
-  # Authenticated root
-  # ใช้ Devise helper authenticated:
-  authenticated :user do
-    root "dashboard#index", as: :authenticated_root
-  end
-
-  unauthenticated do
-    root "home#index"
-  end
-
-  # หรือ handle ใน controller:
-  root "home#index"
-  # ใน HomeController:
-  # def index
-  #   redirect_to dashboard_path if user_signed_in?
-  # end
-end
-```
-
----
-
-## ขั้นตอนที่ 713: Constraints
-
-### Pattern Constraints
-
-```ruby
-Rails.application.routes.draw do
-  # Format constraint - :id ต้องเป็นตัวเลขเท่านั้น
-  resources :articles, constraints: { id: /\d+/ }
-
-  # Custom path constraint
-  get "/users/:username",
-    to: "users#show",
-    constraints: { username: /[a-zA-Z0-9_]+/ },
-    as: :user_profile
-
-  # Subdomain constraint
-  constraints subdomain: "api" do
-    namespace :api do
-      resources :articles
-    end
-  end
-
-  # Format constraint
-  resources :articles, constraints: { format: "json" }
-end
-```
-
-### Custom Constraint Class
-
-```ruby
-# app/constraints/admin_constraint.rb
-class AdminConstraint
-  def matches?(request)
-    return false unless request.session[:user_id]
-    user = User.find_by(id: request.session[:user_id])
-    user&.admin?
-  end
-end
-
-# config/routes.rb
-Rails.application.routes.draw do
-  namespace :admin, constraints: AdminConstraint.new do
-    resources :articles
-    resources :users
-  end
-end
-```
-
-```ruby
-# Lambda constraint
-Rails.application.routes.draw do
-  constraints ->(req) { req.env["HTTP_USER_AGENT"] !~ /MSIE/ } do
-    resources :articles
-  end
-
-  # IP constraint
-  constraints ip: /127\.0\.0\.1/ do
-    get "/debug", to: "debug#index"
-  end
-end
-```
-
----
-
-## ขั้นตอนที่ 714: Route Helpers (_path, _url)
-
-### _path vs _url
-
-```ruby
-# _path = relative path (เริ่มด้วย /)
-articles_path          # => "/articles"
-article_path(1)        # => "/articles/1"
-new_article_path       # => "/articles/new"
-edit_article_path(1)   # => "/articles/1/edit"
-
-# _url = absolute URL (มี protocol + host)
-articles_url           # => "http://localhost:3000/articles"
-article_url(1)         # => "http://localhost:3000/articles/1"
-
-# เมื่อไหร่ใช้อะไร?
-# _path: ทั่วไปใน views และ controllers
-# _url: ใน emails, external redirects, API responses
-
-# ตัวอย่างใน Mailer (ต้องใช้ _url):
-class ArticleMailer < ApplicationMailer
-  def new_article(article)
-    @article = article
-    @article_url = article_url(article)  # ต้องใช้ _url
-    mail(to: "user@example.com", subject: "New Article")
-  end
-end
-```
-
-### Route Helpers กับ Parameters
-
-```ruby
-# ส่ง ID โดยตรง
-article_path(1)
-# => "/articles/1"
-
-# ส่ง object (Rails ใช้ to_param)
-article_path(@article)
-# => "/articles/42"
-
-# Nested routes
-article_comment_path(@article, @comment)
-# => "/articles/1/comments/5"
-
-# เพิ่ม query parameters
-articles_path(page: 2, sort: "title")
-# => "/articles?page=2&sort=title"
-
-# สร้าง path สำหรับ named routes
-about_path
-# => "/about"
-
-# format
-article_path(@article, format: :json)
-# => "/articles/1.json"
-
-# Anchor
-article_path(@article, anchor: "comments")
-# => "/articles/1#comments"
-```
-
-### url_options
-
-```ruby
-# ตั้งค่า default_url_options
-class ApplicationController < ActionController::Base
-  def default_url_options
-    { host: ENV["APP_HOST"] || "localhost:3000" }
-  end
-end
-
-# config/environments/development.rb
-config.action_mailer.default_url_options = {
-  host: "localhost",
-  port: 3000
-}
-
-# config/environments/production.rb
-config.action_mailer.default_url_options = {
-  host: "myapp.com",
-  protocol: "https"
-}
-```
-
----
-
-## ขั้นตอนที่ 715: Advanced Routes
-
-### Routes with Format
-
-```ruby
-Rails.application.routes.draw do
-  resources :articles, defaults: { format: :json }
-  # GET /articles → articles#index (JSON)
-
-  # Format-specific routes
-  resources :articles do
-    get :feed, on: :collection, defaults: { format: :atom }
-    # GET /articles/feed.atom
-  end
-end
-
-# Controller:
-class ArticlesController < ApplicationController
-  def index
-    @articles = Article.published
-
-    respond_to do |format|
-      format.html
-      format.json { render json: @articles }
-      format.atom { render layout: false }
-    end
-  end
-
-  def feed
-    @articles = Article.published.limit(20)
-    respond_to do |format|
-      format.atom { render layout: false }
-    end
-  end
-end
-```
-
-### Routes with Redirect
-
-```ruby
-Rails.application.routes.draw do
-  # Simple redirect
-  get "/home", to: redirect("/")
-
-  # Redirect กับ dynamic path
-  get "/articles/:id", to: redirect("/posts/%{id}")
-
-  # Redirect ด้วย proc
-  get "/search",
-    to: redirect { |params, request|
-      "/articles?q=#{request.query_parameters[:q]}"
-    }
-
-  # Redirect ด้วย status code (default 301)
-  get "/old-path", to: redirect("/new-path", status: 302)
-end
-```
-
-### Routes with Constraints และ Wildcards
-
-```ruby
-Rails.application.routes.draw do
-  # Wildcard segment
-  get "/articles/*slug", to: "articles#show_by_slug"
-  # จะ match: /articles/2024/my-article-title
-  # params[:slug] = "2024/my-article-title"
-
-  # Optional segment
-  get "/articles(/:year(/:month))", to: "articles#archive"
-  # จะ match:
-  # /articles
-  # /articles/2024
-  # /articles/2024/01
-
-  # Multiple optional segments
-  resources :articles do
-    get ":year/:month", on: :collection, to: "articles#archive", as: :archive
-    # GET /articles/2024/01 → articles#archive
-    # archive_articles_path(year: 2024, month: "01")
-  end
-end
-```
-
----
-
-## ขั้นตอนที่ 716: Route Concerns
-
-```ruby
-Rails.application.routes.draw do
-  # กำหนด concern
-  concern :commentable do
+# อีกวิธี - ใช้ shallow block
+shallow do
+  resources :posts do
     resources :comments
   end
-
-  concern :taggable do
-    resources :tags, only: [:index, :create, :destroy]
-  end
-
-  concern :likeable do
-    member do
-      post :like
-      post :unlike
-    end
-  end
-
-  # ใช้ concerns
-  resources :articles, concerns: [:commentable, :taggable, :likeable]
-  resources :photos, concerns: [:commentable, :likeable]
-  resources :videos, concerns: [:commentable, :taggable]
-end
-
-# สร้าง routes:
-# GET /articles/:article_id/comments
-# GET /articles/:article_id/tags
-# POST /articles/:id/like
-# GET /photos/:photo_id/comments
-# POST /photos/:id/like
-# etc.
-```
-
----
-
-## ขั้นตอนที่ 717: Routes สำหรับ API
-
-```ruby
-Rails.application.routes.draw do
-  namespace :api do
-    namespace :v1 do
-      # Resources สำหรับ API
-      resources :articles, only: [:index, :show, :create, :update, :destroy]
-      resources :users, only: [:show, :create, :update]
-
-      # Authentication
-      namespace :auth do
-        post :login
-        post :logout
-        post :register
-        post :refresh_token
-        post :forgot_password
-        put :reset_password
-      end
-
-      # Search
-      get "/search", to: "search#index"
-
-      # Health check
-      get "/health", to: "health#index"
-    end
-
-    namespace :v2 do
-      resources :articles
-    end
-  end
-end
-
-# API Controller:
-class Api::V1::ArticlesController < Api::BaseController
-  before_action :authenticate_api_user!
-  before_action :set_article, only: [:show, :update, :destroy]
-
-  def index
-    @articles = Article.published
-                       .page(params[:page])
-                       .per(params[:per_page] || 20)
-
-    render json: {
-      articles: @articles.as_json(include: :user),
-      meta: {
-        total: @articles.total_count,
-        page: @articles.current_page,
-        per_page: @articles.limit_value
-      }
-    }
-  end
-
-  def show
-    render json: @article.as_json(include: [:user, :tags, :comments])
-  end
-
-  def create
-    @article = current_api_user.articles.build(article_params)
-    if @article.save
-      render json: @article, status: :created
-    else
-      render json: { errors: @article.errors }, status: :unprocessable_entity
-    end
-  end
-
-  def update
-    if @article.update(article_params)
-      render json: @article
-    else
-      render json: { errors: @article.errors }, status: :unprocessable_entity
-    end
-  end
-
-  def destroy
-    @article.destroy
-    head :no_content
-  end
-
-  private
-
-  def set_article
-    @article = Article.find(params[:id])
-  end
-
-  def article_params
-    params.require(:article).permit(:title, :body, :status, tag_ids: [])
-  end
 end
 ```
 
 ---
 
-## ขั้นตอนที่ 718: Testing Routes
-
-### Route Tests ด้วย Minitest
-
-```ruby
-# test/routing/articles_routing_test.rb
-require "test_helper"
-
-class ArticlesRoutingTest < ActionDispatch::IntegrationTest
-  test "routes to articles#index" do
-    assert_routing "/articles", controller: "articles", action: "index"
-  end
-
-  test "routes to articles#show" do
-    assert_routing "/articles/1", controller: "articles", action: "show", id: "1"
-  end
-
-  test "routes to articles#new" do
-    assert_routing "/articles/new", controller: "articles", action: "new"
-  end
-
-  test "routes to articles#create" do
-    assert_routing({ method: "post", path: "/articles" },
-      { controller: "articles", action: "create" })
-  end
-
-  test "routes to articles#edit" do
-    assert_routing "/articles/1/edit",
-      controller: "articles", action: "edit", id: "1"
-  end
-
-  test "routes to articles#update via patch" do
-    assert_routing({ method: "patch", path: "/articles/1" },
-      { controller: "articles", action: "update", id: "1" })
-  end
-
-  test "routes to articles#destroy" do
-    assert_routing({ method: "delete", path: "/articles/1" },
-      { controller: "articles", action: "destroy", id: "1" })
-  end
-
-  test "routes recognizes articles path" do
-    assert_recognizes(
-      { controller: "articles", action: "index" },
-      "/articles"
-    )
-  end
-
-  test "generates articles path" do
-    assert_generates "/articles", controller: "articles", action: "index"
-    assert_generates "/articles/1", controller: "articles", action: "show", id: "1"
-  end
-end
-```
-
-### Route Tests ด้วย RSpec
-
-```ruby
-# spec/routing/articles_routing_spec.rb
-require "rails_helper"
-
-RSpec.describe "Articles routing", type: :routing do
-  describe "routing" do
-    it "routes GET /articles to articles#index" do
-      expect(get: "/articles").to route_to("articles#index")
-    end
-
-    it "routes GET /articles/1 to articles#show" do
-      expect(get: "/articles/1").to route_to(
-        controller: "articles",
-        action: "show",
-        id: "1"
-      )
-    end
-
-    it "routes POST /articles to articles#create" do
-      expect(post: "/articles").to route_to("articles#create")
-    end
-
-    it "routes PATCH /articles/1 to articles#update" do
-      expect(patch: "/articles/1").to route_to(
-        controller: "articles",
-        action: "update",
-        id: "1"
-      )
-    end
-
-    it "routes DELETE /articles/1 to articles#destroy" do
-      expect(delete: "/articles/1").to route_to(
-        controller: "articles",
-        action: "destroy",
-        id: "1"
-      )
-    end
-
-    it "routes to admin namespace" do
-      expect(get: "/admin/articles").to route_to("admin/articles#index")
-    end
-
-    it "does not route to non-existent paths" do
-      expect(get: "/invalid-path").not_to be_routable
-    end
-  end
-
-  describe "named routes" do
-    it "generates articles_path" do
-      expect(articles_path).to eq("/articles")
-    end
-
-    it "generates article_path" do
-      expect(article_path(id: 1)).to eq("/articles/1")
-    end
-
-    it "generates new_article_path" do
-      expect(new_article_path).to eq("/articles/new")
-    end
-
-    it "generates edit_article_path" do
-      expect(edit_article_path(id: 1)).to eq("/articles/1/edit")
-    end
-  end
-end
-```
-
----
-
-## ขั้นตอนที่ 719-730: Routes Best Practices
-
-### ตัวอย่าง routes.rb ที่สมบูรณ์
+## Step 712: Namespace (Admin Namespace)
 
 ```ruby
 # config/routes.rb
-Rails.application.routes.draw do
-  # ===== Health Check =====
-  get "/health", to: "health#show", as: :health_check
+namespace :admin do
+  resources :posts
+  resources :users
+  resources :categories
+end
+```
 
-  # ===== Static Pages =====
-  get "/about",   to: "pages#about",   as: :about
-  get "/contact", to: "pages#contact", as: :contact
-  get "/privacy", to: "pages#privacy", as: :privacy
-  get "/terms",   to: "pages#terms",   as: :terms
+สร้าง routes:
+- `/admin/posts` => `admin/posts#index`
+- `/admin/posts/:id` => `admin/posts#show`
+- ฯลฯ
 
-  # ===== Authentication =====
-  devise_for :users, controllers: {
-    sessions: "users/sessions",
-    registrations: "users/registrations",
-    passwords: "users/passwords",
-    confirmations: "users/confirmations"
-  }
+Named routes: `admin_posts_path`, `admin_post_path(post)`
 
-  # ===== Root =====
-  authenticated :user do
-    root "dashboard#index", as: :authenticated_root
-  end
-  root "home#index"
+### Admin Controller Structure
 
-  # ===== Public Resources =====
-  resources :articles, only: [:index, :show] do
-    collection do
-      get :search
-      get :popular
-    end
-
-    resources :comments, only: [:create, :destroy]
-  end
-
-  resources :categories, only: [:index, :show]
-  resources :tags, only: [:index, :show]
-
-  # ===== User Dashboard =====
-  namespace :dashboard do
-    root "overview#index"
-
-    resources :articles do
-      member do
-        post :publish
-        post :unpublish
-        post :archive
-        get :preview
-      end
-    end
-
-    resource :profile, only: [:show, :edit, :update]
-    resources :notifications, only: [:index, :update] do
-      collection do
-        patch :mark_all_read
-      end
-    end
-  end
-
-  # ===== Admin Panel =====
-  namespace :admin, constraints: AdminConstraint.new do
-    root "dashboard#index"
-
-    resources :articles do
-      collection do
-        get :pending
-        post :bulk_approve
-      end
-    end
-
-    resources :users do
-      member do
-        post :suspend
-        post :activate
-        post :make_admin
-      end
-    end
-
-    resources :categories
-    resources :tags
-    resources :settings, only: [:index, :update]
-
-    namespace :reports do
-      get :traffic,  to: "traffic#index"
-      get :revenue,  to: "revenue#index"
-      get :users,    to: "users#index"
-      get :articles, to: "articles#index"
-    end
-  end
-
-  # ===== API =====
-  namespace :api, defaults: { format: :json } do
-    namespace :v1 do
-      # Authentication
-      namespace :auth do
-        post :login
-        post :logout
-        post :register
-        post :refresh
-        post :forgot_password
-        patch :reset_password
-      end
-
-      # Resources
-      resources :articles, only: [:index, :show, :create, :update, :destroy] do
-        resources :comments, only: [:index, :create, :destroy]
-      end
-
-      resources :users, only: [:show, :update]
-      resources :categories, only: [:index, :show]
-      resources :tags, only: [:index]
-
-      # Search
-      get "/search", to: "search#index"
+```ruby
+# app/controllers/admin/application_controller.rb
+module Admin
+  class ApplicationController < ActionController::Base
+    before_action :authenticate_admin!
+    
+    layout "admin"
+    
+    private
+    
+    def authenticate_admin!
+      redirect_to root_path unless current_user&.admin?
     end
   end
 end
+
+# app/controllers/admin/posts_controller.rb
+module Admin
+  class PostsController < Admin::ApplicationController
+    def index
+      @posts = Post.all
+    end
+    
+    def destroy
+      @post = Post.find(params[:id])
+      @post.destroy
+      redirect_to admin_posts_path, notice: "Post deleted"
+    end
+  end
+end
+```
+
+### ใช้ใน views
+
+```erb
+<!-- Admin navigation -->
+<%= link_to "Posts", admin_posts_path %>
+<%= link_to "Users", admin_users_path %>
+<%= link_to "Edit", edit_admin_post_path(@post) %>
 ```
 
 ---
 
-## แบบฝึกหัด Part 33 (ขั้นตอนที่ 706-730)
+## Step 713: Scope
 
-**ข้อ 1:** เขียน routes ที่สร้าง CRUD ครบสำหรับ Product
+Scope ช่วย group routes โดยไม่สร้าง module ใหม่
 
 ```ruby
-# คำตอบ:
-Rails.application.routes.draw do
-  resources :products
+# config/routes.rb
+
+# scope path - เพิ่ม prefix ใน URL แต่ controller ยังอยู่ที่เดิม
+scope "/admin" do
+  resources :posts
 end
-# สร้าง:
-# GET    /products          → index
-# GET    /products/new      → new
-# POST   /products          → create
-# GET    /products/:id      → show
-# GET    /products/:id/edit → edit
-# PATCH  /products/:id      → update
-# DELETE /products/:id      → destroy
+# URL: /admin/posts  => PostsController#index
+# Named: posts_path (ไม่มี admin prefix)
+
+# scope module - เพิ่ม module prefix ใน controller แต่ URL เหมือนเดิม
+scope module: "admin" do
+  resources :posts
+end
+# URL: /posts  => Admin::PostsController#index
+
+# scope as - เพิ่ม prefix ใน named routes
+scope as: "admin" do
+  resources :posts
+end
+# URL: /posts  => PostsController#index
+# Named: admin_posts_path
+
+# รวม path + module + as
+scope path: "/admin", module: "admin", as: "admin" do
+  resources :posts  # เหมือน namespace แต่ควบคุมได้มากกว่า
+end
 ```
 
-**ข้อ 2:** สร้าง routes สำหรับ admin namespace
+### ตัวอย่างการใช้งาน scope
 
 ```ruby
-# คำตอบ:
-namespace :admin do
-  root "dashboard#index"
-  resources :users
-  resources :products
-  resources :orders
-end
-```
-
-**ข้อ 3:** สร้าง nested routes สำหรับ Order มี LineItems
-
-```ruby
-# คำตอบ:
-resources :orders do
-  resources :line_items, shallow: true
-end
-# สร้าง:
-# GET    /orders/:order_id/line_items      → index
-# POST   /orders/:order_id/line_items      → create
-# GET    /line_items/:id                   → show (shallow)
-# PATCH  /line_items/:id                   → update (shallow)
-# DELETE /line_items/:id                   → destroy (shallow)
-```
-
-**ข้อ 4:** เพิ่ม member routes สำหรับ publish, archive ให้กับ Article
-
-```ruby
-# คำตอบ:
-resources :articles do
-  member do
-    post :publish
-    post :archive
-    get :preview
+# API versioning
+scope "/api" do
+  scope "/v1" do
+    resources :users
+    resources :posts
+  end
+  
+  scope "/v2" do
+    resources :users
+    resources :posts
   end
 end
-```
 
-**ข้อ 5:** เพิ่ม collection routes สำหรับ search, popular ให้กับ Product
+# /api/v1/users  => UsersController#index
+# /api/v2/users  => UsersController#index (ยัง controller เดิม!)
 
-```ruby
-# คำตอบ:
-resources :products do
-  collection do
-    get :search
-    get :popular
-    get :featured
-  end
-end
-```
-
-**ข้อ 6:** สร้าง routes สำหรับ User Profile (singular resource)
-
-```ruby
-# คำตอบ:
-resource :profile do
-  member do
-    get :avatar
-    delete :avatar
-  end
-end
-```
-
-**ข้อ 7:** สร้าง API routes ใน namespace /api/v1
-
-```ruby
-# คำตอบ:
+# ดีกว่าใช้ namespace สำหรับ versioning
 namespace :api do
   namespace :v1 do
-    resources :articles, only: [:index, :show, :create, :update, :destroy]
-    resources :users, only: [:show, :update]
-    post "/auth/login", to: "auth#login"
-    post "/auth/logout", to: "auth#logout"
+    resources :users
+    resources :posts
   end
 end
+# /api/v1/users  => Api::V1::UsersController#index
 ```
 
-**ข้อ 8:** เขียน constraint ที่อนุญาตเฉพาะ admin users
+---
+
+## Step 714: Custom Routes
+
+### GET Routes
 
 ```ruby
-# คำตอบ:
-# app/constraints/admin_constraint.rb
-class AdminConstraint
-  def matches?(request)
-    session_user_id = request.session[:user_id]
-    return false unless session_user_id
-
-    User.find_by(id: session_user_id)&.admin?
-  end
-end
-
 # config/routes.rb
-namespace :admin, constraints: AdminConstraint.new do
-  resources :users
-  resources :articles
+get "/about", to: "pages#about"
+get "/contact", to: "pages#contact"
+get "/privacy-policy", to: "pages#privacy", as: :privacy_policy
+get "/terms", to: "pages#terms", as: :terms
+
+# ด้วย block
+get "/profile" do
+  redirect_to "/users/me"
 end
 ```
 
-**ข้อ 9:** สร้าง route redirect จาก /old-articles ไป /articles
+### POST Routes
 
 ```ruby
-# คำตอบ:
-get "/old-articles", to: redirect("/articles")
-get "/old-articles/:id", to: redirect("/articles/%{id}")
+post "/login", to: "sessions#create"
+post "/register", to: "registrations#create"
+post "/newsletter/subscribe", to: "newsletters#subscribe"
 ```
 
-**ข้อ 10:** ใช้ route concerns สำหรับ commentable resources
+### PATCH/PUT Routes
 
 ```ruby
-# คำตอบ:
-concern :commentable do
-  resources :comments, only: [:index, :create, :destroy]
-end
+patch "/profile", to: "profiles#update"
+put "/settings", to: "settings#update"
+```
 
-concern :likeable do
+### DELETE Routes
+
+```ruby
+delete "/logout", to: "sessions#destroy"
+delete "/account", to: "accounts#destroy"
+```
+
+### Route ที่รับ parameter
+
+```ruby
+# Named parameter
+get "/users/:username", to: "users#show", as: :user_profile
+# => user_profile_path("john") => /users/john
+
+# Multiple parameters
+get "/posts/:year/:month/:day/:slug", to: "posts#show", as: :dated_post
+# => dated_post_path(2024, 1, 15, "my-post")
+```
+
+---
+
+## Step 715: Root Route
+
+```ruby
+# config/routes.rb
+root "pages#home"
+# หรือ
+root to: "pages#home"
+# หรือ
+root "posts#index"
+
+# GET / => pages#home
+# Named: root_path, root_url
+```
+
+### ใช้ root route ใน code
+
+```ruby
+# Controller
+redirect_to root_path
+
+# View
+<%= link_to "Home", root_path %>
+
+# หลังจาก login
+after_sign_in_path_for(resource) = root_path
+```
+
+---
+
+## Step 716: Member Routes
+
+Member routes ใช้กับ record เฉพาะ (ต้องมี :id)
+
+```ruby
+# config/routes.rb
+resources :posts do
   member do
-    post :like
-    delete :like, action: :unlike
+    post :publish      # POST /posts/:id/publish
+    delete :unpublish  # DELETE /posts/:id/unpublish
+    get :preview       # GET /posts/:id/preview
+    patch :archive     # PATCH /posts/:id/archive
   end
 end
 
-resources :articles, concerns: [:commentable, :likeable]
-resources :photos,   concerns: [:commentable, :likeable]
-resources :videos,   concerns: [:commentable]
+# หรือ inline syntax
+resources :posts do
+  post :publish, on: :member
+  get :preview, on: :member
+end
 ```
 
-**ข้อ 11:** เขียน Route test สำหรับ articles#index และ articles#show
+Routes ที่สร้าง:
+- `POST /posts/:id/publish` => posts#publish
+- Named: `publish_post_path(@post)`
+- `GET /posts/:id/preview` => posts#preview
+- Named: `preview_post_path(@post)`
+
+### ใช้ใน Controller
 
 ```ruby
-# คำตอบ:
-# spec/routing/articles_routing_spec.rb
-RSpec.describe "Articles routing", type: :routing do
-  it "routes GET /articles to articles#index" do
-    expect(get: "/articles").to route_to("articles#index")
+# app/controllers/posts_controller.rb
+class PostsController < ApplicationController
+  def publish
+    @post = Post.find(params[:id])
+    @post.update!(published_at: Time.current, status: "published")
+    redirect_to @post, notice: "เผยแพร่แล้ว"
   end
+  
+  def preview
+    @post = Post.find(params[:id])
+    render :show, layout: "preview"
+  end
+  
+  def archive
+    @post = Post.find(params[:id])
+    @post.archive!
+    redirect_to posts_path
+  end
+end
+```
 
-  it "routes GET /articles/1 to articles#show" do
-    expect(get: "/articles/1").to route_to(
-      controller: "articles",
+```erb
+<!-- ใน views -->
+<%= link_to "Preview", preview_post_path(@post) %>
+
+<%= button_to "Publish", publish_post_path(@post), method: :post %>
+
+<%= button_to "Archive", archive_post_path(@post), 
+    method: :patch,
+    data: { confirm: "แน่ใจ?" } %>
+```
+
+---
+
+## Step 717: Collection Routes
+
+Collection routes ใช้กับ collection ทั้งหมด (ไม่มี :id)
+
+```ruby
+# config/routes.rb
+resources :posts do
+  collection do
+    get :published    # GET /posts/published
+    get :drafts       # GET /posts/drafts
+    get :archived     # GET /posts/archived
+    delete :bulk_destroy  # DELETE /posts/bulk_destroy
+  end
+end
+
+# หรือ inline
+resources :posts do
+  get :published, on: :collection
+  get :drafts, on: :collection
+end
+```
+
+Routes ที่สร้าง:
+- `GET /posts/published` => posts#published
+- Named: `published_posts_path`
+- `GET /posts/drafts` => posts#drafts
+- Named: `drafts_posts_path`
+
+### ใช้ใน Controller
+
+```ruby
+# app/controllers/posts_controller.rb
+class PostsController < ApplicationController
+  def published
+    @posts = Post.where(status: "published").order(published_at: :desc)
+    render :index
+  end
+  
+  def drafts
+    @posts = current_user.posts.where(status: "draft")
+    render :index
+  end
+  
+  def archived
+    @posts = Post.where(archived: true)
+    render :index
+  end
+  
+  def bulk_destroy
+    ids = params[:post_ids]
+    Post.where(id: ids).destroy_all
+    redirect_to posts_path, notice: "ลบ #{ids.count} posts สำเร็จ"
+  end
+end
+```
+
+---
+
+## Step 718: Constraints on Routes
+
+### Format Constraints
+
+```ruby
+# config/routes.rb
+
+# เฉพาะ integer
+get "/posts/:id", to: "posts#show", constraints: { id: /\d+/ }
+
+# Subdomain
+constraints subdomain: "api" do
+  resources :users
+end
+# api.example.com/users => users#index
+
+# ด้วย class
+class AdminSubdomainConstraint
+  def matches?(request)
+    request.subdomain == "admin"
+  end
+end
+
+constraints AdminSubdomainConstraint.new do
+  namespace :admin do
+    resources :users
+  end
+end
+```
+
+### IP Constraints
+
+```ruby
+# เฉพาะ local network
+constraints ip: /127\.0\.0\.\d+/ do
+  get "/debug", to: "debug#index"
+end
+```
+
+### Custom Constraints
+
+```ruby
+# config/routes.rb
+class AuthenticatedConstraint
+  def matches?(request)
+    user = User.find_by(auth_token: request.cookies["auth_token"])
+    user.present?
+  end
+end
+
+constraints AuthenticatedConstraint.new do
+  resources :dashboard
+end
+
+# หรือ lambda
+constraints lambda { |req| req.env["warden"].user.admin? } do
+  resources :admin_panel
+end
+```
+
+---
+
+## Step 719: Redirect Routes
+
+```ruby
+# config/routes.rb
+
+# Redirect ไปยัง path ใหม่
+get "/old-path", to: redirect("/new-path")
+
+# Redirect ด้วย code (default 301)
+get "/old-posts", to: redirect("/posts", status: 302)
+
+# Dynamic redirect
+get "/users/:username", to: redirect { |params, req|
+  "/profiles/#{params[:username]}"
+}
+
+# Redirect ด้วย method
+get "/shop", to: redirect { |params, req|
+  "/products?#{req.query_string}"
+}
+
+# Redirect ภายนอก
+get "/google", to: redirect("https://google.com")
+```
+
+---
+
+## Step 720: Route Helpers (_path vs _url)
+
+### _path - Relative URL
+
+```ruby
+# ส่งคืน path เช่น /posts/1
+post_path(@post)         # => "/posts/1"
+posts_path               # => "/posts"
+new_post_path            # => "/posts/new"
+edit_post_path(@post)    # => "/posts/1/edit"
+```
+
+### _url - Absolute URL
+
+```ruby
+# ส่งคืน full URL เช่น http://example.com/posts/1
+post_url(@post)          # => "http://example.com/posts/1"
+posts_url                # => "http://example.com/posts"
+```
+
+### เมื่อไหร่ใช้อะไร
+
+- ใช้ `_path` ใน views และ controllers (ส่วนใหญ่)
+- ใช้ `_url` ใน mailers (email ต้องการ full URL)
+- ใช้ `_url` เมื่อ redirect ข้าม domain
+
+```ruby
+# ใน mailer (ต้องใช้ _url)
+class UserMailer < ApplicationMailer
+  def welcome_email(user)
+    @user = user
+    @login_url = login_url  # http://example.com/login
+    mail(to: user.email)
+  end
+end
+```
+
+### Helper Methods ใน Routes
+
+```ruby
+# url_for
+url_for(@post)           # => "/posts/1"
+url_for(controller: "posts", action: "index")  # => "/posts"
+
+# polymorphic_path (สำหรับ polymorphic associations)
+polymorphic_path(@post)  # => "/posts/1"
+polymorphic_path([:admin, @post])  # => "/admin/posts/1"
+
+# link_to ด้วย model
+link_to "Show", @post    # ใช้ post_path(@post)
+link_to "Edit", [:edit, @post]  # ใช้ edit_post_path(@post)
+```
+
+---
+
+## Step 721: rails routes Command
+
+```bash
+# ดู routes ทั้งหมด
+rails routes
+
+# ดูเฉพาะ controller
+rails routes -c posts
+rails routes -c admin/users
+
+# ค้นหา routes ด้วย pattern
+rails routes -g post
+
+# ดูใน format ต่างๆ
+rails routes --expanded
+
+# Output ทั้งหมดเป็น grep-friendly
+rails routes | grep DELETE
+
+# ดู routes ที่เกี่ยวกับ path เฉพาะ
+rails routes -g /posts/new
+```
+
+### ตัวอย่าง Output
+
+```
+$ rails routes
+   Prefix Verb   URI Pattern               Controller#Action
+    posts GET    /posts(.:format)          posts#index
+          POST   /posts(.:format)          posts#create
+ new_post GET    /posts/new(.:format)      posts#new
+edit_post GET    /posts/:id/edit(.:format) posts#edit
+     post GET    /posts/:id(.:format)      posts#show
+          PATCH  /posts/:id(.:format)      posts#update
+          PUT    /posts/:id(.:format)      posts#update
+          DELETE /posts/:id(.:format)      posts#destroy
+     root GET    /                         pages#home
+```
+
+---
+
+## Step 722: Testing Routes
+
+### ใช้ assert_routing
+
+```ruby
+# test/routing/posts_routing_test.rb
+require "test_helper"
+
+class PostsRoutingTest < ActionDispatch::IntegrationTest
+  test "routes to posts index" do
+    assert_routing "/posts", controller: "posts", action: "index"
+  end
+  
+  test "routes to post show" do
+    assert_routing "/posts/1", controller: "posts", action: "show", id: "1"
+  end
+  
+  test "routes to new post" do
+    assert_routing "/posts/new", controller: "posts", action: "new"
+  end
+  
+  test "routes POST to create" do
+    assert_routing({ method: "post", path: "/posts" },
+                   { controller: "posts", action: "create" })
+  end
+end
+```
+
+### ใช้ assert_generates
+
+```ruby
+test "generates correct path" do
+  assert_generates "/posts/1", controller: "posts", action: "show", id: "1"
+  assert_generates "/posts", controller: "posts", action: "index"
+end
+```
+
+### ใช้ RSpec route matchers
+
+```ruby
+# spec/routing/posts_routing_spec.rb
+require "rails_helper"
+
+RSpec.describe "Posts routing", type: :routing do
+  it "routes GET /posts to posts#index" do
+    expect(get: "/posts").to route_to("posts#index")
+  end
+  
+  it "routes GET /posts/:id to posts#show" do
+    expect(get: "/posts/1").to route_to(
+      controller: "posts",
       action: "show",
+      id: "1"
+    )
+  end
+  
+  it "routes POST /posts to posts#create" do
+    expect(post: "/posts").to route_to("posts#create")
+  end
+  
+  it "routes DELETE /posts/:id to posts#destroy" do
+    expect(delete: "/posts/1").to route_to(
+      controller: "posts",
+      action: "destroy",
       id: "1"
     )
   end
 end
 ```
 
-**ข้อ 12:** สร้าง custom route สำหรับ user profile ด้วย username
+---
+
+## ตัวอย่าง Routes ที่สมบูรณ์
+
+### E-commerce Application
 
 ```ruby
-# คำตอบ:
-get "/@:username",
-  to: "users#show",
-  as: :user_profile,
-  constraints: { username: /[a-zA-Z0-9_]+/ }
-
-# หรือ:
-get "/users/:username",
-  to: "users#show",
-  as: :user_by_username,
-  constraints: { username: /[a-zA-Z0-9_.-]+/ }
-```
-
-**ข้อ 13:** อธิบายความแตกต่างระหว่าง _path และ _url helpers
-
-```
-คำตอบ:
-_path: สร้าง relative path
-- articles_path → "/articles"
-- article_path(1) → "/articles/1"
-- ใช้สำหรับ links ภายใน app
-- เร็วกว่าเล็กน้อย (ไม่ต้องใส่ host)
-
-_url: สร้าง absolute URL
-- articles_url → "http://localhost:3000/articles"
-- article_url(1) → "http://localhost:3000/articles/1"
-- ใช้สำหรับ:
-  * Email links (ต้องมี full URL)
-  * External redirects
-  * JSON API responses
-  * Social sharing
-```
-
-**ข้อ 14:** สร้าง routes สำหรับ newsletter subscription
-
-```ruby
-# คำตอบ:
-resource :subscription, only: [:new, :create, :destroy] do
-  get :confirm, on: :member
-  post :unsubscribe, on: :collection
-end
-
-# หรือ:
-namespace :newsletter do
-  post :subscribe
-  delete :unsubscribe
-  get :confirm
-end
-```
-
-**ข้อ 15:** สร้าง wildcard route สำหรับ CMS pages
-
-```ruby
-# คำตอบ:
-# ต้องอยู่ท้ายสุดใน routes.rb!
-get "/*permalink",
-  to: "pages#show",
-  as: :cms_page,
-  constraints: { permalink: /[a-z0-9\-\/]+/ }
-
-# Controller:
-class PagesController < ApplicationController
-  def show
-    @page = Page.find_by!(permalink: params[:permalink])
-  rescue ActiveRecord::RecordNotFound
-    render :not_found, status: :not_found
-  end
-end
-```
-
-**ข้อ 16:** เพิ่ม routes สำหรับ Devise กับ custom controllers
-
-```ruby
-# คำตอบ:
-devise_for :users,
-  path: "",
-  path_names: {
-    sign_in: "login",
-    sign_out: "logout",
-    sign_up: "register"
-  },
-  controllers: {
-    sessions: "users/sessions",
-    registrations: "users/registrations",
-    passwords: "users/passwords",
-    confirmations: "users/confirmations",
-    unlocks: "users/unlocks"
-  }
-
-# Routes สร้าง:
-# GET /login → users/sessions#new
-# POST /login → users/sessions#create
-# DELETE /logout → users/sessions#destroy
-# GET /register → users/registrations#new
-```
-
-**ข้อ 17:** สร้าง scope สำหรับ locale-prefixed routes
-
-```ruby
-# คำตอบ:
-scope "(:locale)", locale: /th|en/ do
+# config/routes.rb
+Rails.application.routes.draw do
   root "home#index"
-  resources :articles
-  resources :categories
-end
-
-# สร้าง routes:
-# GET /articles          (ไม่มี locale)
-# GET /th/articles       (Thai locale)
-# GET /en/articles       (English locale)
-
-# ApplicationController:
-class ApplicationController < ActionController::Base
-  before_action :set_locale
-
-  def set_locale
-    I18n.locale = params[:locale] || I18n.default_locale
+  
+  # Auth
+  devise_for :users
+  get "/profile", to: "users#profile", as: :profile
+  patch "/profile", to: "users#update_profile"
+  
+  # Public
+  resources :products, only: [:index, :show] do
+    collection do
+      get :search
+      get :featured
+      get :sale
+    end
+    member do
+      post :add_to_wishlist
+      delete :remove_from_wishlist
+    end
+    resources :reviews, only: [:index, :create, :destroy]
   end
-
-  def default_url_options
-    { locale: I18n.locale == I18n.default_locale ? nil : I18n.locale }
+  
+  resources :categories, only: [:index, :show]
+  
+  # Shopping
+  resource :cart, only: [:show, :update, :destroy] do
+    post :add_item
+    delete :remove_item
+    patch :update_quantity
   end
-end
-```
-
-**ข้อ 18:** เขียน routes สำหรับ shopping cart
-
-```ruby
-# คำตอบ:
-resource :cart, only: [:show] do
-  resources :cart_items, only: [:create, :update, :destroy]
-  post :checkout
-  post :apply_coupon
-  delete :clear
-end
-
-# สร้าง:
-# GET    /cart              → show
-# POST   /cart/cart_items   → create
-# PATCH  /cart/cart_items/:id → update
-# DELETE /cart/cart_items/:id → destroy
-# POST   /cart/checkout     → checkout
-```
-
-**ข้อ 19:** สร้าง routes สำหรับ Multi-step form (wizard)
-
-```ruby
-# คำตอบ:
-namespace :registration do
-  get :step1
-  post :step1, action: :save_step1
-  get :step2
-  post :step2, action: :save_step2
-  get :step3
-  post :step3, action: :save_step3
-  get :complete
-end
-
-# หรือ:
-resources :registrations, only: [] do
-  collection do
-    get "step/:step",     action: :show,   as: :step
-    post "step/:step",    action: :update, as: :update_step
-    get "complete",       action: :complete
-  end
-end
-```
-
-**ข้อ 20:** สร้าง routes สำหรับ Two-factor authentication
-
-```ruby
-# คำตอบ:
-namespace :two_factor_auth do
-  get  :setup
-  post :enable
-  post :disable
-  get  :verify
-  post :verify, action: :confirm
-  post :generate_backup_codes
-  get  :backup_codes
-end
-
-# หรือผ่าน devise:
-devise_for :users
-devise_scope :user do
-  get  "/two_factor/setup",   to: "two_factor#setup"
-  post "/two_factor/enable",  to: "two_factor#enable"
-  post "/two_factor/verify",  to: "two_factor#verify"
-end
-```
-
-**ข้อ 21:** สร้าง routes สำหรับ Social features (follow, unfollow)
-
-```ruby
-# คำตอบ:
-resources :users, only: [:index, :show] do
-  member do
-    post :follow
-    delete :follow, action: :unfollow, as: :unfollow
-    get :followers
-    get :following
-  end
-end
-
-# หรือ:
-resources :follows, only: [:create, :destroy]
-# POST   /follows        { user_id: X }   → follow
-# DELETE /follows/:id                     → unfollow
-```
-
-**ข้อ 22:** สร้าง routes สำหรับ File upload
-
-```ruby
-# คำตอบ:
-resources :documents, only: [:index, :show, :create, :destroy] do
-  member do
-    get :download
-    post :process
-  end
-  collection do
-    post :bulk_upload
-  end
-end
-
-resources :avatars, only: [:create, :destroy]
-```
-
-**ข้อ 23:** เขียน integration test สำหรับ routes
-
-```ruby
-# คำตอบ:
-# test/integration/routing_test.rb
-class RoutingTest < ActionDispatch::IntegrationTest
-  test "admin routes require admin authentication" do
-    get admin_articles_path
-    assert_redirected_to new_user_session_path
-  end
-
-  test "api routes return json" do
-    get api_v1_articles_path, headers: { "Accept" => "application/json" }
-    assert_response :unauthorized  # ถ้าต้องการ auth
-  end
-
-  test "nested routes work correctly" do
-    article = create(:article)
-    get article_comments_path(article)
-    assert_response :success
-  end
-end
-```
-
-**ข้อ 24:** สร้าง routes สำหรับ Search ที่ซับซ้อน
-
-```ruby
-# คำตอบ:
-namespace :search do
-  get :articles
-  get :users
-  get :tags
-  get :global, to: "search#global", as: :global
-end
-
-# หรือ:
-get "/search",          to: "search#index",    as: :search
-get "/search/articles", to: "search#articles", as: :search_articles
-get "/search/users",    to: "search#users",    as: :search_users
-
-# ใน controller:
-class SearchController < ApplicationController
-  def index
-    @query = params[:q]
-
-    if @query.present?
-      @articles = Article.search(@query).limit(10)
-      @users = User.search(@query).limit(5)
-      @tags = Tag.search(@query).limit(10)
+  
+  resources :orders, only: [:index, :show, :create] do
+    member do
+      post :cancel
+      get :invoice
     end
   end
+  
+  resources :checkouts, only: [:new, :create]
+  
+  # API
+  namespace :api do
+    namespace :v1 do
+      resources :products, only: [:index, :show]
+      resources :orders, only: [:index, :show, :create]
+      post "/auth/login", to: "auth#login"
+      post "/auth/logout", to: "auth#logout"
+    end
+  end
+  
+  # Admin
+  namespace :admin do
+    root "dashboard#index"
+    
+    resources :products
+    resources :orders do
+      member do
+        patch :ship
+        patch :complete
+        patch :refund
+      end
+      collection do
+        get :pending
+        get :shipped
+      end
+    end
+    resources :users do
+      member do
+        post :ban
+        post :unban
+      end
+    end
+    resources :categories
+    resources :reviews, only: [:index, :destroy]
+  end
+  
+  # Static pages
+  get "/about", to: "pages#about", as: :about
+  get "/contact", to: "pages#contact", as: :contact
+  get "/terms", to: "pages#terms", as: :terms
+  get "/privacy", to: "pages#privacy", as: :privacy
+  
+  # Health check
+  get "/health", to: proc { [200, {}, ["OK"]] }
+  
+  # Wildcard (ต้องอยู่ท้ายสุด)
+  # get "*path", to: "errors#not_found"
 end
 ```
 
-**ข้อ 25:** ดู routes ที่สร้างและอธิบาย route helpers ที่ได้
+---
 
-```bash
-# คำตอบ:
-rails routes
+## แบบฝึกหัด (Steps 723-730)
 
-# Output จะแสดง:
-#         Prefix Verb   URI Pattern                    Controller#Action
-#       articles GET    /articles(.:format)             articles#index
-#                POST   /articles(.:format)             articles#create
-#    new_article GET    /articles/new(.:format)         articles#new
-#   edit_article GET    /articles/:id/edit(.:format)    articles#edit
-#        article GET    /articles/:id(.:format)         articles#show
-#                PATCH  /articles/:id(.:format)         articles#update
-#                DELETE /articles/:id(.:format)         articles#destroy
+### แบบฝึกหัดที่ 1
+สร้าง routes สำหรับ `Article` model ที่มีทุก RESTful routes
 
-# Route helpers:
-# articles_path       → GET /articles
-# new_article_path    → GET /articles/new
-# article_path(id)    → GET /articles/:id
-# edit_article_path(id) → GET /articles/:id/edit
+**เฉลย:**
+```ruby
+resources :articles
+```
 
-# ดู routes เฉพาะ controller:
-rails routes -c articles
+### แบบฝึกหัดที่ 2
+สร้าง routes สำหรับ `Comment` ที่ nested ใน `Article` แต่เฉพาะ index, create, destroy
 
-# ดู routes ที่ match URL:
-rails routes -g /admin
+**เฉลย:**
+```ruby
+resources :articles do
+  resources :comments, only: [:index, :create, :destroy]
+end
+```
+
+### แบบฝึกหัดที่ 3
+สร้าง admin namespace ที่มี `articles`, `users`, `categories`
+
+**เฉลย:**
+```ruby
+namespace :admin do
+  resources :articles
+  resources :users
+  resources :categories
+end
+```
+
+### แบบฝึกหัดที่ 4
+สร้าง custom route `GET /search` ที่ไปยัง `searches#index` โดยมีชื่อว่า `search`
+
+**เฉลย:**
+```ruby
+get "/search", to: "searches#index", as: :search
+```
+
+### แบบฝึกหัดที่ 5
+เพิ่ม member route `publish` (POST) และ `unpublish` (DELETE) ใน articles
+
+**เฉลย:**
+```ruby
+resources :articles do
+  member do
+    post :publish
+    delete :unpublish
+  end
+end
+```
+
+### แบบฝึกหัดที่ 6
+เพิ่ม collection route `featured` (GET) และ `drafts` (GET) ใน articles
+
+**เฉลย:**
+```ruby
+resources :articles do
+  collection do
+    get :featured
+    get :drafts
+  end
+end
+```
+
+### แบบฝึกหัดที่ 7
+สร้าง root route ที่ชี้ไปยัง `home#index`
+
+**เฉลย:**
+```ruby
+root "home#index"
+```
+
+### แบบฝึกหัดที่ 8
+สร้าง route constraint ที่ allow เฉพาะ integer สำหรับ `:id` parameter
+
+**เฉลย:**
+```ruby
+resources :posts, constraints: { id: /\d+/ }
+```
+
+### แบบฝึกหัดที่ 9
+สร้าง redirect route จาก `/old-blog` ไป `/articles`
+
+**เฉลย:**
+```ruby
+get "/old-blog", to: redirect("/articles")
+```
+
+### แบบฝึกหัดที่ 10
+สร้าง `login` และ `logout` routes
+
+**เฉลย:**
+```ruby
+get "/login", to: "sessions#new", as: :login
+post "/login", to: "sessions#create"
+delete "/logout", to: "sessions#destroy", as: :logout
+```
+
+### แบบฝึกหัดที่ 11
+สร้าง shallow nested routes สำหรับ posts > comments
+
+**เฉลย:**
+```ruby
+resources :posts do
+  resources :comments, shallow: true
+end
+```
+
+### แบบฝึกหัดที่ 12
+ใช้ scope module สำหรับ api namespace โดย URL ยังเป็น `/users`
+
+**เฉลย:**
+```ruby
+scope module: "api" do
+  resources :users
+end
+# URL: /users => Api::UsersController#index
+```
+
+### แบบฝึกหัดที่ 13
+สร้าง API versioning ด้วย namespace
+
+**เฉลย:**
+```ruby
+namespace :api do
+  namespace :v1 do
+    resources :users
+    resources :posts
+  end
+  
+  namespace :v2 do
+    resources :users
+    resources :posts
+  end
+end
+```
+
+### แบบฝึกหัดที่ 14
+เขียน test ตรวจสอบว่า `GET /articles` routes ไปยัง `articles#index`
+
+**เฉลย:**
+```ruby
+require "test_helper"
+
+class ArticlesRoutingTest < ActionDispatch::IntegrationTest
+  test "routes to articles index" do
+    assert_routing "/articles", controller: "articles", action: "index"
+  end
+end
+```
+
+### แบบฝึกหัดที่ 15
+สร้าง routes สำหรับ `singular resource` เช่น user profile (ไม่มี id)
+
+**เฉลย:**
+```ruby
+resource :profile, only: [:show, :edit, :update]
+# GET /profile     => profiles#show
+# GET /profile/edit  => profiles#edit
+# PATCH /profile   => profiles#update
+```
+
+### แบบฝึกหัดที่ 16
+สร้าง route ที่ accept ทั้ง GET และ POST ด้วย match
+
+**เฉลย:**
+```ruby
+match "/contact", to: "contacts#index", via: [:get, :post]
+```
+
+### แบบฝึกหัดที่ 17
+สร้าง route สำหรับ health check ที่ส่งคืน 200 OK โดยไม่ใช้ controller
+
+**เฉลย:**
+```ruby
+get "/health", to: proc { [200, { "Content-Type" => "text/plain" }, ["OK"]] }
+```
+
+### แบบฝึกหัดที่ 18
+แสดงชื่อ helper method สำหรับ route `admin_posts_path`
+
+**เฉลย:**
+```ruby
+# admin_posts_path  => /admin/posts (GET)
+# admin_post_path(@post)  => /admin/posts/:id (GET)
+# new_admin_post_path  => /admin/posts/new (GET)
+# edit_admin_post_path(@post)  => /admin/posts/:id/edit (GET)
+```
+
+### แบบฝึกหัดที่ 19
+สร้าง route สำหรับ download article PDF โดยเป็น member route
+
+**เฉลย:**
+```ruby
+resources :articles do
+  get :download_pdf, on: :member
+end
+# GET /articles/:id/download_pdf
+# Named: download_pdf_article_path(@article)
+```
+
+### แบบฝึกหัดที่ 20
+กำหนด route constraint ให้รับเฉพาะ request จาก subdomain "api"
+
+**เฉลย:**
+```ruby
+constraints subdomain: "api" do
+  namespace :api do
+    resources :users
+    resources :posts
+  end
+end
+```
+
+### แบบฝึกหัดที่ 21
+ใช้ scope path เพิ่ม prefix `/v1` โดยไม่สร้าง module ใหม่
+
+**เฉลย:**
+```ruby
+scope "/v1" do
+  resources :users
+  resources :posts
+end
+# /v1/users => UsersController#index (ไม่ใช่ V1::UsersController)
+```
+
+### แบบฝึกหัดที่ 22
+สร้าง named route `dashboard` ที่ชี้ไปยัง `dashboards#index`
+
+**เฉลย:**
+```ruby
+get "/dashboard", to: "dashboards#index", as: :dashboard
+# dashboard_path => /dashboard
+```
+
+### แบบฝึกหัดที่ 23
+สร้าง route สำหรับ `bulk_delete` ใน articles collection
+
+**เฉลย:**
+```ruby
+resources :articles do
+  delete :bulk_delete, on: :collection
+end
+# DELETE /articles/bulk_delete
+# Named: bulk_delete_articles_path
+```
+
+### แบบฝึกหัดที่ 24
+อธิบายความแตกต่างระหว่าง `namespace` และ `scope`
+
+**เฉลย:**
+- `namespace` เปลี่ยนทั้ง URL path, module path, และ named route prefix
+- `scope` ให้เราควบคุมแต่ละส่วนแยกกัน
+  - `scope path:` เปลี่ยน URL prefix เท่านั้น
+  - `scope module:` เปลี่ยน module path เท่านั้น
+  - `scope as:` เปลี่ยน named route prefix เท่านั้น
+
+### แบบฝึกหัดที่ 25
+สร้าง complete routes สำหรับ blog application ที่มี posts, categories, tags และ admin section
+
+**เฉลย:**
+```ruby
+Rails.application.routes.draw do
+  root "posts#index"
+  
+  # Public
+  resources :posts, only: [:index, :show] do
+    resources :comments, only: [:create, :destroy]
+  end
+  resources :categories, only: [:index, :show]
+  resources :tags, only: [:index, :show]
+  
+  # Search
+  get "/search", to: "searches#index", as: :search
+  
+  # Auth
+  get "/login", to: "sessions#new", as: :login
+  post "/login", to: "sessions#create"
+  delete "/logout", to: "sessions#destroy", as: :logout
+  
+  # Admin
+  namespace :admin do
+    root "dashboard#index"
+    resources :posts do
+      member do
+        post :publish
+        post :unpublish
+      end
+    end
+    resources :categories
+    resources :tags
+    resources :users
+    resources :comments, only: [:index, :destroy]
+  end
+end
 ```
 
 ---
 
-## สรุป Part 33
+## สรุป
 
-ในบทนี้เราได้เรียนรู้:
+ใน Rails Routing เราได้เรียนรู้:
 
-1. **routes.rb basics** - HTTP verbs, path patterns
-2. **RESTful routes** - resources helper สร้าง 7 routes อัตโนมัติ
-3. **Named routes** - route helpers (_path, _url)
-4. **Nested routes** - parent-child relationships, shallow nesting
-5. **Namespace & Scope** - admin, api namespacing
-6. **Custom routes** - collection, member, redirects
-7. **Root route** - authenticated/unauthenticated roots
-8. **Constraints** - pattern, class, lambda constraints
-9. **Route Concerns** - reusable route sets
-10. **Testing routes** - Minitest และ RSpec
-
-Routing เป็นส่วนสำคัญที่เชื่อม request กับ controller Rails routing system มีความยืดหยุ่นสูงและรองรับ patterns หลากหลาย
-
----
-
-*ต่อไป: Part 34 - Controllers (ขั้นตอนที่ 731-755)*
+1. **resources** - สร้าง 7 RESTful routes อัตโนมัติ
+2. **only/except** - จำกัด routes ที่สร้าง
+3. **Named routes** - กำหนดชื่อให้ routes ด้วย `as:`
+4. **Nested resources** - routes ที่ซ้อนกัน
+5. **Shallow nesting** - ลด URL complexity
+6. **namespace** - สร้าง admin section
+7. **scope** - ควบคุม URL, module, named routes แยกกัน
+8. **Custom routes** - get, post, put, patch, delete
+9. **Member routes** - actions บน individual record
+10. **Collection routes** - actions บน collection
+11. **Constraints** - จำกัด routes ด้วย regex หรือ class
+12. **Redirect routes** - redirect จาก URL เก่า
+13. **Route helpers** - _path vs _url
