@@ -1,398 +1,355 @@
-# Part 34: Controllers (ขั้นตอนที่ 731-755)
+# ตอนที่ 34: Controllers (Steps 731-755)
 
 ## บทนำ
 
-Controllers เป็นส่วนที่ประสานงานระหว่าง Models กับ Views รับ HTTP request ดึงข้อมูลจาก model และส่งไปแสดงใน view ถ้า Rails เป็นร้านอาหาร controller ก็คือพนักงานเสิร์ฟที่รับออเดอร์และส่งอาหาร
+Controllers เป็นส่วนที่เชื่อมระหว่าง Models (data) และ Views (presentation) ใน MVC pattern Controller รับ HTTP request, ทำงานกับ Model และส่งข้อมูลไปยัง View หรือส่ง response กลับ
 
 ---
 
-## ขั้นตอนที่ 731: ApplicationController
-
-### ApplicationController คืออะไร?
-
-`ApplicationController` เป็น base class ที่ controllers ทุกตัวใน application inherit มา
+## Step 731: ApplicationController
 
 ```ruby
 # app/controllers/application_controller.rb
 class ApplicationController < ActionController::Base
-  # ===== Security =====
+  # ทุก controller สืบทอดจาก ApplicationController
+  
+  # CSRF protection (เปิดโดย default)
   protect_from_forgery with: :exception
-
-  # ===== Authentication =====
-  before_action :authenticate_user!
+  
+  # Helper methods ที่ใช้ได้ทุก controller
   helper_method :current_user, :user_signed_in?
-
-  # ===== Locale =====
+  
   before_action :set_locale
-
-  # ===== Logging =====
-  before_action :log_request
-
-  # ===== Error Handling =====
-  rescue_from ActiveRecord::RecordNotFound, with: :handle_not_found
-  rescue_from Pundit::NotAuthorizedError, with: :handle_unauthorized
-  rescue_from ActionController::InvalidAuthenticityToken, with: :handle_invalid_token
-
+  before_action :authenticate_user!
+  
   private
-
-  def authenticate_user!
-    unless user_signed_in?
-      respond_to do |format|
-        format.html { redirect_to login_path, alert: "กรุณาเข้าสู่ระบบก่อน" }
-        format.json { render json: { error: "Unauthorized" }, status: :unauthorized }
-      end
-    end
-  end
-
+  
   def current_user
-    @current_user ||= User.find(session[:user_id]) if session[:user_id]
+    @current_user ||= User.find_by(id: session[:user_id])
   end
-
+  
   def user_signed_in?
     current_user.present?
   end
-
+  
+  def authenticate_user!
+    redirect_to login_path unless user_signed_in?
+  end
+  
   def set_locale
-    I18n.locale = params[:locale] || session[:locale] || I18n.default_locale
-    session[:locale] = I18n.locale
-  end
-
-  def log_request
-    Rails.logger.info("#{request.method} #{request.path} by User #{current_user&.id}")
-  end
-
-  def handle_not_found(exception)
-    Rails.logger.warn("Record not found: #{exception.message}")
-    respond_to do |format|
-      format.html { render "errors/not_found", status: :not_found }
-      format.json { render json: { error: "Not found" }, status: :not_found }
-    end
-  end
-
-  def handle_unauthorized(exception)
-    respond_to do |format|
-      format.html { redirect_to root_path, alert: "ไม่มีสิทธิ์เข้าถึง" }
-      format.json { render json: { error: "Forbidden" }, status: :forbidden }
-    end
-  end
-
-  def handle_invalid_token
-    redirect_to root_path, alert: "Session หมดอายุ กรุณาลองใหม่อีกครั้ง"
+    I18n.locale = params[:locale] || :th
   end
 end
 ```
 
-### ActionController::API vs ActionController::Base
+### API Controller
 
 ```ruby
-# สำหรับ API-only applications
-# app/controllers/api/base_controller.rb
-module Api
-  class BaseController < ActionController::API
-    include ActionController::HttpAuthentication::Token::ControllerMethods
-
-    before_action :authenticate_api_token!
-
-    rescue_from ActiveRecord::RecordNotFound do |e|
-      render json: { error: e.message }, status: :not_found
+# API-only ApplicationController
+class ApplicationController < ActionController::API
+  # ไม่มี CSRF, cookies, views
+  
+  before_action :authenticate_token!
+  
+  private
+  
+  def authenticate_token!
+    token = request.headers["Authorization"]&.split(" ")&.last
+    @current_user = User.find_by_auth_token(token)
+    
+    unless @current_user
+      render json: { error: "Unauthorized" }, status: :unauthorized
     end
-
-    rescue_from ActiveRecord::RecordInvalid do |e|
-      render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
-    end
-
-    private
-
-    def authenticate_api_token!
-      authenticate_or_request_with_http_token do |token, options|
-        @current_api_user = User.find_by(api_token: token)
-      end
-    end
-
-    def current_api_user
-      @current_api_user
-    end
+  end
+  
+  def current_user
+    @current_user
   end
 end
 ```
 
 ---
 
-## ขั้นตอนที่ 732: CRUD Actions
+## Step 732: 7 RESTful Actions
 
-### Complete CRUD Controller
+### Index - แสดงรายการ
 
 ```ruby
-# app/controllers/articles_controller.rb
-class ArticlesController < ApplicationController
-  before_action :authenticate_user!, except: [:index, :show]
-  before_action :set_article, only: [:show, :edit, :update, :destroy]
-  before_action :authorize_article!, only: [:edit, :update, :destroy]
-
-  # GET /articles
+# app/controllers/posts_controller.rb
+class PostsController < ApplicationController
   def index
-    @articles = Article.published
-                       .includes(:user, :tags, :comments)
-                       .order(created_at: :desc)
-
-    # Filtering
-    @articles = @articles.where(category_id: params[:category_id]) if params[:category_id].present?
-    @articles = @articles.search(params[:q]) if params[:q].present?
-    @articles = @articles.tagged_with(params[:tag]) if params[:tag].present?
-
-    # Pagination
-    @articles = @articles.page(params[:page]).per(params[:per_page] || 12)
-
+    @posts = Post.all
+    # เมื่อใช้ pagination
+    @posts = Post.order(created_at: :desc).page(params[:page]).per(10)
+    
+    # ด้วย filtering
+    @posts = Post.published
+    @posts = @posts.where(category_id: params[:category_id]) if params[:category_id]
+    @posts = @posts.search(params[:q]) if params[:q]
+    
     respond_to do |format|
       format.html
-      format.json { render json: @articles }
+      format.json { render json: @posts }
     end
   end
+```
 
-  # GET /articles/:id
+### Show - แสดง record เฉพาะ
+
+```ruby
   def show
-    @article.increment!(:views_count)
-    @comments = @article.comments.includes(:user).order(created_at: :asc)
-    @new_comment = Comment.new
-    @related_articles = Article.published
-                                .where.not(id: @article.id)
-                                .tagged_with(@article.tag_list)
-                                .limit(5)
+    @post = Post.find(params[:id])
+    # find จะ raise ActiveRecord::RecordNotFound ถ้าไม่เจอ
+    
+    # ตาม best practices
+    @post = Post.find(params[:id])
+    @comments = @post.comments.order(created_at: :asc)
+    
+    # Increment view count
+    @post.increment!(:views_count)
   end
+```
 
-  # GET /articles/new
+### New - แสดงฟอร์มสร้างใหม่
+
+```ruby
   def new
-    @article = current_user.articles.build
-    @article.build_seo_meta  # สร้าง associated record
+    @post = Post.new
+    # กำหนดค่า default
+    @post = Post.new(status: "draft")
+    # สำหรับ nested form
+    @post.comments.build
   end
+```
 
-  # POST /articles
+### Create - สร้าง record ใหม่
+
+```ruby
   def create
-    @article = current_user.articles.build(article_params)
-
-    respond_to do |format|
-      if @article.save
-        format.html { redirect_to @article, notice: "บทความถูกสร้างเรียบร้อยแล้ว" }
-        format.json { render json: @article, status: :created, location: @article }
-      else
-        format.html { render :new, status: :unprocessable_entity }
-        format.json { render json: { errors: @article.errors }, status: :unprocessable_entity }
-      end
+    @post = Post.new(post_params)
+    @post.user = current_user
+    
+    if @post.save
+      redirect_to @post, notice: "สร้างบทความสำเร็จ"
+    else
+      render :new, status: :unprocessable_entity
     end
   end
+```
 
-  # GET /articles/:id/edit
+### Edit - แสดงฟอร์มแก้ไข
+
+```ruby
   def edit
-    @article.build_seo_meta unless @article.seo_meta
+    @post = Post.find(params[:id])
+    # ตรวจสอบ authorization
+    authorize @post  # ถ้าใช้ Pundit
   end
+```
 
-  # PATCH/PUT /articles/:id
+### Update - อัปเดต record
+
+```ruby
   def update
-    respond_to do |format|
-      if @article.update(article_params)
-        format.html { redirect_to @article, notice: "บทความถูกอัพเดทเรียบร้อยแล้ว" }
-        format.json { render json: @article }
-      else
-        format.html { render :edit, status: :unprocessable_entity }
-        format.json { render json: { errors: @article.errors }, status: :unprocessable_entity }
-      end
+    @post = Post.find(params[:id])
+    
+    if @post.update(post_params)
+      redirect_to @post, notice: "อัปเดตสำเร็จ"
+    else
+      render :edit, status: :unprocessable_entity
     end
   end
+```
 
-  # DELETE /articles/:id
+### Destroy - ลบ record
+
+```ruby
   def destroy
-    @article.destroy!
+    @post = Post.find(params[:id])
+    @post.destroy
+    redirect_to posts_path, notice: "ลบสำเร็จ", status: :see_other
+  end
+```
 
-    respond_to do |format|
-      format.html { redirect_to articles_path, notice: "บทความถูกลบเรียบร้อยแล้ว" }
-      format.json { head :no_content }
+### Complete Controller
+
+```ruby
+class PostsController < ApplicationController
+  before_action :authenticate_user!, except: [:index, :show]
+  before_action :set_post, only: [:show, :edit, :update, :destroy]
+  before_action :authorize_post!, only: [:edit, :update, :destroy]
+  
+  def index
+    @posts = Post.published.order(created_at: :desc)
+    @posts = @posts.page(params[:page]).per(10) if defined?(Kaminari)
+  end
+  
+  def show
+    @comments = @post.comments.includes(:user).order(created_at: :asc)
+  end
+  
+  def new
+    @post = Post.new
+  end
+  
+  def create
+    @post = current_user.posts.new(post_params)
+    
+    if @post.save
+      redirect_to @post, notice: "สร้างบทความสำเร็จ"
+    else
+      render :new, status: :unprocessable_entity
     end
   end
-
+  
+  def edit
+  end
+  
+  def update
+    if @post.update(post_params)
+      redirect_to @post, notice: "อัปเดตสำเร็จ"
+    else
+      render :edit, status: :unprocessable_entity
+    end
+  end
+  
+  def destroy
+    @post.destroy
+    redirect_to posts_path, notice: "ลบบทความสำเร็จ", status: :see_other
+  end
+  
   private
-
-  def set_article
-    @article = Article.find(params[:id])
+  
+  def set_post
+    @post = Post.find(params[:id])
+  rescue ActiveRecord::RecordNotFound
+    redirect_to posts_path, alert: "ไม่พบบทความ"
   end
-
-  def article_params
-    params.require(:article).permit(
-      :title,
-      :body,
-      :status,
-      :category_id,
-      :featured_image,
-      tag_ids: [],
-      seo_meta_attributes: [:id, :title, :description, :keywords]
-    )
-  end
-
-  def authorize_article!
-    unless @article.user == current_user || current_user.admin?
-      redirect_to articles_path, alert: "ไม่มีสิทธิ์แก้ไขบทความนี้"
+  
+  def authorize_post!
+    unless @post.user == current_user || current_user.admin?
+      redirect_to @post, alert: "ไม่มีสิทธิ์"
     end
+  end
+  
+  def post_params
+    params.require(:post).permit(:title, :content, :status, :category_id,
+                                  :published_at, tag_ids: [])
   end
 end
 ```
 
 ---
 
-## ขั้นตอนที่ 733: Strong Parameters
+## Step 733: Strong Parameters
 
-### Strong Parameters คืออะไร?
-
-Strong Parameters ป้องกัน **Mass Assignment Vulnerability** - ป้องกันไม่ให้ user ส่งข้อมูลที่ไม่ต้องการมา update
-
-```ruby
-# ❌ อันตราย! (Rails 3 แบบเก่า)
-# @user = User.new(params[:user])
-# ถ้า user ส่ง { admin: true } มาด้วย จะถูก assign!
-
-# ✅ ปลอดภัย (Rails 4+)
-def user_params
-  params.require(:user).permit(:name, :email, :password)
-  # :admin ไม่ถูก permit จึงถูก filter ออกไป
-end
-```
+Strong Parameters ป้องกัน mass assignment vulnerability
 
 ### require และ permit
 
 ```ruby
-# params.require(:model_name) → ต้องมี parameter นี้ (raise error ถ้าไม่มี)
-# params.permit(:field_name) → อนุญาต parameter นี้
-
-# Basic usage
-def article_params
-  params.require(:article).permit(:title, :body, :status)
+# require - กำหนด root key ที่ต้องมี
+# permit - กำหนด attributes ที่อนุญาต
+def user_params
+  params.require(:user).permit(:name, :email, :password, :password_confirmation)
 end
 
-# Nested attributes
+# ถ้าไม่มี :user key จะ raise ActionController::ParameterMissing
+# ถ้ามี attribute ที่ไม่ได้ permit จะถูกกรองออก (ไม่ raise error)
+```
+
+### ตัวอย่างต่างๆ
+
+```ruby
+# Simple attributes
+def post_params
+  params.require(:post).permit(:title, :content, :published)
+end
+
+# Array values (checkboxes)
+def post_params
+  params.require(:post).permit(:title, tag_ids: [])
+end
+
+# Nested attributes (accepts_nested_attributes_for)
 def user_params
   params.require(:user).permit(
     :name,
     :email,
-    :password,
-    :password_confirmation,
-    address_attributes: [:id, :street, :city, :country, :_destroy],
-    profile_attributes: [:id, :bio, :avatar, :website]
+    addresses_attributes: [:id, :street, :city, :_destroy]
   )
 end
 
-# Array parameters
-def article_params
-  params.require(:article).permit(
-    :title,
-    :body,
-    tag_ids: [],           # Array of integers
-    category_ids: [],      # Array of integers
-    images: []             # Array of files
-  )
-end
-
-# Hash parameters
+# Hash values
 def settings_params
   params.require(:settings).permit(
-    :email_notifications,
-    preferences: {},       # Hash ที่ไม่รู้โครงสร้าง
-    notification_settings: [:new_comments, :new_followers]
+    preferences: [:theme, :language, :notifications]
   )
 end
 
-# Optional require (ไม่ raise error ถ้าไม่มี)
-def search_params
-  params.permit(:q, :category, :sort, :page, :per_page)
-end
+# Permit all (ใช้ด้วยความระวัง - dev/test เท่านั้น)
+params.require(:post).permit!  # อนุญาตทุก attribute
 
-# ตรวจสอบ Strong Parameters
-def create
-  ap article_params  # ด้วย awesome_print gem
-  # หรือ
-  puts article_params.inspect
+# Optional require
+def search_params
+  params.permit(:q, :category, :sort, :page)  # ไม่มี require
 end
 ```
 
-### Strong Parameters กับ Nested Forms
+### Handling Missing Parameters
 
 ```ruby
-# Model:
-class Order < ApplicationRecord
-  has_many :order_items, dependent: :destroy
-  accepts_nested_attributes_for :order_items, allow_destroy: true, reject_if: :all_blank
+def create
+  # ถ้า params[:post] ไม่มี จะ raise ActionController::ParameterMissing
+  @post = Post.new(post_params)
+rescue ActionController::ParameterMissing => e
+  render json: { error: e.message }, status: :bad_request
 end
 
-# Controller:
-def order_params
-  params.require(:order).permit(
-    :customer_name,
-    :shipping_address,
-    :payment_method,
-    order_items_attributes: [
-      :id,
-      :product_id,
-      :quantity,
-      :unit_price,
-      :_destroy  # อนุญาตการลบ nested record
-    ]
-  )
+# หรือ rescue ใน ApplicationController
+class ApplicationController < ActionController::Base
+  rescue_from ActionController::ParameterMissing, with: :handle_bad_request
+  
+  private
+  
+  def handle_bad_request(exception)
+    render json: { error: exception.message }, status: :bad_request
+  end
 end
 ```
 
 ---
 
-## ขั้นตอนที่ 734: Callbacks (before_action, after_action, around_action)
+## Step 734: before_action / after_action / around_action
 
 ### before_action
 
 ```ruby
-class ArticlesController < ApplicationController
-  # รันก่อน ทุก action
+class PostsController < ApplicationController
+  # รันก่อนทุก action
   before_action :authenticate_user!
-
-  # รันก่อน เฉพาะบาง actions
-  before_action :set_article, only: [:show, :edit, :update, :destroy]
-  before_action :check_article_owner, only: [:edit, :update, :destroy]
-
-  # ยกเว้นบาง actions
-  before_action :require_admin!, except: [:index, :show]
-
-  # รันแบบมีเงื่อนไข
-  before_action :redirect_if_banned, if: :user_banned?
-  before_action :show_maintenance_notice, unless: :maintenance_mode_off?
-
-  def index
-    @articles = Article.all
-  end
-
-  def show
-    # @article พร้อมใช้แล้วจาก before_action
-  end
-
+  
+  # รันก่อนเฉพาะ actions ที่ระบุ
+  before_action :set_post, only: [:show, :edit, :update, :destroy]
+  
+  # รันก่อนทุก action ยกเว้นที่ระบุ
+  before_action :log_action, except: [:index]
+  
+  def index; end
+  def show; end
+  
   private
-
-  def set_article
-    @article = Article.find(params[:id])
-  rescue ActiveRecord::RecordNotFound
-    redirect_to articles_path, alert: "ไม่พบบทความ"
+  
+  def authenticate_user!
+    redirect_to login_path unless current_user
   end
-
-  def check_article_owner
-    unless @article.user == current_user
-      redirect_to @article, alert: "คุณไม่ใช่เจ้าของบทความนี้"
-    end
+  
+  def set_post
+    @post = Post.find(params[:id])
   end
-
-  def require_admin!
-    unless current_user&.admin?
-      redirect_to root_path, alert: "ต้องเป็น Admin เท่านั้น"
-    end
-  end
-
-  def user_banned?
-    current_user&.banned?
-  end
-
-  def maintenance_mode_off?
-    !Rails.application.config.maintenance_mode
+  
+  def log_action
+    Rails.logger.info "User #{current_user&.id} accessed #{action_name}"
   end
 end
 ```
@@ -400,48 +357,27 @@ end
 ### after_action
 
 ```ruby
-class ArticlesController < ApplicationController
-  # รันหลัง action เสร็จ
-  after_action :track_page_view, only: [:show]
-  after_action :notify_subscribers, only: [:create]
-  after_action :log_api_usage, if: :api_request?
-
+class PostsController < ApplicationController
+  after_action :log_access, only: [:show]
+  after_action :update_stats
+  
   def show
-    @article = Article.find(params[:id])
+    @post = Post.find(params[:id])
   end
-
-  def create
-    @article = Article.create!(article_params)
-    redirect_to @article
-  end
-
+  
   private
-
-  def track_page_view
-    PageView.create!(
-      path: request.path,
+  
+  def log_access
+    AccessLog.create!(
       user: current_user,
-      ip_address: request.remote_ip,
-      user_agent: request.user_agent
+      resource: @post,
+      action: "view"
     )
   end
-
-  def notify_subscribers
-    return unless @article&.persisted?
-    ArticleNotificationJob.perform_later(@article.id)
-  end
-
-  def log_api_usage
-    ApiLog.create!(
-      endpoint: request.path,
-      method: request.method,
-      user: current_user,
-      response_status: response.status
-    )
-  end
-
-  def api_request?
-    request.format.json?
+  
+  def update_stats
+    # รันหลังทุก action
+    Stats.increment("request_count")
   end
 end
 ```
@@ -449,98 +385,145 @@ end
 ### around_action
 
 ```ruby
-class ArticlesController < ApplicationController
-  around_action :track_execution_time
-  around_action :wrap_in_transaction, only: [:create, :update, :destroy]
-
-  private
-
-  def track_execution_time
-    start_time = Time.current
-    yield  # รัน action
-    end_time = Time.current
-
-    duration = (end_time - start_time) * 1000
-    Rails.logger.info("#{action_name} took #{duration.round(2)}ms")
-
-    response.headers["X-Execution-Time"] = duration.to_s
+class PostsController < ApplicationController
+  around_action :time_action
+  around_action :catch_errors
+  
+  def index
+    @posts = Post.all
   end
-
-  def wrap_in_transaction
-    ActiveRecord::Base.transaction do
-      yield
-    end
-  rescue ActiveRecord::RecordInvalid => e
-    flash[:alert] = e.message
-    redirect_to :back
+  
+  private
+  
+  def time_action
+    start = Time.current
+    yield  # รัน action จริงๆ
+    elapsed = Time.current - start
+    Rails.logger.info "#{action_name} took #{elapsed.round(3)}s"
+  end
+  
+  def catch_errors
+    yield
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: "Not found" }, status: :not_found
+  rescue StandardError => e
+    Sentry.capture_exception(e)
+    render json: { error: "Server error" }, status: :internal_server_error
   end
 end
 ```
 
-### Skipping Callbacks
+### Filter Ordering
 
 ```ruby
-class AdminArticlesController < ArticlesController
-  # Skip inherited before_action
-  skip_before_action :authenticate_user!, only: [:index]
-  skip_before_action :check_article_owner
+class ApplicationController < ActionController::Base
+  before_action :authenticate_user!
+end
+
+class PostsController < ApplicationController
+  before_action :set_post, only: [:show]
+  
+  # ลำดับการรัน:
+  # 1. authenticate_user! (จาก ApplicationController)
+  # 2. set_post (จาก PostsController)
+  # 3. action จริง (show, index, etc.)
 end
 ```
 
 ---
 
-## ขั้นตอนที่ 735: render vs redirect_to
+## Step 735: skip_before_action
+
+```ruby
+class ApplicationController < ActionController::Base
+  before_action :authenticate_user!
+  before_action :check_maintenance_mode
+end
+
+class SessionsController < ApplicationController
+  # ข้าม authentication สำหรับ login หน้า
+  skip_before_action :authenticate_user!, only: [:new, :create]
+  
+  def new
+    # หน้า login - ไม่ต้อง authenticate
+  end
+  
+  def create
+    # สร้าง session - ไม่ต้อง authenticate
+  end
+  
+  def destroy
+    # Logout - ต้อง authenticate (ไม่ skip)
+  end
+end
+
+class PublicController < ApplicationController
+  skip_before_action :authenticate_user!
+  skip_before_action :check_maintenance_mode
+  
+  def index
+    # Public page
+  end
+end
+```
+
+---
+
+## Step 736: render vs redirect_to
 
 ### render
 
 ```ruby
-class ArticlesController < ApplicationController
-  def new
-    @article = Article.new
-    # Default: render :new  (app/views/articles/new.html.erb)
-  end
-
+class PostsController < ApplicationController
   def create
-    @article = Article.new(article_params)
-    if @article.save
-      redirect_to @article  # ส่ง HTTP 302 แล้วให้ browser load URL ใหม่
+    @post = Post.new(post_params)
+    
+    if @post.save
+      redirect_to @post
     else
-      render :new, status: :unprocessable_entity  # แสดง new form อีกครั้ง
+      # render แสดง view โดยไม่ทำ HTTP request ใหม่
+      render :new, status: :unprocessable_entity
     end
   end
-
+  
   def show
-    @article = Article.find(params[:id])
-
+    @post = Post.find(params[:id])
+    
     # render template ต่างๆ
-    render :show               # app/views/articles/show.html.erb
-    render "articles/show"     # ระบุ path เต็ม
-    render "shared/error"      # render template จาก folder อื่น
-
-    # render inline HTML
-    render html: "<h1>Hello</h1>".html_safe
-
+    render :show                              # default - แสดง views/posts/show.html.erb
+    render "show"                             # เหมือนกัน
+    render template: "posts/show"             # explicit template path
+    render "posts/index"                      # template อื่น
+    
+    # render ด้วย layout ต่างๆ
+    render :show, layout: false               # ไม่ใช้ layout
+    render :show, layout: "special"           # ใช้ layout อื่น
+    render layout: "mobile"                   # เปลี่ยน layout
+    
     # render JSON
-    render json: @article
-
+    render json: @post
+    render json: @post, status: :ok
+    render json: { error: "Not found" }, status: :not_found
+    render json: @post, only: [:id, :title]
+    render json: @post.to_json(include: :comments)
+    
     # render text
     render plain: "Hello World"
-
-    # render file
-    render file: Rails.root.join("public/404.html"), status: :not_found
-
+    render html: "<h1>Hello</h1>".html_safe
+    
+    # render ด้วย status
+    render :show, status: 200
+    render :new, status: :unprocessable_entity  # 422
+    render :show, status: :not_found            # 404
+    render :show, status: :forbidden            # 403
+    
+    # render XML
+    render xml: @post
+    
     # render nothing
     head :ok
-
-    # render กับ layout
-    render :show, layout: "admin"
-    render :show, layout: false  # ไม่มี layout
-    render layout: "application"
-
-    # render กับ status
-    render :show, status: :ok       # 200
-    render :new, status: :unprocessable_entity  # 422
-    render :show, status: 404
+    head :no_content   # 204
+    head :not_found    # 404
   end
 end
 ```
@@ -548,325 +531,420 @@ end
 ### redirect_to
 
 ```ruby
-class ArticlesController < ApplicationController
+class PostsController < ApplicationController
   def create
-    @article = Article.create!(article_params)
-
-    # redirect กับ path helper
-    redirect_to articles_path
-
-    # redirect กับ object
-    redirect_to @article  # Rails รู้ว่าต้อง redirect ไป article_path(@article)
-
-    # redirect กับ URL
-    redirect_to "https://example.com"
-
-    # redirect กับ flash message
-    redirect_to @article, notice: "สร้างเรียบร้อย!"
-    redirect_to articles_path, alert: "เกิดข้อผิดพลาด"
-    redirect_to root_path, flash: { custom_type: "Custom message" }
-
-    # redirect back
-    redirect_back fallback_location: root_path
-    redirect_back_or_to root_path  # Rails 7.1+
-
-    # redirect กับ status
-    redirect_to articles_path, status: :moved_permanently  # 301
-    redirect_to articles_path, status: :found              # 302 (default)
-    redirect_to articles_path, status: :see_other          # 303
-    redirect_to articles_path, status: :temporary_redirect  # 307
-
-    # redirect กับ allow_other_host (Rails 7.1)
-    redirect_to "https://external.com", allow_other_host: true
+    @post = Post.create(post_params)
+    
+    # redirect สร้าง HTTP 302 response
+    redirect_to posts_path                    # => GET /posts
+    redirect_to @post                         # => GET /posts/:id
+    redirect_to post_path(@post)              # เหมือนกัน
+    
+    # redirect ด้วย flash message
+    redirect_to @post, notice: "สร้างสำเร็จ"
+    redirect_to @post, alert: "มีข้อผิดพลาด"
+    redirect_to @post, flash: { success: "OK", info: "Note" }
+    
+    # redirect ด้วย status code
+    redirect_to posts_path, status: :moved_permanently  # 301
+    redirect_to posts_path, status: 302                 # default
+    redirect_to posts_path, status: :see_other          # 303
+    
+    # redirect ภายนอก
+    redirect_to "https://google.com"
+    redirect_to "https://google.com", allow_other_host: true
+    
+    # redirect กลับไปหน้าก่อนหน้า
+    redirect_back(fallback_location: root_path)
+    redirect_back_or_to root_path  # Rails 7+
   end
 end
 ```
 
-### ความแตกต่างระหว่าง render และ redirect_to
+### ความแตกต่าง render vs redirect_to
 
-```ruby
-# render: ไม่ส่ง HTTP redirect
-# - แสดง template โดยตรง
-# - instance variables พร้อมใช้ใน template
-# - URL ใน browser ไม่เปลี่ยน
-# - ใช้เมื่อ: form errors, หน้าพิเศษ
+```
+render    - แสดง view โดยไม่เพิ่ม request count
+           - ข้อมูลใน @variables ยังคงอยู่
+           - URL ไม่เปลี่ยน
+           - ใช้สำหรับ errors
 
-# redirect_to: ส่ง HTTP 302 response
-# - browser จะ load URL ใหม่
-# - instance variables หายไป (ต้องใช้ flash)
-# - URL ใน browser เปลี่ยน
-# - ใช้เมื่อ: หลัง create/update/destroy สำเร็จ
-
-# PRG Pattern (Post-Redirect-Get)
-def create
-  @article = Article.create!(article_params)
-  redirect_to @article  # ✅ PRG Pattern
-  # ไม่ render โดยตรง เพราะถ้า user refresh จะ POST ซ้ำ
-end
+redirect_to - สร้าง HTTP redirect response
+            - Browser ส่ง request ใหม่
+            - URL เปลี่ยน
+            - ใช้หลัง create/update/destroy สำเร็จ
+            - ป้องกัน double submit
 ```
 
 ---
 
-## ขั้นตอนที่ 736: Flash Messages
+## Step 737: Flash Messages
 
-### การใช้ Flash
+### Flash ปกติ
 
 ```ruby
-# ใน Controller
-class ArticlesController < ApplicationController
+# Controller
+class PostsController < ApplicationController
   def create
-    @article = Article.create!(article_params)
-
-    # Flash กับ redirect
-    redirect_to @article, notice: "บทความถูกสร้างเรียบร้อยแล้ว"
-    redirect_to @article, alert: "มีข้อผิดพลาด"
-    redirect_to @article, flash: {
-      notice: "สำเร็จ",
-      alert: "คำเตือน",
-      info: "ข้อมูล",
-      success: "สำเร็จ"
-    }
+    @post = Post.create(post_params)
+    # flash[:notice] persist ข้าม request (1 request)
+    flash[:notice] = "สร้างสำเร็จ"
+    redirect_to @post
   end
-
-  def update
-    if @article.update(article_params)
-      flash[:notice] = "อัพเดทสำเร็จ"
-      redirect_to @article
-    else
-      flash.now[:alert] = "เกิดข้อผิดพลาด"  # flash.now สำหรับ render (ไม่ใช่ redirect)
-      render :edit, status: :unprocessable_entity
-    end
-  end
-
+  
   def destroy
-    @article.destroy
-    flash[:notice] = "ลบบทความเรียบร้อยแล้ว"
-    redirect_to articles_path
+    @post.destroy
+    flash[:alert] = "ลบสำเร็จ"
+    redirect_to posts_path
   end
 end
 
-# ใน View
-# app/views/layouts/application.html.erb
+# Shorthand
+redirect_to @post, notice: "สร้างสำเร็จ"
+redirect_to posts_path, alert: "ลบสำเร็จ"
+```
+
+### flash.now (สำหรับ render)
+
+```ruby
+class PostsController < ApplicationController
+  def create
+    @post = Post.new(post_params)
+    
+    if @post.save
+      redirect_to @post, notice: "สร้างสำเร็จ"
+    else
+      # flash.now ใช้ใน request ปัจจุบัน (ไม่ persist)
+      flash.now[:alert] = "กรุณาตรวจสอบข้อมูล"
+      render :new, status: :unprocessable_entity
+    end
+  end
+end
+```
+
+### Custom Flash Types
+
+```ruby
+# config/application.rb
+class Application < Rails::Application
+  config.action_dispatch.default_headers = {
+    "X-Frame-Options" => "SAMEORIGIN"
+  }
+end
+
+# ApplicationController
+class ApplicationController < ActionController::Base
+  add_flash_types :success, :info, :warning, :danger
+end
+
+# ใช้ใน controller
+redirect_to @post, success: "บันทึกสำเร็จ"
+redirect_to @post, warning: "โปรดระวัง"
+redirect_to @post, danger: "มีข้อผิดพลาด"
+```
+
+### แสดง Flash ใน Views
+
+```erb
+<!-- app/views/layouts/application.html.erb -->
 <% flash.each do |type, message| %>
-  <% css_class = case type.to_sym
-                 when :notice, :success then "alert-success"
-                 when :alert, :error    then "alert-danger"
-                 when :warning          then "alert-warning"
-                 when :info             then "alert-info"
-                 else "alert-secondary"
-                 end %>
-  <div class="alert <%= css_class %> alert-dismissible fade show" role="alert">
+  <div class="alert alert-<%= type %>" role="alert">
+    <%= message %>
+  </div>
+<% end %>
+
+<!-- Bootstrap classes -->
+<% flash.each do |type, message| %>
+  <% css_class = { notice: "success", alert: "danger", warning: "warning" }[type.to_sym] || "info" %>
+  <div class="alert alert-<%= css_class %> alert-dismissible fade show" role="alert">
     <%= message %>
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
   </div>
 <% end %>
 ```
 
-### Flash กับ Turbo Streams (Rails 7)
-
-```ruby
-# app/views/articles/create.turbo_stream.erb
-<%= turbo_stream.prepend "articles", partial: "articles/article", locals: { article: @article } %>
-<%= turbo_stream.update "flash", partial: "shared/flash_message", locals: { message: "บทความถูกสร้างแล้ว", type: "success" } %>
-
-# Controller:
-def create
-  @article = Article.create!(article_params)
-
-  respond_to do |format|
-    format.turbo_stream
-    format.html { redirect_to @article, notice: "สร้างสำเร็จ" }
-  end
-end
-```
-
 ---
 
-## ขั้นตอนที่ 737: respond_to
-
-### respond_to สำหรับ Multiple Formats
+## Step 738: respond_to
 
 ```ruby
-class ArticlesController < ApplicationController
+class PostsController < ApplicationController
   def index
-    @articles = Article.published.includes(:user)
-
+    @posts = Post.all
+    
     respond_to do |format|
-      format.html  # render app/views/articles/index.html.erb
-      format.json do
-        render json: @articles.as_json(
-          only: [:id, :title, :status, :created_at],
-          include: {
-            user: { only: [:id, :name, :email] }
-          }
-        )
-      end
-      format.atom do
-        # RSS/Atom feed
-        render layout: false
-      end
-      format.csv do
-        send_data Article.to_csv(@articles),
-          filename: "articles-#{Date.current}.csv",
-          type: "text/csv"
-      end
-      format.pdf do
-        pdf = ArticlePDF.new(@articles)
-        send_data pdf.render,
-          filename: "articles.pdf",
-          type: "application/pdf"
-      end
-      format.xlsx do
-        response.headers["Content-Disposition"] = 'attachment; filename="articles.xlsx"'
-        render xlsx: "index"
+      format.html   # renders views/posts/index.html.erb
+      format.json { render json: @posts }
+      format.xml  { render xml: @posts }
+      format.csv  do
+        send_data @posts.to_csv, filename: "posts.csv",
+                                  type: "text/csv"
       end
     end
   end
-
+  
   def show
-    @article = Article.find(params[:id])
-
+    @post = Post.find(params[:id])
+    
     respond_to do |format|
       format.html
-      format.json { render json: @article }
-      format.pdf do
-        pdf = ArticlePDF.new(@article)
-        send_data pdf.render,
-          filename: "#{@article.slug}.pdf",
-          type: "application/pdf",
-          disposition: "inline"  # inline = แสดงในหน้าต่างเบราว์เซอร์
-          # disposition: "attachment" = download
+      format.json { render json: @post, include: :comments }
+      format.pdf  do
+        pdf = PostPdfGenerator.new(@post).generate
+        send_data pdf, filename: "post-#{@post.id}.pdf",
+                       type: "application/pdf",
+                       disposition: "inline"
+      end
+    end
+  end
+  
+  def create
+    @post = Post.new(post_params)
+    
+    respond_to do |format|
+      if @post.save
+        format.html { redirect_to @post, notice: "สร้างสำเร็จ" }
+        format.json { render json: @post, status: :created }
+        format.turbo_stream  # Rails 7 Turbo
+      else
+        format.html { render :new, status: :unprocessable_entity }
+        format.json { render json: @post.errors, status: :unprocessable_entity }
       end
     end
   end
 end
 ```
 
-### respond_with (Rails API)
+### Turbo Stream response (Rails 7)
 
 ```ruby
-# API Controller
-class Api::V1::ArticlesController < Api::BaseController
-  def index
-    @articles = Article.published
-
-    render json: {
-      data: @articles.map { |a| serialize_article(a) },
-      meta: {
-        total: @articles.count,
-        page: params[:page] || 1
-      }
-    }
-  end
-
-  def show
-    @article = Article.find(params[:id])
-    render json: { data: serialize_article(@article) }
-  end
-
-  def create
-    @article = Article.new(article_params)
-    @article.user = current_api_user
-
-    if @article.save
-      render json: { data: serialize_article(@article) }, status: :created
+def create
+  @comment = @post.comments.new(comment_params)
+  
+  respond_to do |format|
+    if @comment.save
+      format.turbo_stream  # renders views/comments/create.turbo_stream.erb
+      format.html { redirect_to @post }
     else
-      render json: {
-        errors: @article.errors.as_json,
-        message: "Validation failed"
-      }, status: :unprocessable_entity
+      format.html { render :new, status: :unprocessable_entity }
     end
   end
+end
+```
 
+```erb
+<!-- views/comments/create.turbo_stream.erb -->
+<%= turbo_stream.append "comments" do %>
+  <%= render @comment %>
+<% end %>
+```
+
+---
+
+## Step 739: params Hash
+
+```ruby
+class PostsController < ApplicationController
+  def index
+    # URL: /posts?page=2&q=ruby&sort=created_at
+    params[:page]     # => "2" (string)
+    params[:q]        # => "ruby"
+    params[:sort]     # => "created_at"
+    
+    # params.to_h - convert to regular hash
+    params.to_h
+    
+    # ตรวจสอบ
+    params[:page].present?
+    params.key?(:page)
+  end
+  
+  def show
+    # URL: /posts/1
+    params[:id]       # => "1" (string)
+    params[:id].to_i  # => 1 (integer)
+    
+    # Route parameters
+    params[:controller]  # => "posts"
+    params[:action]      # => "show"
+    params[:format]      # => nil หรือ "json"
+  end
+  
+  def create
+    # Form data หรือ JSON body
+    params[:post]         # => ActionController::Parameters
+    params[:post][:title] # => "My Post"
+    
+    # Nested params
+    params[:user][:address][:city]
+  end
+  
+  def search
+    # Array params
+    # URL: /search?tags[]=ruby&tags[]=rails
+    params[:tags]     # => ["ruby", "rails"]
+    
+    # Hash params
+    # URL: /search?filters[status]=published&filters[year]=2024
+    params[:filters][:status]  # => "published"
+    params[:filters][:year]    # => "2024"
+  end
+end
+```
+
+### ประเภท params
+
+```ruby
+# Query parameters (URL)
+# GET /posts?page=1&q=ruby
+params[:page]  # => "1"
+
+# Path parameters
+# GET /posts/1
+params[:id]    # => "1"
+
+# Form parameters (POST body)
+# POST /posts { post: { title: "Hello" } }
+params[:post][:title]  # => "Hello"
+
+# Multipart (file upload)
+params[:avatar]  # => ActionDispatch::Http::UploadedFile
+```
+
+---
+
+## Step 740: request Object
+
+```ruby
+class ApplicationController < ActionController::Base
+  def debug
+    # HTTP method
+    request.method          # => "GET", "POST", etc.
+    request.get?            # => true
+    request.post?           # => false
+    request.patch?          # => false
+    request.delete?         # => false
+    
+    # URL info
+    request.url             # => "http://example.com/posts?page=1"
+    request.path            # => "/posts"
+    request.query_string    # => "page=1"
+    request.fullpath        # => "/posts?page=1"
+    request.host            # => "example.com"
+    request.port            # => 3000
+    request.protocol        # => "http://"
+    
+    # Format
+    request.format          # => Mime::Type
+    request.format.html?    # => true
+    request.format.json?    # => false
+    request.xhr?            # => true ถ้า AJAX request
+    request.format.turbo_stream?  # Rails 7
+    
+    # IP
+    request.ip              # => "127.0.0.1"
+    request.remote_ip       # => real IP (through proxies)
+    
+    # Headers
+    request.headers["User-Agent"]
+    request.headers["Authorization"]
+    request.headers["Content-Type"]
+    request.headers["Accept"]
+    
+    # Body
+    request.body.read       # raw body
+    
+    # Environment
+    request.env             # Rack environment hash
+    
+    # SSL
+    request.ssl?            # => false in development
+    
+    # Referrer
+    request.referrer        # => URL ที่ user มาจาก
+    request.referer         # alias
+  end
+end
+```
+
+### ตัวอย่างการใช้งาน
+
+```ruby
+class ApplicationController < ActionController::Base
+  before_action :set_current_request_details
+  
   private
-
-  def serialize_article(article)
-    {
-      id: article.id,
-      type: "article",
-      attributes: {
-        title: article.title,
-        body: article.body,
-        status: article.status,
-        created_at: article.created_at.iso8601,
-        updated_at: article.updated_at.iso8601
-      },
-      relationships: {
-        user: {
-          data: {
-            id: article.user_id,
-            type: "user"
-          }
-        }
-      }
-    }
+  
+  def set_current_request_details
+    Current.ip = request.remote_ip
+    Current.user_agent = request.user_agent
+    Current.request_id = request.request_id
+  end
+  
+  def mobile_device?
+    request.user_agent =~ /Mobile|Android|iPhone|iPad/i
+  end
+  
+  def api_request?
+    request.format.json? || request.headers["Accept"] == "application/json"
   end
 end
 ```
 
 ---
 
-## ขั้นตอนที่ 738: Filters และ Callbacks
-
-### Filter Chain
+## Step 741: response Object
 
 ```ruby
-class ApplicationController < ActionController::Base
-  before_action :log_access
-  before_action :authenticate_user!
-
-  private
-
-  def log_access
-    Rails.logger.info "[#{Time.current}] #{request.method} #{request.path}"
+class PostsController < ApplicationController
+  def show
+    @post = Post.find(params[:id])
+    
+    # Set headers
+    response.headers["X-Post-Id"] = @post.id.to_s
+    response.headers["Cache-Control"] = "public, max-age=3600"
+    response.headers["Content-Type"] = "application/json"
+    
+    # Set status
+    response.status = 200
+    response.status = :ok
+    
+    # Set body
+    response.body = "Hello World"
+    
+    # Set cookies
+    response.set_cookie("seen_post_#{@post.id}", value: "true", expires: 1.day.from_now)
+    
+    # ETag สำหรับ caching
+    if stale?(@post)
+      respond_to do |format|
+        format.html
+        format.json { render json: @post }
+      end
+    end
   end
-end
-
-class ArticlesController < ApplicationController
-  # เพิ่ม filter ใหม่
-  before_action :set_article, only: [:show, :edit, :update, :destroy]
-  before_action :check_ownership, only: [:edit, :update, :destroy]
-
-  # Filter order:
-  # 1. ApplicationController#log_access
-  # 2. ApplicationController#authenticate_user!
-  # 3. ArticlesController#set_article (ถ้า action ตรง)
-  # 4. ArticlesController#check_ownership (ถ้า action ตรง)
-  # 5. Action itself (index/show/new/create/etc.)
-
-  # Skip inherited filters
-  skip_before_action :authenticate_user!, only: [:index, :show]
-
-  # Prepend filter (รันก่อน filter chain ทั้งหมด)
-  prepend_before_action :redirect_maintenance_mode
-end
-```
-
-### Conditional Filters
-
-```ruby
-class ArticlesController < ApplicationController
-  # ใช้ method name เป็น condition
-  before_action :premium_required, if: :premium_content?
-  before_action :notify_admin, unless: :admin_action?
-
-  # ใช้ lambda เป็น condition
-  before_action :check_ip, if: -> { request.remote_ip == "127.0.0.1" }
-  before_action :redirect_old_browsers, unless: -> { request.user_agent =~ /Chrome/ }
-
-  private
-
-  def premium_content?
-    action_name == "show" && @article&.premium?
+  
+  def download
+    send_file Rails.root.join("storage/files/document.pdf"),
+      filename: "document.pdf",
+      type: "application/pdf",
+      disposition: "attachment"  # force download
+      # disposition: "inline"   # แสดงใน browser
   end
-
-  def admin_action?
-    current_user&.admin?
-  end
-
-  def premium_required
-    unless current_user&.premium?
-      redirect_to upgrade_path, alert: "บทความนี้สำหรับสมาชิก Premium เท่านั้น"
+  
+  def stream
+    response.headers["Content-Type"] = "text/event-stream"
+    response.headers["X-Accel-Buffering"] = "no"
+    
+    sse = SSE.new(response.stream, retry: 300, event: "update")
+    
+    begin
+      10.times do |i|
+        sse.write({ message: "Update #{i}" })
+        sleep 1
+      end
+    ensure
+      sse.close
     end
   end
 end
@@ -874,868 +952,980 @@ end
 
 ---
 
-## ขั้นตอนที่ 739: Helper Methods ใน Controllers
-
-### Controller Helper Methods
+## Step 742: Session ใน Controllers
 
 ```ruby
-class ApplicationController < ActionController::Base
-  # ประกาศ helper_method เพื่อให้ใช้ได้ใน views
-  helper_method :current_user, :user_signed_in?, :admin?
+class SessionsController < ApplicationController
+  def create
+    user = User.find_by(email: params[:email])
+    
+    if user&.authenticate(params[:password])
+      # เก็บข้อมูลใน session
+      session[:user_id] = user.id
+      session[:login_time] = Time.current.to_s
+      session[:remember_token] = SecureRandom.hex(20)
+      
+      redirect_to root_path, notice: "เข้าสู่ระบบสำเร็จ"
+    else
+      flash.now[:alert] = "อีเมลหรือรหัสผ่านไม่ถูกต้อง"
+      render :new, status: :unprocessable_entity
+    end
+  end
+  
+  def destroy
+    # ล้าง session ทั้งหมด
+    reset_session
+    # หรือล้างแบบ selective
+    session.delete(:user_id)
+    
+    redirect_to login_path, notice: "ออกจากระบบสำเร็จ"
+  end
+end
 
+class ApplicationController < ActionController::Base
+  helper_method :current_user
+  
+  private
+  
   def current_user
     @current_user ||= User.find_by(id: session[:user_id])
   end
-
-  def user_signed_in?
-    current_user.present?
+  
+  def authenticate_user!
+    unless current_user
+      session[:return_to] = request.fullpath
+      redirect_to login_path, alert: "กรุณาเข้าสู่ระบบ"
+    end
   end
-
-  def admin?
-    current_user&.admin?
+  
+  def after_login_redirect
+    # redirect กลับไปหน้าที่ต้องการ
+    redirect_to session.delete(:return_to) || root_path
   end
 end
-
-# การใช้ใน Views:
-# <% if user_signed_in? %>
-#   <span>สวัสดี, <%= current_user.name %></span>
-# <% end %>
-#
-# <% if admin? %>
-#   <%= link_to "Admin Panel", admin_root_path %>
-# <% end %>
 ```
 
-### Utility Methods
+### Session Configuration
 
 ```ruby
-class ArticlesController < ApplicationController
-  private
+# config/initializers/session_store.rb
 
-  # Pagination helper
-  def paginate_scope(scope)
-    scope.page(params[:page]).per(per_page)
-  end
+# Cookie session (default - ข้อมูลอยู่ใน cookie)
+Rails.application.config.session_store :cookie_store, 
+  key: "_myapp_session",
+  expire_after: 14.days,
+  secure: Rails.env.production?,
+  httponly: true,
+  same_site: :lax
 
-  def per_page
-    [params[:per_page].to_i, 100].min.nonzero? || 20
-  end
-
-  # Sort helper
-  def sort_column
-    Article.column_names.include?(params[:sort]) ? params[:sort] : "created_at"
-  end
-
-  def sort_direction
-    %w[asc desc].include?(params[:direction]) ? params[:direction] : "desc"
-  end
-
-  # Search helper
-  def search_query
-    params[:q].presence
-  end
-
-  # JSON response helper
-  def render_success(data, message: nil, status: :ok)
-    response_body = { success: true, data: data }
-    response_body[:message] = message if message
-    render json: response_body, status: status
-  end
-
-  def render_error(errors, message: "Validation failed", status: :unprocessable_entity)
-    render json: {
-      success: false,
-      message: message,
-      errors: errors
-    }, status: status
-  end
-end
+# Redis session
+Rails.application.config.session_store :redis_store,
+  servers: [{ host: "localhost", port: 6379, db: 0 }],
+  expire_in: 90.minutes,
+  key: "_myapp_session"
 ```
 
 ---
 
-## ขั้นตอนที่ 740: Request และ Response Objects
-
-### Request Object
+## Step 743: Cookies ใน Controllers
 
 ```ruby
-class ArticlesController < ApplicationController
+class PostsController < ApplicationController
   def show
-    # Request information
-    request.method          # "GET", "POST", etc.
-    request.path            # "/articles/1"
-    request.url             # "http://localhost:3000/articles/1"
-    request.host            # "localhost"
-    request.port            # 3000
-    request.remote_ip       # "127.0.0.1"
-    request.user_agent      # Browser string
-    request.referer         # Previous URL
-    request.xhr?            # Ajax request?
-    request.format          # :html, :json, etc.
-    request.content_type    # "application/json"
-    request.headers["Authorization"]  # Custom headers
-
-    # Parameters
-    params[:id]             # URL params
-    request.query_parameters # Query string params
-    request.request_parameters # POST body params
-
-    # Body
-    request.body.read       # Raw request body
-
-    # Cookies
-    cookies[:session_token]
-    request.cookies
-  end
-end
-```
-
-### Response Object
-
-```ruby
-class ArticlesController < ApplicationController
-  def index
-    @articles = Article.all
-
-    # Set response headers
-    response.headers["X-Custom-Header"] = "value"
-    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    response.headers["Last-Modified"] = Article.maximum(:updated_at).httpdate
-
-    # Set cache headers
-    expires_in 10.minutes, public: true
-
-    # Set content type
-    response.content_type = "application/json"
-
-    # Status
-    response.status = :ok  # หรือ 200
-
-    # ETag caching
-    fresh_when etag: @articles, last_modified: @articles.maximum(:updated_at)
+    @post = Post.find(params[:id])
+    
+    # อ่าน cookie
+    viewed_posts = JSON.parse(cookies[:viewed_posts] || "[]")
+    
+    # เขียน cookie
+    viewed_posts << @post.id
+    viewed_posts = viewed_posts.last(10)  # เก็บ 10 อัน
+    cookies[:viewed_posts] = {
+      value: viewed_posts.to_json,
+      expires: 30.days.from_now,
+      httponly: true
+    }
+    
+    # Signed cookie (ป้องกัน tampering)
+    cookies.signed[:user_id] = {
+      value: current_user.id,
+      expires: 30.days.from_now
+    }
+    
+    # อ่าน signed cookie
+    user_id = cookies.signed[:user_id]
+    
+    # Encrypted cookie (ป้องกันทั้ง tampering และ reading)
+    cookies.encrypted[:preferences] = {
+      value: { theme: "dark" }.to_json,
+      expires: 1.year.from_now
+    }
+    preferences = JSON.parse(cookies.encrypted[:preferences] || "{}")
+    
+    # ลบ cookie
+    cookies.delete(:viewed_posts)
+    
+    # Permanent cookie
+    cookies.permanent[:theme] = "dark"
+    cookies.permanent.signed[:remember_token] = remember_token
   end
 end
 ```
 
 ---
 
-## ขั้นตอนที่ 741: Concerns สำหรับ Controllers
-
-### การสร้าง Controller Concern
-
-```ruby
-# app/controllers/concerns/paginatable.rb
-module Paginatable
-  extend ActiveSupport::Concern
-
-  included do
-    before_action :set_pagination_params
-  end
-
-  private
-
-  def set_pagination_params
-    @page = params.fetch(:page, 1).to_i
-    @per_page = [params.fetch(:per_page, 20).to_i, 100].min
-  end
-
-  def paginate(scope)
-    scope.page(@page).per(@per_page)
-  end
-
-  def pagination_meta(collection)
-    {
-      current_page: collection.current_page,
-      total_pages: collection.total_pages,
-      total_count: collection.total_count,
-      per_page: collection.limit_value
-    }
-  end
-end
-```
+## Step 744: Concerns (Shared Controller Code)
 
 ```ruby
 # app/controllers/concerns/authenticatable.rb
 module Authenticatable
   extend ActiveSupport::Concern
-
+  
   included do
-    before_action :authenticate_request
-    helper_method :current_user
+    before_action :authenticate_user!
+    helper_method :current_user, :user_signed_in?
   end
-
-  private
-
-  def authenticate_request
-    header = request.headers["Authorization"]
-    token = header&.split(" ")&.last
-
-    payload = JwtService.decode(token)
-    @current_user_id = payload&.dig("user_id")
-
-    unless @current_user_id
-      render json: { error: "Unauthorized" }, status: :unauthorized
-    end
-  end
-
-  def current_user
-    @current_user ||= User.find_by(id: @current_user_id)
-  end
-end
-```
-
-```ruby
-# app/controllers/concerns/rate_limitable.rb
-module RateLimitable
-  extend ActiveSupport::Concern
-
-  included do
-    before_action :check_rate_limit
-  end
-
-  private
-
-  def check_rate_limit
-    key = "rate_limit:#{request.remote_ip}:#{action_name}"
-    count = Rails.cache.increment(key, 1, expires_in: 1.minute)
-
-    if count > rate_limit_for(action_name)
-      render json: { error: "Rate limit exceeded" }, status: :too_many_requests
-    end
-  end
-
-  def rate_limit_for(action)
-    limits = {
-      "index" => 100,
-      "show" => 100,
-      "create" => 10,
-      "update" => 20,
-      "destroy" => 10
-    }
-    limits[action] || 60
-  end
-end
-```
-
-```ruby
-# app/controllers/api/v1/articles_controller.rb
-class Api::V1::ArticlesController < Api::BaseController
-  include Paginatable
-  include RateLimitable
-
-  def index
-    @articles = paginate(Article.published)
-
-    render json: {
-      data: @articles,
-      meta: pagination_meta(@articles)
-    }
-  end
-end
-```
-
----
-
-## ขั้นตอนที่ 742-755: Testing Controllers
-
-### Controller Tests ด้วย RSpec
-
-```ruby
-# spec/requests/articles_spec.rb (Request specs แนะนำมากกว่า Controller specs)
-require "rails_helper"
-
-RSpec.describe "Articles", type: :request do
-  let(:user) { create(:user) }
-  let(:other_user) { create(:user) }
-  let(:article) { create(:article, user: user) }
-
-  describe "GET /articles" do
-    before do
-      create_list(:article, 5, status: "published")
-    end
-
-    it "returns success" do
-      get articles_path
-      expect(response).to have_http_status(:ok)
-    end
-
-    it "displays articles" do
-      get articles_path
-      expect(response.body).to include(article.title)
-    end
-
-    context "with pagination" do
-      it "paginates results" do
-        get articles_path, params: { page: 1, per_page: 2 }
-        expect(response).to have_http_status(:ok)
-      end
-    end
-
-    context "with search" do
-      it "filters by search query" do
-        target = create(:article, title: "Ruby on Rails Tips", status: "published")
-        other = create(:article, title: "Python Tips", status: "published")
-
-        get articles_path, params: { q: "Ruby" }
-        expect(response.body).to include(target.title)
-        expect(response.body).not_to include(other.title)
-      end
-    end
-  end
-
-  describe "GET /articles/:id" do
-    context "when article exists" do
-      let!(:published_article) { create(:article, status: "published") }
-
-      it "returns success" do
-        get article_path(published_article)
-        expect(response).to have_http_status(:ok)
-      end
-    end
-
-    context "when article does not exist" do
-      it "returns 404" do
-        get article_path(id: 999999)
-        expect(response).to have_http_status(:not_found)
-      end
-    end
-  end
-
-  describe "POST /articles" do
-    context "when authenticated" do
-      before { sign_in user }
-
-      context "with valid params" do
-        let(:valid_params) do
-          { article: { title: "New Article", body: "This is the article body content that is long enough", status: "draft" } }
-        end
-
-        it "creates article" do
-          expect {
-            post articles_path, params: valid_params
-          }.to change(Article, :count).by(1)
-        end
-
-        it "redirects to article" do
-          post articles_path, params: valid_params
-          expect(response).to redirect_to(article_path(Article.last))
-        end
-
-        it "sets flash notice" do
-          post articles_path, params: valid_params
-          expect(flash[:notice]).to be_present
-        end
-      end
-
-      context "with invalid params" do
-        let(:invalid_params) do
-          { article: { title: "", body: "" } }
-        end
-
-        it "does not create article" do
-          expect {
-            post articles_path, params: invalid_params
-          }.not_to change(Article, :count)
-        end
-
-        it "renders new template" do
-          post articles_path, params: invalid_params
-          expect(response).to have_http_status(:unprocessable_entity)
-          expect(response).to render_template(:new)
-        end
-      end
-    end
-
-    context "when not authenticated" do
-      it "redirects to login" do
-        post articles_path, params: { article: attributes_for(:article) }
-        expect(response).to redirect_to(login_path)
-      end
-    end
-  end
-
-  describe "PATCH /articles/:id" do
-    context "when authenticated as owner" do
-      before { sign_in user }
-
-      context "with valid params" do
-        it "updates article" do
-          patch article_path(article), params: {
-            article: { title: "Updated Title" }
-          }
-          expect(article.reload.title).to eq("Updated Title")
-        end
-      end
-    end
-
-    context "when authenticated as other user" do
-      before { sign_in other_user }
-
-      it "redirects with error" do
-        patch article_path(article), params: {
-          article: { title: "Hacked Title" }
-        }
-        expect(response).to redirect_to(articles_path)
-        expect(flash[:alert]).to be_present
-      end
-    end
-  end
-
-  describe "DELETE /articles/:id" do
-    context "when authenticated as owner" do
-      before { sign_in user }
-
-      it "destroys article" do
-        article  # Ensure article exists
-        expect {
-          delete article_path(article)
-        }.to change(Article, :count).by(-1)
-      end
-
-      it "redirects to articles" do
-        delete article_path(article)
-        expect(response).to redirect_to(articles_path)
-      end
-    end
-  end
-end
-```
-
-### JSON API Tests
-
-```ruby
-# spec/requests/api/v1/articles_spec.rb
-require "rails_helper"
-
-RSpec.describe "Api::V1::Articles", type: :request do
-  let(:user) { create(:user) }
-  let(:headers) { { "Authorization" => "Bearer #{user.api_token}", "Content-Type" => "application/json" } }
-
-  describe "GET /api/v1/articles" do
-    before { create_list(:article, 3, status: "published") }
-
-    it "returns articles" do
-      get api_v1_articles_path, headers: headers
-      expect(response).to have_http_status(:ok)
-
-      json = JSON.parse(response.body)
-      expect(json["data"].length).to eq(3)
-    end
-
-    it "includes pagination meta" do
-      get api_v1_articles_path, headers: headers
-      json = JSON.parse(response.body)
-      expect(json["meta"]).to include("total", "page")
-    end
-  end
-
-  describe "POST /api/v1/articles" do
-    let(:valid_params) do
-      {
-        article: {
-          title: "New API Article",
-          body: "This is a test article body with enough content",
-          status: "draft"
-        }
-      }.to_json
-    end
-
-    it "creates article" do
-      expect {
-        post api_v1_articles_path, params: valid_params, headers: headers
-      }.to change(Article, :count).by(1)
-
-      expect(response).to have_http_status(:created)
-    end
-
-    context "without authentication" do
-      it "returns 401" do
-        post api_v1_articles_path, params: valid_params
-        expect(response).to have_http_status(:unauthorized)
-      end
-    end
-  end
-end
-```
-
----
-
-## แบบฝึกหัด Part 34 (ขั้นตอนที่ 731-755)
-
-**ข้อ 1:** สร้าง ApplicationController ที่มี authentication และ error handling
-
-```ruby
-# คำตอบ:
-class ApplicationController < ActionController::Base
-  before_action :authenticate_user!
-  helper_method :current_user, :user_signed_in?
-
-  rescue_from ActiveRecord::RecordNotFound do |e|
-    respond_to do |format|
-      format.html { render "errors/not_found", status: :not_found }
-      format.json { render json: { error: "Not found" }, status: :not_found }
-    end
-  end
-
-  private
-
+  
   def current_user
     @current_user ||= User.find_by(id: session[:user_id])
   end
-
+  
   def user_signed_in?
     current_user.present?
   end
-
+  
+  private
+  
   def authenticate_user!
-    redirect_to login_path unless user_signed_in?
+    redirect_to login_path, alert: "กรุณาเข้าสู่ระบบ" unless user_signed_in?
+  end
+end
+
+# app/controllers/concerns/paginatable.rb
+module Paginatable
+  extend ActiveSupport::Concern
+  
+  private
+  
+  def paginate(scope)
+    scope.page(params[:page]).per(per_page)
+  end
+  
+  def per_page
+    [(params[:per_page] || 25).to_i, 100].min
+  end
+end
+
+# app/controllers/concerns/sortable.rb
+module Sortable
+  extend ActiveSupport::Concern
+  
+  private
+  
+  def sort_column(model)
+    allowed_columns = model.column_names
+    allowed_columns.include?(params[:sort]) ? params[:sort] : "created_at"
+  end
+  
+  def sort_direction
+    %w[asc desc].include?(params[:direction]) ? params[:direction] : "desc"
+  end
+end
+
+# ใช้ concerns ใน controller
+class PostsController < ApplicationController
+  include Paginatable
+  include Sortable
+  
+  def index
+    @posts = paginate(
+      Post.order(sort_column(Post) => sort_direction)
+    )
+  end
+end
+
+class ApplicationController < ActionController::Base
+  include Authenticatable
+end
+```
+
+---
+
+## Step 745: Testing Controllers
+
+### Minitest
+
+```ruby
+# test/controllers/posts_controller_test.rb
+require "test_helper"
+
+class PostsControllerTest < ActionDispatch::IntegrationTest
+  setup do
+    @user = users(:one)
+    @post = posts(:one)
+    sign_in @user  # หรือ session[:user_id] = @user.id
+  end
+  
+  # Test index
+  test "GET /posts returns success" do
+    get posts_path
+    assert_response :success
+    assert_template :index
+  end
+  
+  # Test show
+  test "GET /posts/:id returns success" do
+    get post_path(@post)
+    assert_response :success
+    assert_assigns(:post, @post)
+  end
+  
+  # Test create
+  test "POST /posts with valid params" do
+    assert_difference("Post.count", 1) do
+      post posts_path, params: {
+        post: { title: "New Post", content: "Content" }
+      }
+    end
+    assert_redirected_to post_path(Post.last)
+    assert_equal "สร้างบทความสำเร็จ", flash[:notice]
+  end
+  
+  test "POST /posts with invalid params" do
+    assert_no_difference("Post.count") do
+      post posts_path, params: {
+        post: { title: "", content: "" }
+      }
+    end
+    assert_response :unprocessable_entity
+    assert_template :new
+  end
+  
+  # Test update
+  test "PATCH /posts/:id with valid params" do
+    patch post_path(@post), params: {
+      post: { title: "Updated Title" }
+    }
+    assert_redirected_to post_path(@post)
+    @post.reload
+    assert_equal "Updated Title", @post.title
+  end
+  
+  # Test destroy
+  test "DELETE /posts/:id" do
+    assert_difference("Post.count", -1) do
+      delete post_path(@post)
+    end
+    assert_redirected_to posts_path
+  end
+  
+  # Test unauthorized
+  test "redirect to login when not authenticated" do
+    sign_out
+    get posts_path
+    assert_redirected_to login_path
   end
 end
 ```
 
-**ข้อ 2:** เขียน Strong Parameters สำหรับ User model ที่มี nested profile
+### RSpec
 
 ```ruby
-# คำตอบ:
+# spec/requests/posts_spec.rb
+require "rails_helper"
+
+RSpec.describe "Posts", type: :request do
+  let(:user) { create(:user) }
+  let(:post) { create(:post, user: user) }
+  
+  before { sign_in user }
+  
+  describe "GET /posts" do
+    it "returns success" do
+      get posts_path
+      expect(response).to have_http_status(:success)
+    end
+    
+    it "shows all posts" do
+      create_list(:post, 3, user: user)
+      get posts_path
+      expect(response.body).to include(post.title)
+    end
+  end
+  
+  describe "POST /posts" do
+    context "with valid params" do
+      let(:valid_params) { { post: { title: "New Post", content: "Content" } } }
+      
+      it "creates a post" do
+        expect {
+          post posts_path, params: valid_params
+        }.to change(Post, :count).by(1)
+      end
+      
+      it "redirects to the new post" do
+        post posts_path, params: valid_params
+        expect(response).to redirect_to(Post.last)
+      end
+    end
+    
+    context "with invalid params" do
+      let(:invalid_params) { { post: { title: "", content: "" } } }
+      
+      it "does not create a post" do
+        expect {
+          post posts_path, params: invalid_params
+        }.not_to change(Post, :count)
+      end
+      
+      it "returns unprocessable entity" do
+        post posts_path, params: invalid_params
+        expect(response).to have_http_status(:unprocessable_entity)
+      end
+    end
+  end
+  
+  describe "DELETE /posts/:id" do
+    it "destroys the post" do
+      post_to_delete = create(:post, user: user)
+      expect {
+        delete post_path(post_to_delete)
+      }.to change(Post, :count).by(-1)
+    end
+  end
+end
+```
+
+---
+
+## แบบฝึกหัด (Steps 746-755)
+
+### แบบฝึกหัดที่ 1
+สร้าง ApplicationController ที่มี `current_user` helper และ `authenticate_user!` before_action
+
+**เฉลย:**
+```ruby
+class ApplicationController < ActionController::Base
+  helper_method :current_user
+  
+  private
+  
+  def current_user
+    @current_user ||= User.find_by(id: session[:user_id])
+  end
+  
+  def authenticate_user!
+    redirect_to login_path unless current_user
+  end
+end
+```
+
+### แบบฝึกหัดที่ 2
+สร้าง `PostsController` ที่มีทุก 7 RESTful actions พร้อม Strong Parameters
+
+**เฉลย:**
+```ruby
+class PostsController < ApplicationController
+  before_action :set_post, only: [:show, :edit, :update, :destroy]
+  
+  def index
+    @posts = Post.all
+  end
+  
+  def show; end
+  
+  def new
+    @post = Post.new
+  end
+  
+  def create
+    @post = Post.new(post_params)
+    if @post.save
+      redirect_to @post, notice: "สร้างสำเร็จ"
+    else
+      render :new, status: :unprocessable_entity
+    end
+  end
+  
+  def edit; end
+  
+  def update
+    if @post.update(post_params)
+      redirect_to @post, notice: "อัปเดตสำเร็จ"
+    else
+      render :edit, status: :unprocessable_entity
+    end
+  end
+  
+  def destroy
+    @post.destroy
+    redirect_to posts_path, notice: "ลบสำเร็จ", status: :see_other
+  end
+  
+  private
+  
+  def set_post
+    @post = Post.find(params[:id])
+  end
+  
+  def post_params
+    params.require(:post).permit(:title, :content)
+  end
+end
+```
+
+### แบบฝึกหัดที่ 3
+เพิ่ม before_action ที่ตรวจสอบว่า user เป็น admin เท่านั้นที่เข้าถึง destroy ได้
+
+**เฉลย:**
+```ruby
+before_action :require_admin!, only: [:destroy]
+
+private
+
+def require_admin!
+  redirect_to root_path, alert: "ไม่มีสิทธิ์" unless current_user&.admin?
+end
+```
+
+### แบบฝึกหัดที่ 4
+สร้าง controller ที่ respond ทั้ง HTML และ JSON
+
+**เฉลย:**
+```ruby
+def index
+  @posts = Post.all
+  
+  respond_to do |format|
+    format.html
+    format.json { render json: @posts }
+  end
+end
+```
+
+### แบบฝึกหัดที่ 5
+ใช้ flash.now เพื่อแสดง error message เมื่อ create ไม่สำเร็จ
+
+**เฉลย:**
+```ruby
+def create
+  @post = Post.new(post_params)
+  if @post.save
+    redirect_to @post, notice: "สร้างสำเร็จ"
+  else
+    flash.now[:alert] = "กรุณาตรวจสอบข้อมูล"
+    render :new, status: :unprocessable_entity
+  end
+end
+```
+
+### แบบฝึกหัดที่ 6
+สร้าง concern `Trackable` ที่ log action ทุกครั้งที่มี request
+
+**เฉลย:**
+```ruby
+# app/controllers/concerns/trackable.rb
+module Trackable
+  extend ActiveSupport::Concern
+  
+  included do
+    after_action :log_action
+  end
+  
+  private
+  
+  def log_action
+    Rails.logger.info "[#{Time.current}] #{controller_name}##{action_name} - User: #{current_user&.id}"
+  end
+end
+```
+
+### แบบฝึกหัดที่ 7
+implement `skip_before_action` ให้ SessionsController ข้าม authenticate
+
+**เฉลย:**
+```ruby
+class SessionsController < ApplicationController
+  skip_before_action :authenticate_user!, only: [:new, :create]
+  
+  def new; end
+  
+  def create
+    user = User.find_by(email: params[:email])
+    if user&.authenticate(params[:password])
+      session[:user_id] = user.id
+      redirect_to root_path
+    else
+      flash.now[:alert] = "ข้อมูลไม่ถูกต้อง"
+      render :new, status: :unprocessable_entity
+    end
+  end
+  
+  def destroy
+    reset_session
+    redirect_to login_path
+  end
+end
+```
+
+### แบบฝึกหัดที่ 8
+สร้าง around_action ที่วัดเวลาการรัน action
+
+**เฉลย:**
+```ruby
+around_action :measure_performance
+
+private
+
+def measure_performance
+  start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+  yield
+  elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start
+  Rails.logger.info "#{controller_name}##{action_name} took #{(elapsed * 1000).round(2)}ms"
+end
+```
+
+### แบบฝึกหัดที่ 9
+ใช้ Strong Parameters สำหรับ User ที่มี nested address attributes
+
+**เฉลย:**
+```ruby
 def user_params
   params.require(:user).permit(
     :name,
     :email,
     :password,
     :password_confirmation,
-    :avatar,
-    profile_attributes: [
-      :id,
-      :bio,
-      :website,
-      :github_username,
-      :twitter_username,
-      :location,
-      :_destroy
-    ]
+    address_attributes: [:id, :street, :city, :province, :postal_code, :_destroy]
   )
 end
 ```
 
-**ข้อ 3:** เขียน before_action ที่ตรวจสอบว่า user เป็นเจ้าของ resource
+### แบบฝึกหัดที่ 10
+สร้าง before_action ที่ set ค่า @post และ handle RecordNotFound error
 
+**เฉลย:**
 ```ruby
-# คำตอบ:
-class ArticlesController < ApplicationController
-  before_action :set_article, only: [:show, :edit, :update, :destroy]
-  before_action :ensure_owner!, only: [:edit, :update, :destroy]
+before_action :set_post, only: [:show, :edit, :update, :destroy]
 
-  private
+private
 
-  def set_article
-    @article = Article.find(params[:id])
+def set_post
+  @post = Post.find(params[:id])
+rescue ActiveRecord::RecordNotFound
+  redirect_to posts_path, alert: "ไม่พบบทความ"
+end
+```
+
+### แบบฝึกหัดที่ 11
+สร้าง action ที่ส่ง redirect_back พร้อม fallback
+
+**เฉลย:**
+```ruby
+def vote
+  @post = Post.find(params[:id])
+  @post.votes.create!(user: current_user)
+  redirect_back(fallback_location: @post, notice: "โหวตสำเร็จ")
+end
+```
+
+### แบบฝึกหัดที่ 12
+implement cookie-based "remember me" feature
+
+**เฉลย:**
+```ruby
+def create
+  user = User.find_by(email: params[:email])
+  
+  if user&.authenticate(params[:password])
+    session[:user_id] = user.id
+    
+    if params[:remember_me]
+      token = SecureRandom.urlsafe_base64
+      user.update!(remember_token: token)
+      cookies.permanent.signed[:remember_token] = token
+    end
+    
+    redirect_to root_path
   end
+end
 
-  def ensure_owner!
-    unless @article.user == current_user || current_user.admin?
-      respond_to do |format|
-        format.html { redirect_to articles_path, alert: "ไม่มีสิทธิ์เข้าถึง" }
-        format.json { render json: { error: "Forbidden" }, status: :forbidden }
+# ใน ApplicationController
+def current_user
+  @current_user ||= 
+    if session[:user_id]
+      User.find_by(id: session[:user_id])
+    elsif cookies.signed[:remember_token]
+      user = User.find_by(remember_token: cookies.signed[:remember_token])
+      session[:user_id] = user.id if user
+      user
+    end
+end
+```
+
+### แบบฝึกหัดที่ 13
+เขียน request spec สำหรับ PostsController ที่ test index action
+
+**เฉลย:**
+```ruby
+RSpec.describe "Posts", type: :request do
+  describe "GET /posts" do
+    before { create_list(:post, 5) }
+    
+    it "returns success" do
+      get posts_path
+      expect(response).to have_http_status(:ok)
+    end
+    
+    it "returns posts in the response" do
+      get posts_path
+      expect(response.body).to include(Post.first.title)
+    end
+    
+    context "as JSON" do
+      it "returns JSON" do
+        get posts_path, headers: { "Accept" => "application/json" }
+        expect(response.content_type).to include("application/json")
       end
     end
   end
 end
 ```
 
-**ข้อ 4:** เขียน respond_to ที่รองรับ HTML, JSON, และ CSV
+### แบบฝึกหัดที่ 14
+สร้าง action ที่ download CSV file
 
+**เฉลย:**
 ```ruby
-# คำตอบ:
-def index
-  @products = Product.active.order(:name)
-
+def export
+  @posts = Post.all
+  
   respond_to do |format|
-    format.html
-    format.json { render json: @products }
     format.csv do
       csv_data = CSV.generate(headers: true) do |csv|
-        csv << ["ID", "Name", "Price", "Stock"]
-        @products.each do |p|
-          csv << [p.id, p.name, p.price, p.stock]
+        csv << ["ID", "Title", "Created At"]
+        @posts.each do |post|
+          csv << [post.id, post.title, post.created_at.strftime("%Y-%m-%d")]
         end
       end
-      send_data csv_data,
-        filename: "products-#{Date.current}.csv",
-        type: "text/csv"
+      send_data csv_data, 
+                filename: "posts-#{Date.today}.csv",
+                type: "text/csv"
     end
   end
 end
 ```
 
-**ข้อ 5:** สร้าง flash message ที่รองรับหลาย types
+### แบบฝึกหัดที่ 15
+implement pagination โดยใช้ Concern
 
-```erb
-<%# app/views/shared/_flash.html.erb %>
-<% flash.each do |type, message| %>
-  <% css_class = { notice: "success", alert: "danger", warning: "warning", info: "info" }[type.to_sym] || "secondary" %>
-  <div class="alert alert-<%= css_class %> alert-dismissible">
-    <%= message %>
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-  </div>
-<% end %>
-```
-
-**ข้อ 6:** เขียน around_action สำหรับ measure execution time
-
+**เฉลย:**
 ```ruby
-# คำตอบ:
-around_action :measure_execution do
-  start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-  yield
-  elapsed = (Process.clock_gettime(Process::CLOCK_MONOTONIC) - start) * 1000
-  Rails.logger.info("[Performance] #{controller_name}##{action_name}: #{elapsed.round(2)}ms")
-  response.headers["X-Runtime-Ms"] = elapsed.round(2).to_s
-end
-```
-
-**ข้อ 7:** สร้าง Controller Concern สำหรับ sorting
-
-```ruby
-# คำตอบ:
-# app/controllers/concerns/sortable.rb
-module Sortable
+# app/controllers/concerns/paginatable.rb
+module Paginatable
   extend ActiveSupport::Concern
-
-  ALLOWED_SORT_COLUMNS = %w[created_at updated_at name title].freeze
-  ALLOWED_SORT_DIRECTIONS = %w[asc desc].freeze
-
+  
   private
-
-  def sort_column(allowed: ALLOWED_SORT_COLUMNS, default: "created_at")
-    allowed.include?(params[:sort]) ? params[:sort] : default
-  end
-
-  def sort_direction(default: "desc")
-    ALLOWED_SORT_DIRECTIONS.include?(params[:dir]) ? params[:dir] : default
-  end
-
-  def sorted(scope, allowed: ALLOWED_SORT_COLUMNS, default_col: "created_at", default_dir: "desc")
-    scope.order(sort_column(allowed: allowed, default: default_col) => sort_direction(default: default_dir))
-  end
-end
-
-# ใช้:
-class ArticlesController < ApplicationController
-  include Sortable
-
-  def index
-    @articles = sorted(Article.published, allowed: %w[title created_at views_count])
-  end
-end
-```
-
-**ข้อ 8:** เขียน request spec สำหรับ CRUD actions
-
-```ruby
-# คำตอบ:
-RSpec.describe "Products", type: :request do
-  let(:user) { create(:user) }
-  let(:product) { create(:product, user: user) }
-
-  before { sign_in user }
-
-  it "creates a product" do
-    expect {
-      post products_path, params: {
-        product: { name: "Test", price: 100, stock: 10 }
+  
+  def paginate(scope)
+    page = [params[:page].to_i, 1].max
+    per_page = [[params[:per_page].to_i, 10].max, 100].min
+    
+    total = scope.count
+    offset = (page - 1) * per_page
+    
+    {
+      records: scope.limit(per_page).offset(offset),
+      meta: {
+        total: total,
+        page: page,
+        per_page: per_page,
+        total_pages: (total.to_f / per_page).ceil
       }
-    }.to change(Product, :count).by(1)
-    expect(response).to redirect_to(product_path(Product.last))
-  end
-
-  it "updates a product" do
-    patch product_path(product), params: {
-      product: { name: "Updated Name" }
     }
-    expect(product.reload.name).to eq("Updated Name")
-  end
-
-  it "destroys a product" do
-    product
-    expect {
-      delete product_path(product)
-    }.to change(Product, :count).by(-1)
   end
 end
 ```
 
-**ข้อ 9:** สร้าง API controller ที่ return JSON responses แบบสม่ำเสมอ
+### แบบฝึกหัดที่ 16
+สร้าง after_action ที่ cache response headers
 
+**เฉลย:**
 ```ruby
-# คำตอบ:
-class Api::BaseController < ActionController::API
-  before_action :authenticate!
+after_action :set_cache_headers, only: [:show, :index]
 
-  rescue_from ActiveRecord::RecordNotFound do
-    render_error("Not found", status: :not_found)
+private
+
+def set_cache_headers
+  if @post&.published?
+    response.headers["Cache-Control"] = "public, max-age=300"
+    response.headers["Vary"] = "Accept"
+  else
+    response.headers["Cache-Control"] = "private, no-cache"
   end
+end
+```
 
-  rescue_from ActiveRecord::RecordInvalid do |e|
-    render_error("Validation failed", errors: e.record.errors.full_messages)
+### แบบฝึกหัดที่ 17
+ใช้ request.xhr? เพื่อ respond แตกต่างกันระหว่าง AJAX และ regular request
+
+**เฉลย:**
+```ruby
+def index
+  @posts = Post.all
+  
+  if request.xhr?
+    render partial: "posts", locals: { posts: @posts }
+  else
+    render :index
   end
+end
+```
 
+### แบบฝึกหัดที่ 18
+implement rate limiting ด้วย before_action
+
+**เฉลย:**
+```ruby
+before_action :check_rate_limit, only: [:create]
+
+private
+
+def check_rate_limit
+  key = "rate_limit:#{request.ip}:#{controller_name}"
+  count = Rails.cache.increment(key, 1, expires_in: 1.hour)
+  
+  if count > 100
+    render json: { error: "Rate limit exceeded" }, status: :too_many_requests
+  end
+end
+```
+
+### แบบฝึกหัดที่ 19
+สร้าง controller action ที่ handle JSON API request
+
+**เฉลย:**
+```ruby
+class Api::PostsController < ApplicationController
+  before_action :authenticate_token!
+  
+  def index
+    @posts = Post.all
+    render json: {
+      data: @posts.map { |post|
+        {
+          id: post.id,
+          type: "post",
+          attributes: {
+            title: post.title,
+            content: post.content,
+            created_at: post.created_at.iso8601
+          }
+        }
+      }
+    }
+  end
+  
   private
-
-  def render_success(data, message: nil, status: :ok, meta: nil)
-    response = { success: true, data: data }
-    response[:message] = message if message
-    response[:meta] = meta if meta
-    render json: response, status: status
-  end
-
-  def render_error(message, errors: nil, status: :unprocessable_entity)
-    response = { success: false, message: message }
-    response[:errors] = errors if errors
-    render json: response, status: status
-  end
-
-  def authenticate!
-    token = request.headers["Authorization"]&.split(" ")&.last
+  
+  def authenticate_token!
+    token = request.headers["Authorization"]&.remove("Bearer ")
     @current_user = User.find_by(api_token: token)
-    render json: { error: "Unauthorized" }, status: :unauthorized unless @current_user
+    render json: { error: "Unauthorized" }, status: 401 unless @current_user
   end
 end
 ```
 
-**ข้อ 10:** สร้าง Dashboard controller ที่ใช้ multiple models
+### แบบฝึกหัดที่ 20
+implement การ handle RecordNotFound ใน ApplicationController
 
+**เฉลย:**
 ```ruby
-# คำตอบ:
-class DashboardController < ApplicationController
-  before_action :authenticate_user!
-
-  def index
-    @stats = {
-      total_articles: current_user.articles.count,
-      published_articles: current_user.articles.published.count,
-      draft_articles: current_user.articles.drafts.count,
-      total_views: current_user.articles.sum(:views_count),
-      total_comments: Comment.where(article: current_user.articles).count
-    }
-
-    @recent_articles = current_user.articles
-                                   .includes(:comments)
-                                   .order(updated_at: :desc)
-                                   .limit(5)
-
-    @popular_articles = current_user.articles
-                                    .published
-                                    .order(views_count: :desc)
-                                    .limit(5)
-
-    @recent_comments = Comment.where(article: current_user.articles)
-                               .includes(:user, :article)
-                               .order(created_at: :desc)
-                               .limit(10)
-  end
-end
-```
-
-**ข้อ 11-25:** ดูใน exercises ขยาย
-
-```ruby
-# ข้อ 11: สร้าง controller สำหรับ file download
-def download
-  @document = Document.find(params[:id])
-  authorize! :download, @document
-
-  send_file @document.file_path,
-    filename: @document.original_filename,
-    type: @document.content_type,
-    disposition: :attachment
-end
-
-# ข้อ 12: สร้าง search controller
-class SearchController < ApplicationController
-  skip_before_action :authenticate_user!
-
-  def index
-    @query = params[:q]
-    return unless @query.present?
-
-    @results = {
-      articles: Article.search(@query).published.limit(10),
-      users: User.search(@query).limit(5),
-      tags: Tag.search(@query).limit(10)
-    }
-  end
-end
-
-# ข้อ 13: สร้าง import controller
-class ImportsController < ApplicationController
-  def create
-    file = params[:file]
-    result = ImportService.new(file).call
-
-    if result.success?
-      redirect_to root_path, notice: "นำเข้า #{result.count} รายการสำเร็จ"
-    else
-      redirect_to root_path, alert: "เกิดข้อผิดพลาด: #{result.errors.join(', ')}"
-    end
-  end
-end
-
-# ข้อ 14: สร้าง webhook controller
-class WebhooksController < ApplicationController
-  skip_before_action :authenticate_user!
-  skip_before_action :verify_authenticity_token
-
-  def stripe
-    payload = request.body.read
-    sig_header = request.env["HTTP_STRIPE_SIGNATURE"]
-
-    begin
-      event = Stripe::Webhook.construct_event(
-        payload, sig_header, Rails.application.credentials.dig(:stripe, :webhook_secret)
-      )
-    rescue JSON::ParserError, Stripe::SignatureVerificationError => e
-      render json: { error: e.message }, status: :bad_request
-      return
-    end
-
-    handle_stripe_event(event)
-    render json: { received: true }
-  end
-
+class ApplicationController < ActionController::Base
+  rescue_from ActiveRecord::RecordNotFound, with: :handle_not_found
+  
   private
+  
+  def handle_not_found(exception)
+    respond_to do |format|
+      format.html do
+        render "errors/not_found", status: :not_found
+      end
+      format.json do
+        render json: { error: "Resource not found" }, status: :not_found
+      end
+    end
+  end
+end
+```
 
-  def handle_stripe_event(event)
-    case event["type"]
-    when "payment_intent.succeeded"
-      PaymentSuccessService.new(event["data"]["object"]).call
-    when "payment_intent.payment_failed"
-      PaymentFailedService.new(event["data"]["object"]).call
+### แบบฝึกหัดที่ 21
+สร้าง `CommentsController` ที่ nested ใน `PostsController`
+
+**เฉลย:**
+```ruby
+class CommentsController < ApplicationController
+  before_action :set_post
+  before_action :set_comment, only: [:destroy]
+  
+  def create
+    @comment = @post.comments.new(comment_params)
+    @comment.user = current_user
+    
+    if @comment.save
+      redirect_to @post, notice: "เพิ่มความคิดเห็นสำเร็จ"
+    else
+      redirect_to @post, alert: "ไม่สามารถเพิ่มความคิดเห็นได้"
+    end
+  end
+  
+  def destroy
+    @comment.destroy
+    redirect_to @post, notice: "ลบความคิดเห็นสำเร็จ"
+  end
+  
+  private
+  
+  def set_post
+    @post = Post.find(params[:post_id])
+  end
+  
+  def set_comment
+    @comment = @post.comments.find(params[:id])
+  end
+  
+  def comment_params
+    params.require(:comment).permit(:content)
+  end
+end
+```
+
+### แบบฝึกหัดที่ 22
+implement content negotiation ด้วย respond_to
+
+**เฉลย:**
+```ruby
+def show
+  @post = Post.find(params[:id])
+  
+  respond_to do |format|
+    format.html
+    format.json { render json: @post }
+    format.xml  { render xml: @post }
+    format.pdf  do
+      pdf = WickedPdf.new.pdf_from_string(
+        render_to_string("posts/show", layout: "pdf")
+      )
+      send_data pdf,
+                filename: "post-#{@post.id}.pdf",
+                type: "application/pdf"
+    end
+  end
+end
+```
+
+### แบบฝึกหัดที่ 23
+ใช้ session เพื่อ track user's recently viewed posts
+
+**เฉลย:**
+```ruby
+def show
+  @post = Post.find(params[:id])
+  
+  session[:viewed_posts] ||= []
+  session[:viewed_posts] = ([params[:id]] + session[:viewed_posts]).uniq.first(5)
+  
+  @recently_viewed = Post.where(id: session[:viewed_posts] - [params[:id]])
+end
+```
+
+### แบบฝึกหัดที่ 24
+implement search action ที่ไม่ใช้ model (search across multiple)
+
+**เฉลย:**
+```ruby
+def search
+  query = params[:q].to_s.strip
+  
+  if query.present?
+    @posts = Post.where("title ILIKE ?", "%#{query}%").limit(5)
+    @users = User.where("name ILIKE ?", "%#{query}%").limit(5)
+    @categories = Category.where("name ILIKE ?", "%#{query}%").limit(5)
+  else
+    @posts = @users = @categories = []
+  end
+  
+  respond_to do |format|
+    format.html
+    format.json do
+      render json: {
+        posts: @posts,
+        users: @users,
+        categories: @categories
+      }
+    end
+  end
+end
+```
+
+### แบบฝึกหัดที่ 25
+สร้าง Admin::PostsController ที่สืบทอดจาก Admin::ApplicationController
+
+**เฉลย:**
+```ruby
+# app/controllers/admin/application_controller.rb
+module Admin
+  class ApplicationController < ::ApplicationController
+    before_action :require_admin!
+    layout "admin"
+    
+    private
+    
+    def require_admin!
+      redirect_to root_path unless current_user&.admin?
     end
   end
 end
 
-# ข้อ 15-25: additional patterns
-# (Omitted for brevity - patterns shown above cover key concepts)
+# app/controllers/admin/posts_controller.rb
+module Admin
+  class PostsController < Admin::ApplicationController
+    before_action :set_post, only: [:show, :edit, :update, :destroy]
+    
+    def index
+      @posts = Post.order(created_at: :desc).page(params[:page])
+    end
+    
+    def destroy
+      @post.destroy
+      redirect_to admin_posts_path, notice: "ลบสำเร็จ"
+    end
+    
+    private
+    
+    def set_post
+      @post = Post.find(params[:id])
+    end
+  end
+end
 ```
 
 ---
 
-## สรุป Part 34
+## สรุป
 
-ในบทนี้เราได้เรียนรู้:
+ใน Controllers เราได้เรียนรู้:
 
-1. **ApplicationController** - Base class สำหรับ controllers ทั้งหมด
-2. **CRUD Actions** - index, show, new, create, edit, update, destroy
-3. **Strong Parameters** - ป้องกัน mass assignment vulnerability
-4. **Callbacks** - before_action, after_action, around_action
-5. **render vs redirect_to** - ความแตกต่างและเมื่อไหร่ใช้อะไร
-6. **Flash Messages** - แจ้งเตือน user หลัง action
-7. **respond_to** - รองรับหลาย formats (HTML, JSON, CSV)
-8. **Controller Concerns** - แชร์ behavior ระหว่าง controllers
-9. **Testing** - Request specs ด้วย RSpec
-
-Controllers เป็น "conductor" ของ MVC ที่ประสานงานทุกส่วน เมื่อเข้าใจดีจะทำให้เขียน Rails app ได้อย่างมีประสิทธิภาพ
-
----
-
-*ต่อไป: Part 35 - Views and ERB (ขั้นตอนที่ 756-780)*
+1. **ApplicationController** - base class สำหรับทุก controller
+2. **7 RESTful actions** - index, show, new, create, edit, update, destroy
+3. **Strong Parameters** - require, permit เพื่อความปลอดภัย
+4. **before/after/around_action** - filters ก่อน/หลัง actions
+5. **skip_before_action** - ข้าม filter เฉพาะ actions
+6. **render vs redirect_to** - render ใช้ view, redirect สร้าง request ใหม่
+7. **Flash messages** - notice, alert, flash.now
+8. **respond_to** - handle multiple formats
+9. **params hash** - รับ data จาก request
+10. **request object** - ข้อมูลเกี่ยวกับ HTTP request
+11. **session/cookies** - เก็บ state ระหว่าง requests
+12. **Concerns** - shared controller code
+13. **Testing** - Minitest และ RSpec
