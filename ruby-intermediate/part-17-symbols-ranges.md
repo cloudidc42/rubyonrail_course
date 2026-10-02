@@ -1,1377 +1,1486 @@
-# Part 17: Symbols และ Ranges ใน Ruby
-
-## ขั้นตอนที่ 346-365: Symbol และ Range อย่างละเอียด
-
----
+# ตอนที่ 17: Symbols และ Ranges (Steps 346-365)
 
 ## บทนำ
 
-Symbol และ Range เป็น data types สำคัญใน Ruby ที่ใช้บ่อยมากในชีวิตประจำวัน Symbol นั้นเบากว่า String มาก ส่วน Range ช่วยให้เขียน code ที่อ่านง่ายและมีประสิทธิภาพ
+ในตอนนี้เราจะเรียนรู้เกี่ยวกับ **Symbol** และ **Range** ซึ่งเป็น built-in types ที่สำคัญมากใน Ruby Symbol ช่วยให้โปรแกรมทำงานได้เร็วขึ้นและประหยัดหน่วยความจำ ส่วน Range ช่วยให้เราทำงานกับช่วงค่าต่างๆ ได้อย่างสะดวก
 
 ---
 
-## ขั้นตอนที่ 346: Symbol คืออะไร?
+## Step 346: Symbol คืออะไร?
 
-Symbol คือ identifier ที่ไม่เปลี่ยนแปลง (immutable) และเก็บไว้ในหน่วยความจำเพียงชิ้นเดียว
+**Symbol** คือ object ที่แทนชื่อหรือ identifier ใน Ruby มีลักษณะพิเศษคือ Symbol ที่มีชื่อเหมือนกันจะเป็น object เดียวกันในหน่วยความจำเสมอ
 
 ```ruby
-# การสร้าง Symbol
-sym1 = :hello
-sym2 = :world
-sym3 = :"hello world"  # Symbol ที่มีช่องว่าง
-sym4 = :"user-name"    # Symbol ที่มีขีด
+# สร้าง Symbol
+:hello
+:world
+:user_name
+:age
 
-puts sym1.class        # => Symbol
-puts sym1              # => hello
-puts sym1.inspect      # => :hello
+# Symbol มีค่า object_id เหมือนกันถ้าชื่อเหมือนกัน
+puts :hello.object_id  # เช่น 2468708
+puts :hello.object_id  # เลขเดิม!
+puts :hello.object_id  # เลขเดิมเสมอ
 
-# Symbol เหมือนกันจะมี object_id เดียวกัน
-a = :ruby
-b = :ruby
-puts a.object_id == b.object_id   # => true (same object!)
+# String ต่างกัน - object ใหม่ทุกครั้ง
+puts "hello".object_id  # เช่น 70123456789
+puts "hello".object_id  # ต่างกัน!
+puts "hello".object_id  # ต่างกันอีก
+```
 
-# String ต่างกัน
-s1 = "ruby"
-s2 = "ruby"
-puts s1.object_id == s2.object_id  # => false (different objects)
+### Symbol vs String
+
+| คุณสมบัติ | Symbol | String |
+|-----------|--------|--------|
+| immutable | ✅ เปลี่ยนไม่ได้ | ❌ เปลี่ยนได้ |
+| unique | ✅ มีแค่ชิ้นเดียว | ❌ สร้างใหม่ทุกครั้ง |
+| หน่วยความจำ | ✅ ประหยัด | ❌ ใช้มาก |
+| ความเร็วเปรียบเทียบ | ✅ เร็วกว่า | ❌ ช้ากว่า |
+| method มากมาย | ❌ น้อยกว่า | ✅ มากกว่า |
+
+```ruby
+# ทดสอบความแตกต่าง
+symbol1 = :ruby
+symbol2 = :ruby
+string1 = "ruby"
+string2 = "ruby"
+
+puts symbol1 == symbol2      # true
+puts symbol1.equal?(symbol2) # true  - object เดียวกัน!
+puts string1 == string2      # true
+puts string1.equal?(string2) # false - คนละ object!
+
+# ดู object_id
+puts symbol1.object_id == symbol2.object_id  # true
+puts string1.object_id == string2.object_id  # false
 ```
 
 ---
 
-## ขั้นตอนที่ 347: Symbol vs String - Performance
+## Step 347: วิธีสร้าง Symbol
+
+มีหลายวิธีในการสร้าง Symbol ใน Ruby:
 
 ```ruby
-require 'benchmark'
-require 'objspace'
+# วิธีที่ 1: ใช้ colon นำหน้า (ปกติที่สุด)
+:name
+:user_id
+:first_name
+:total_price
 
-# Symbol ใช้หน่วยความจำน้อยกว่า
-sym = :ruby
-str = "ruby"
+# วิธีที่ 2: ใช้ quote เมื่อมีช่องว่างหรืออักขระพิเศษ
+:"hello world"
+:"user-name"
+:"my.method"
+:"123start"
 
-puts "Symbol size: #{ObjectSpace.memsize_of(sym)} bytes"
-puts "String size: #{ObjectSpace.memsize_of(str)} bytes"
+# วิธีที่ 3: แปลงจาก String ด้วย to_sym
+"name".to_sym       # => :name
+"hello world".to_sym # => :"hello world"
+"user_id".to_sym    # => :user_id
 
-# Comparison performance
-n = 1_000_000
-Benchmark.bm(10) do |x|
-  x.report("Symbol ==:") { n.times { :ruby == :ruby } }
-  x.report("String ==:") { n.times { "ruby" == "ruby" } }
-end
-
-# Symbol comparison เร็วกว่า เพราะเปรียบเทียบ object_id โดยตรง
-# String comparison ช้ากว่า เพราะต้องเปรียบเทียบทีละ character
-
-# Symbol เหมาะสำหรับ:
-# - Hash keys
-# - Method names
-# - Options/configurations
-# - Named parameters
-
-# Hash กับ Symbol keys เร็วกว่า String keys
-hash_sym = { name: "Ruby", version: 3 }
-hash_str = { "name" => "Ruby", "version" => 3 }
-
-Benchmark.bm(15) do |x|
-  x.report("Symbol key:   ") { n.times { hash_sym[:name] } }
-  x.report("String key:   ") { n.times { hash_str["name"] } }
-end
-```
-
----
-
-## ขั้นตอนที่ 348: Symbol Immutability
-
-```ruby
-# Symbol ไม่สามารถเปลี่ยนแปลงได้ (immutable)
-sym = :hello
-
-# ไม่มี method แก้ไข Symbol
-# sym << " world"  # => NoMethodError!
-# sym.upcase!       # => ไม่มี bang version
-
-# แต่สามารถสร้าง Symbol ใหม่ได้
-new_sym = sym.to_s.upcase.to_sym
-puts new_sym   # => :HELLO
-
-# เหตุใด immutability จึงสำคัญ?
-# - Thread-safe: หลาย thread ใช้ Symbol เดียวกันได้อย่างปลอดภัย
-# - Predictable: ค่าไม่เปลี่ยน ทำให้ debug ง่าย
-# - Memory efficient: เก็บแค่ครั้งเดียว
-
-# Symbol pool - ทุก Symbol มีอยู่ใน Symbol table
-puts Symbol.all_symbols.count   # เห็นว่ามี symbols กี่ตัว
-puts Symbol.all_symbols.include?(:hello)  # => true (หลังจากสร้าง :hello)
-```
-
----
-
-## ขั้นตอนที่ 349: Symbol Methods
-
-```ruby
-sym = :hello_world
-
-# to_s / to_proc / to_sym
-puts sym.to_s           # => "hello_world"
-puts sym.inspect        # => ":hello_world"
-puts "hello".to_sym     # => :hello
-
-# length / size
-puts sym.length   # => 11
-puts sym.size     # => 11
-
-# upcase / downcase / capitalize
-puts :hello.upcase      # => :HELLO
-puts :WORLD.downcase    # => :world
-puts :hello.capitalize  # => :Hello
-
-# id2name (เหมือน to_s)
-puts :ruby.id2name   # => "ruby"
-
-# match
-puts :hello.match(/ell/)   # => #<MatchData "ell">
-
-# encoding
-puts :hello.encoding   # => UTF-8
-
-# empty?
-puts :"".empty?   # => true
-puts :a.empty?    # => false
+# วิธีที่ 4: ใช้ intern (alias ของ to_sym)
+"name".intern       # => :name
 
 # ตัวอย่างการใช้งาน
-methods = [:upcase, :downcase, :reverse, :length]
-word = "Ruby"
+name_sym = :name
+greeting_sym = :"สวัสดี"
 
-methods.each do |method|
-  puts "#{word}.#{method} => #{word.send(method)}"
-end
+puts name_sym      # name
+puts greeting_sym  # สวัสดี
+puts name_sym.class # Symbol
+```
+
+### Symbol Array Literal
+
+```ruby
+# สร้าง array ของ Symbol ได้ง่ายๆ ด้วย %i
+colors = %i[red green blue yellow]
+puts colors.inspect
+# => [:red, :green, :blue, :yellow]
+
+# เทียบกับการเขียนแบบปกติ
+colors_long = [:red, :green, :blue, :yellow]
+
+# ใช้ %I สำหรับ interpolation
+prefix = "dark"
+shades = %I[#{prefix}_red #{prefix}_green #{prefix}_blue]
+puts shades.inspect
+# => [:dark_red, :dark_green, :dark_blue]
 ```
 
 ---
 
-## ขั้นตอนที่ 350: Symbol#to_proc
+## Step 348: Symbol Methods
 
-Symbol#to_proc เป็น feature ที่ทรงพลังมากใน Ruby
+Symbol มี method หลายอย่างที่เป็นประโยชน์:
 
 ```ruby
-# &:method_name แปลง symbol เป็น proc ที่เรียก method นั้น
+symbol = :hello_world
+
+# to_s - แปลงเป็น String
+puts symbol.to_s        # "hello_world"
+puts symbol.to_s.class  # String
+
+# id2name - เหมือน to_s
+puts symbol.id2name     # "hello_world"
+
+# to_proc - แปลงเป็น Proc (ใช้กับ map, select ฯลฯ)
+double = :to_s.to_proc
+puts double.call(42)    # "42"
+
 words = ["hello", "world", "ruby"]
+upcase_words = words.map(&:upcase)
+puts upcase_words.inspect  # ["HELLO", "WORLD", "RUBY"]
 
-# แบบ verbose
-puts words.map { |w| w.upcase }.inspect
+# length/size - ความยาวของชื่อ
+puts :hello.length  # 5
+puts :hello.size    # 5
 
-# แบบ elegant ด้วย Symbol#to_proc
-puts words.map(&:upcase).inspect   # => ["HELLO", "WORLD", "RUBY"]
+# empty? - ว่างหรือไม่
+puts :"".empty?     # true
+puts :hello.empty?  # false
 
-# ทำงานได้กับ method ทุกตัว
+# upcase, downcase, capitalize
+puts :hello.upcase    # HELLO
+puts :HELLO.downcase  # hello
+puts :hello.capitalize # Hello
+
+# match? - ตรงกับ regex หรือไม่
+puts :hello_world.match?(/world/)  # true
+puts :hello_world.match?(/xyz/)    # false
+
+# inspect - แสดงแบบ Symbol literal
+puts :hello.inspect  # :hello
+```
+
+### Symbol เปรียบเทียบ
+
+```ruby
+# เปรียบเทียบ Symbol ด้วย == และ <=>
+puts :apple == :apple  # true
+puts :apple == :banana # false
+puts :apple != :banana # true
+
+# เรียงลำดับ
+symbols = [:cherry, :apple, :banana, :date]
+puts symbols.sort.inspect
+# => [:apple, :banana, :cherry, :date]
+
+# <=> คืนค่า -1, 0, 1
+puts (:apple <=> :banana)  # -1
+puts (:banana <=> :banana) # 0
+puts (:cherry <=> :apple)  # 1
+```
+
+---
+
+## Step 349: to_proc และ การใช้ Symbol กับ Blocks
+
+หนึ่งในคุณสมบัติที่ทรงพลังที่สุดของ Symbol คือการแปลงเป็น Proc:
+
+```ruby
+# to_proc แบบ manual
+upcase_proc = :upcase.to_proc
+puts upcase_proc.call("hello")  # "HELLO"
+
+# ใช้ & เพื่อแปลง Symbol เป็น block
 numbers = [1, 2, 3, 4, 5]
-puts numbers.map(&:to_s).inspect    # => ["1", "2", "3", "4", "5"]
-puts numbers.select(&:odd?).inspect # => [1, 3, 5]
+strings = numbers.map(&:to_s)
+puts strings.inspect  # ["1", "2", "3", "4", "5"]
 
-# กับ strings
-puts ["  hello  ", "  world  "].map(&:strip).inspect
-# => ["hello", "world"]
+words = ["hello", "world", "ruby"]
+upcased = words.map(&:upcase)
+puts upcased.inspect  # ["HELLO", "WORLD", "RUBY"]
 
-# กับ hashes
-pairs = [[:a, 1], [:b, 2], [:c, 3]]
-hash = pairs.to_h
-puts hash.inspect  # => {:a=>1, :b=>2, :c=>3}
+lengths = words.map(&:length)
+puts lengths.inspect  # [5, 5, 4]
 
-# ใช้กับ reduce
-puts [1, 2, 3, 4, 5].reduce(:+)   # => 15
-puts [1, 2, 3, 4, 5].reduce(:*)   # => 120
-puts ["a", "b", "c"].reduce(:+)   # => "abc"
+# select ด้วย Symbol
+numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+evens = numbers.select(&:even?)
+odds = numbers.select(&:odd?)
+puts evens.inspect  # [2, 4, 6, 8, 10]
+puts odds.inspect   # [1, 3, 5, 7, 9]
 
-# Custom class กับ Symbol#to_proc
-class Product
-  attr_reader :name, :price
-  
-  def initialize(name, price)
-    @name = name
-    @price = price
-  end
-  
-  def expensive?
-    @price > 1000
-  end
-end
+# reduce ด้วย Symbol
+sum = [1, 2, 3, 4, 5].reduce(:+)
+puts sum  # 15
 
-products = [
-  Product.new("Book", 300),
-  Product.new("Laptop", 30000),
-  Product.new("Pen", 50)
+product = [1, 2, 3, 4, 5].reduce(:*)
+puts product  # 120
+```
+
+### ตัวอย่างจริง: Data Processing
+
+```ruby
+# ข้อมูลผู้ใช้
+users = [
+  { name: "Alice", age: 30, active: true },
+  { name: "Bob", age: 25, active: false },
+  { name: "Charlie", age: 35, active: true },
+  { name: "Diana", age: 28, active: true }
 ]
 
-puts products.map(&:name).inspect
-# => ["Book", "Laptop", "Pen"]
+# ดึงชื่อทั้งหมด
+names = users.map { |u| u[:name] }
+puts names.inspect
 
-puts products.select(&:expensive?).map(&:name).inspect
-# => ["Laptop"]
+# กรองเฉพาะ active users
+active_users = users.select { |u| u[:active] }
+puts active_users.length  # 3
+
+# เรียงตามอายุ
+sorted_users = users.sort_by { |u| u[:age] }
+sorted_users.each { |u| puts "#{u[:name]}: #{u[:age]}" }
 ```
 
 ---
 
-## ขั้นตอนที่ 351: การแปลงระหว่าง Symbol และ String
+## Step 350: Symbol ใช้ทำอะไร? (Hash Keys)
+
+การใช้ Symbol เป็น Hash key เป็นวิธีที่นิยมมากที่สุดใน Ruby:
 
 ```ruby
-# String to Symbol
-str = "hello"
-sym = str.to_sym
-puts sym.class   # => Symbol
-puts sym         # => hello
+# Hash ด้วย Symbol keys (แนะนำ)
+person = {
+  name: "Alice",
+  age: 30,
+  email: "alice@example.com"
+}
 
-# Symbol to String
-sym = :world
-str = sym.to_s
-puts str.class   # => String
-puts str         # => "world"
+# เข้าถึงด้วย Symbol
+puts person[:name]   # Alice
+puts person[:age]    # 30
+puts person[:email]  # alice@example.com
 
-# ตัวอย่างการใช้งาน
-def method_name_to_label(method_name)
-  method_name.to_s.gsub('_', ' ').capitalize
+# Hash ด้วย String keys (น้อยนิยม)
+person_str = {
+  "name" => "Bob",
+  "age"  => 25
+}
+
+# ทำไม Symbol keys ดีกว่า?
+# 1. อ่านง่ายกว่า
+# 2. เร็วกว่าในการค้นหา
+# 3. ใช้หน่วยความจำน้อยกว่า
+
+# ทดสอบความเร็ว
+require 'benchmark'
+n = 1_000_000
+
+Benchmark.bm do |x|
+  x.report("Symbol key:") do
+    n.times { { name: "test" }[:name] }
+  end
+  x.report("String key:") do
+    n.times { { "name" => "test" }["name"] }
+  end
 end
+# Symbol key จะเร็วกว่าประมาณ 20-30%
+```
 
-puts method_name_to_label(:first_name)  # => "First name"
-puts method_name_to_label(:date_of_birth)  # => "Date of birth"
+### Symbol เป็น Method Names
 
-# Dynamic method calling
+```ruby
+# เรียก method ด้วย send
 class Calculator
-  def add(a, b) = a + b
-  def subtract(a, b) = a - b
-  def multiply(a, b) = a * b
+  def add(a, b)
+    a + b
+  end
+
+  def subtract(a, b)
+    a - b
+  end
+
+  def multiply(a, b)
+    a * b
+  end
 end
 
 calc = Calculator.new
-operations = [:add, :subtract, :multiply]
 
-operations.each do |op|
-  puts "#{op}: #{calc.send(op, 10, 3)}"
-end
-# => add: 13
-# => subtract: 7
-# => multiply: 30
+# ใช้ send กับ Symbol
+operation = :add
+result = calc.send(operation, 10, 5)
+puts result  # 15
 
-# Symbol ใน Hash
-# Ruby อนุญาตให้ใช้ shorthand syntax ตั้งแต่ Ruby 1.9
-old_style = { :name => "Ruby", :version => 3 }
-new_style = { name: "Ruby", version: 3 }
+# เปลี่ยน operation
+operation = :multiply
+result = calc.send(operation, 10, 5)
+puts result  # 50
 
-puts old_style == new_style   # => true (เหมือนกัน!)
+# ใช้ method สำหรับ method object
+add_method = calc.method(:add)
+puts add_method.call(3, 4)  # 7
+
+# respond_to? ด้วย Symbol
+puts calc.respond_to?(:add)     # true
+puts calc.respond_to?(:divide)  # false
 ```
 
 ---
 
-## ขั้นตอนที่ 352: Symbols ใน Practical Use Cases
+## Step 351: Symbol ใน Callbacks และ Options
 
 ```ruby
-# 1. ใช้เป็น Hash keys (ที่นิยมที่สุด)
-user = {
-  name: "สมชาย",
-  age: 25,
-  email: "somchai@example.com",
-  role: :admin  # Symbol เป็น value ด้วยได้
-}
+# Symbol ในการกำหนด callback (พบบ่อยใน Rails)
+class Order
+  attr_accessor :status
 
-puts user[:name]  # => "สมชาย"
-puts user[:role]  # => admin
+  CALLBACKS = {
+    before_create: [],
+    after_create:  [],
+    before_save:   []
+  }
 
-# 2. Enum-like behavior
-module Status
-  PENDING  = :pending
-  ACTIVE   = :active
-  INACTIVE = :inactive
-end
-
-user_status = Status::ACTIVE
-case user_status
-when :pending  then puts "รอการอนุมัติ"
-when :active   then puts "ใช้งานอยู่"
-when :inactive then puts "ปิดการใช้งาน"
-end
-
-# 3. Method options
-def create_user(name, options = {})
-  role    = options.fetch(:role, :user)
-  active  = options.fetch(:active, true)
-  
-  puts "สร้าง #{role}: #{name} (active: #{active})"
-end
-
-create_user("สมหญิง", role: :admin, active: true)
-create_user("สมศรี")
-
-# 4. Callbacks
-class EventEmitter
-  def initialize
-    @listeners = {}
+  def self.before_create(method_name)
+    CALLBACKS[:before_create] << method_name
   end
 
-  def on(event, &block)
-    @listeners[event] ||= []
-    @listeners[event] << block
+  def self.after_create(method_name)
+    CALLBACKS[:after_create] << method_name
   end
 
-  def emit(event, *args)
-    @listeners[event]&.each { |block| block.call(*args) }
+  before_create :validate_items
+  before_create :check_stock
+  after_create  :send_confirmation
+
+  def create
+    CALLBACKS[:before_create].each { |cb| send(cb) }
+    puts "Creating order..."
+    CALLBACKS[:after_create].each { |cb| send(cb) }
+  end
+
+  private
+
+  def validate_items
+    puts "Validating items..."
+  end
+
+  def check_stock
+    puts "Checking stock..."
+  end
+
+  def send_confirmation
+    puts "Sending confirmation email..."
   end
 end
 
-emitter = EventEmitter.new
-emitter.on(:data_loaded) { |data| puts "โหลดข้อมูล: #{data}" }
-emitter.on(:error) { |msg| puts "Error: #{msg}" }
+order = Order.new
+order.create
+# Validating items...
+# Checking stock...
+# Creating order...
+# Sending confirmation email...
+```
 
-emitter.emit(:data_loaded, "100 records")
-emitter.emit(:error, "Connection failed")
+### Symbol เป็น Options
+
+```ruby
+# Method ที่รับ Symbol เป็น option
+def process_data(data, format: :json, sort: :asc, limit: nil)
+  puts "Processing in #{format} format"
+  puts "Sorting: #{sort}"
+  puts "Limit: #{limit || 'none'}"
+
+  case format
+  when :json
+    # process as JSON
+    data.to_s
+  when :csv
+    # process as CSV
+    data.join(",")
+  when :xml
+    # process as XML
+    "<data>#{data}</data>"
+  end
+end
+
+process_data([1, 2, 3])
+process_data([1, 2, 3], format: :csv)
+process_data([1, 2, 3], format: :xml, sort: :desc, limit: 10)
 ```
 
 ---
 
-## ขั้นตอนที่ 353: Range พื้นฐาน
+## Step 352: Memory Efficiency ของ Symbol
 
 ```ruby
-# Inclusive range (..) - รวม endpoint ทั้งสอง
-inclusive = (1..5)
-puts inclusive.to_a.inspect   # => [1, 2, 3, 4, 5]
+# ทดสอบการใช้หน่วยความจำ
+require 'objspace'
 
-# Exclusive range (...) - ไม่รวม endpoint สุดท้าย
-exclusive = (1...5)
-puts exclusive.to_a.inspect   # => [1, 2, 3, 4]
+# สร้าง String หลายตัว
+strings = 1000.times.map { "hello_world" }
+string_memory = strings.sum { |s| ObjectSpace.memsize_of(s) }
+puts "String memory: #{string_memory} bytes"
 
-# Range กับ characters
-puts ('a'..'e').to_a.inspect   # => ["a", "b", "c", "d", "e"]
-puts ('A'..'E').to_a.inspect   # => ["A", "B", "C", "D", "E"]
+# Symbol ใช้หน่วยความจำเพียงครั้งเดียว
+symbols = 1000.times.map { :hello_world }
+symbol_memory = symbols.sum { |s| ObjectSpace.memsize_of(s) }
+puts "Symbol memory: #{symbol_memory} bytes"
+# Symbol จะใช้หน่วยความจำน้อยกว่ามาก
 
-# Range กับ String
-str_range = ('aa'..'ae')
-puts str_range.to_a.inspect   # => ["aa", "ab", "ac", "ad", "ae"]
+# แสดงว่า Symbol เป็น object เดียวกัน
+puts symbols.map(&:object_id).uniq.length  # 1 (object เดียว!)
+puts strings.map(&:object_id).uniq.length  # 1000 (object ต่างกัน!)
+```
 
-# Range class methods
-r = (1..10)
-puts r.class      # => Range
-puts r.begin      # => 1 (หรือ r.first)
-puts r.end        # => 10 (หรือ r.last)
-puts r.exclude_end?   # => false (inclusive)
+### ข้อควรระวัง: Dynamic Symbols
 
-r2 = (1...10)
-puts r2.exclude_end?  # => true (exclusive)
+```ruby
+# อย่าสร้าง Symbol แบบ dynamic จาก user input!
+# เพราะ Symbol ไม่ถูก GC เก็บ (ใน Ruby เก่ากว่า 2.2)
+
+# ❌ อันตราย! (Ruby < 2.2)
+# user_input.to_sym  # ถ้ามี user input จำนวนมาก จะทำให้ memory leak
+
+# ✅ ใน Ruby 2.2+ Symbol ถูก GC เก็บได้แล้ว
+# แต่ยังควรระวังสำหรับ performance
+
+# ใช้ freeze เพื่อระบุว่าเป็น immutable
+ALLOWED_STATUSES = %i[pending active inactive].freeze
+
+def update_status(status)
+  unless ALLOWED_STATUSES.include?(status)
+    raise ArgumentError, "Invalid status: #{status}"
+  end
+  puts "Updating to #{status}"
+end
+
+update_status(:active)    # OK
+update_status(:pending)   # OK
+update_status(:unknown)   # ArgumentError!
 ```
 
 ---
 
-## ขั้นตอนที่ 354: Range Methods
+## Step 353: Range คืออะไร?
+
+**Range** คือ object ที่แทนช่วงค่าระหว่างค่าเริ่มต้นและค่าสิ้นสุด มีสองประเภทหลัก:
 
 ```ruby
-r = (1..10)
+# Inclusive Range (..) - รวมค่าสุดท้าย
+inclusive = 1..10
+puts inclusive.include?(10)  # true
+puts inclusive.to_a.inspect  # [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
-# include? / member? / cover?
-puts r.include?(5)    # => true
-puts r.include?(11)   # => false
-puts r.member?(3)     # => true
-puts r.cover?(5.5)    # => true (cover? ไม่ enumerate ทั้งหมด - เร็วกว่า)
+# Exclusive Range (...) - ไม่รวมค่าสุดท้าย
+exclusive = 1...10
+puts exclusive.include?(10)  # false
+puts exclusive.to_a.inspect  # [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
-# include? vs cover?
-float_range = (1.0..10.0)
-puts float_range.include?(5.5)   # => true
-puts float_range.cover?(5.5)     # => true
+# Range ของตัวอักษร
+letters = 'a'..'z'
+puts letters.to_a.inspect
+# => ["a", "b", "c", ..., "z"]
 
-# แต่สำหรับ non-integer ranges, cover? เร็วกว่ามาก
-# cover? ใช้ comparison operators
-# include? enumerate ทั้งหมด
+# Range ของ String
+str_range = "aa".."az"
+puts str_range.to_a.length  # 26
 
-# size / count
-puts r.size     # => 10
-puts r.count    # => 10
+# Range แสดงแบบ inspect
+puts (1..10).inspect    # 1..10
+puts (1...10).inspect   # 1...10
+```
 
-# first / last กับ argument
-puts r.first        # => 1
-puts r.first(3).inspect   # => [1, 2, 3]
-puts r.last         # => 10
-puts r.last(3).inspect    # => [8, 9, 10]
+---
 
-# min / max
-puts r.min   # => 1
-puts r.max   # => 10
+## Step 354: สร้าง Range ประเภทต่างๆ
+
+```ruby
+# Integer Range
+int_range = 1..100
+puts int_range.first  # 1
+puts int_range.last   # 100
+puts int_range.size   # 100
+
+# Float Range (ไม่สามารถ iterate ได้โดยตรง)
+float_range = 1.0..5.0
+puts float_range.include?(3.5)  # true
+puts float_range.include?(5.0)  # true
+puts float_range.include?(5.1)  # false
+
+# String Range
+str_range = 'a'..'e'
+puts str_range.to_a.inspect  # ["a", "b", "c", "d", "e"]
+
+# Date Range
+require 'date'
+today = Date.today
+next_week = today + 7
+date_range = today..next_week
+puts date_range.count  # 8 (รวมทั้งสองวัน)
+
+date_range.each do |date|
+  puts date.strftime("%Y-%m-%d")
+end
+
+# Time Range
+now = Time.now
+later = now + 3600  # 1 ชั่วโมง
+time_range = now..later
+puts time_range.include?(now + 1800)  # true (30 นาที = ครึ่งทาง)
+```
+
+---
+
+## Step 355: Range Methods - Basics
+
+```ruby
+range = 1..10
+
+# first, last
+puts range.first    # 1
+puts range.last     # 10
+puts range.first(3).inspect  # [1, 2, 3]
+puts range.last(3).inspect   # [8, 9, 10]
+
+# min, max
+puts range.min  # 1
+puts range.max  # 10
+
+# minmax
+puts range.minmax.inspect  # [1, 10]
+
+# size, count, length
+puts range.size    # 10
+puts range.count   # 10
+puts range.length  # 10
 
 # sum
-puts r.sum   # => 55
+puts range.sum  # 55 (1+2+3+...+10)
 
-# each
-r.each { |n| print "#{n} " }
+# to_a - แปลงเป็น Array
+arr = range.to_a
+puts arr.inspect  # [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+# each - วนซ้ำ
+range.each { |n| print "#{n} " }
+puts  # newline
+# 1 2 3 4 5 6 7 8 9 10
+```
+
+---
+
+## Step 356: Range Methods - include? และ cover?
+
+```ruby
+# include? - ตรวจสอบว่าค่าอยู่ใน Range หรือไม่
+range = 1..10
+puts range.include?(5)   # true
+puts range.include?(10)  # true
+puts range.include?(11)  # false
+puts range.include?(0)   # false
+
+# กับ exclusive range
+ex_range = 1...10
+puts ex_range.include?(9)   # true
+puts ex_range.include?(10)  # false
+
+# cover? - คล้าย include? แต่ไม่ iterate (เร็วกว่า)
+float_range = 1.0..10.0
+puts float_range.cover?(5.5)   # true
+puts float_range.cover?(10.0)  # true
+puts float_range.cover?(10.1)  # false
+
+# ความแตกต่างระหว่าง include? กับ cover?
+# include? ใช้ iteration ดังนั้นช้ากว่าสำหรับ range ขนาดใหญ่
+# cover? ใช้การเปรียบเทียบโดยตรง จึงเร็วกว่า
+
+# String ranges
+str_range = 'a'..'z'
+puts str_range.include?('m')   # true
+puts str_range.include?('1')   # false
+
+# include? กับ String หลายตัว - cover? ต่างจาก include?
+str_range2 = 'a'..'z'
+puts str_range2.cover?('m')    # true
+puts str_range2.cover?('aa')   # false (include? เป็น false ด้วย)
+```
+
+---
+
+## Step 357: Range Methods - step, each_slice
+
+```ruby
+# step - วนซ้ำทีละ N
+(1..20).step(2) { |n| print "#{n} " }
 puts
+# 1 3 5 7 9 11 13 15 17 19
 
-# to_a
-puts (1..5).to_a.inspect   # => [1, 2, 3, 4, 5]
+(0.0..1.0).step(0.1) { |n| print "#{n.round(1)} " }
+puts
+# 0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0
+
+# วันในสัปดาห์
+require 'date'
+start_date = Date.new(2024, 1, 1)
+end_date = Date.new(2024, 1, 31)
+(start_date..end_date).step(7) { |date| puts date.strftime("%A, %b %d") }
+
+# each_slice
+(1..12).each_slice(3) { |group| puts group.inspect }
+# [1, 2, 3]
+# [4, 5, 6]
+# [7, 8, 9]
+# [10, 11, 12]
+
+# each_cons
+(1..6).each_cons(3) { |window| puts window.inspect }
+# [1, 2, 3]
+# [2, 3, 4]
+# [3, 4, 5]
+# [4, 5, 6]
 ```
 
 ---
 
-## ขั้นตอนที่ 355: Step Ranges
+## Step 358: Endless Ranges (Ruby 2.6+)
+
+Ruby 2.6 แนะนำ **Endless Range** ซึ่งไม่มีค่าสิ้นสุด:
 
 ```ruby
-# step method - วนด้วย step ที่กำหนด
-(1..10).step(2) { |n| print "#{n} " }
-puts   # => 1 3 5 7 9
+# Endless Range
+range = (1..)
+puts range.class  # Range
 
-# Float ranges
-(0.0..1.0).step(0.25) { |n| print "#{n} " }
-puts   # => 0.0 0.25 0.5 0.75 1.0
+# ตรวจสอบ
+puts range.include?(100)   # true
+puts range.include?(1000)  # true
+puts range.include?(0)     # false
 
-# step คืนค่า Enumerator
-enumerator = (1..10).step(3)
-puts enumerator.to_a.inspect   # => [1, 4, 7, 10]
-
-# การใช้งาน: สร้าง sequence
-# ทุก 5 นาที
-minutes = (0..60).step(5).to_a
-puts minutes.inspect
-# => [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60]
-
-# ทุก 10% ตั้งแต่ 0 ถึง 100
-percentages = (0..100).step(10).to_a
-puts percentages.inspect
-# => [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
-
-# สร้าง progress bar
-def progress_bar(percent, width = 20)
-  filled = (percent * width / 100.0).round
-  bar = "█" * filled + "░" * (width - filled)
-  "[#{bar}] #{percent}%"
+# ใช้กับ case/when
+def classify_age(age)
+  case age
+  when (..12)   then "เด็ก"
+  when (13..17) then "วัยรุ่น"
+  when (18..64) then "ผู้ใหญ่"
+  when (65..)   then "ผู้สูงอายุ"
+  end
 end
 
-(0..100).step(10) do |pct|
-  puts progress_bar(pct)
-end
+puts classify_age(5)   # เด็ก
+puts classify_age(15)  # วัยรุ่น
+puts classify_age(30)  # ผู้ใหญ่
+puts classify_age(70)  # ผู้สูงอายุ
+
+# ใช้กับ Array slicing
+arr = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+puts arr[3..].inspect   # [4, 5, 6, 7, 8, 9, 10]
+puts arr[..4].inspect   # [1, 2, 3, 4, 5]
+puts arr[2..7].inspect  # [3, 4, 5, 6, 7, 8]
+
+# select กับ Endless Range
+numbers = (1..20).to_a
+big_numbers = numbers.select { |n| (10..) === n }
+puts big_numbers.inspect  # [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
 ```
 
 ---
 
-## ขั้นตอนที่ 356: Range ใน Case/When
+## Step 359: Beginless Ranges (Ruby 2.7+)
+
+Ruby 2.7 แนะนำ **Beginless Range** ซึ่งไม่มีค่าเริ่มต้น:
 
 ```ruby
-# Range ใน case/when เป็น feature ที่ทรงพลังมาก
+# Beginless Range
+range = (..10)
+puts range.include?(5)   # true
+puts range.include?(10)  # true
+puts range.include?(11)  # false
+puts range.include?(-999) # true!
 
-def grade(score)
+# ใช้กับ Array slicing
+arr = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+puts arr[..4].inspect   # [0, 1, 2, 3, 4]
+puts arr[...4].inspect  # [0, 1, 2, 3]
+
+# ใช้กับ case/when
+def check_score(score)
+  case score
+  when (..49)  then "F - ล้มเหลว"
+  when (50..59) then "D - พอใช้"
+  when (60..69) then "C - ปานกลาง"
+  when (70..79) then "B - ดี"
+  when (80..89) then "A- - ดีมาก"
+  when (90..)   then "A - ยอดเยี่ยม"
+  end
+end
+
+puts check_score(45)   # F - ล้มเหลว
+puts check_score(75)   # B - ดี
+puts check_score(95)   # A - ยอดเยี่ยม
+
+# grep กับ Beginless/Endless Range
+data = [-5, 0, 3, 7, 12, 20, 35]
+positives = data.grep((1..))
+puts positives.inspect  # [3, 7, 12, 20, 35]
+
+negatives = data.grep((..0))
+puts negatives.inspect  # [-5, 0]
+```
+
+---
+
+## Step 360: Range ใน case/when
+
+Range ทำงานได้ดีมากใน `case/when`:
+
+```ruby
+# ตัวอย่างคะแนนเกรด
+def letter_grade(score)
   case score
   when 90..100 then "A"
   when 80...90 then "B"
   when 70...80 then "C"
   when 60...70 then "D"
-  else "F"
+  when 0...60  then "F"
+  else "Invalid score"
   end
 end
 
-[95, 85, 75, 65, 55].each do |score|
-  puts "#{score} => #{grade(score)}"
-end
-
-# เกรดภาษาไทย
-def bmi_category(bmi)
-  case bmi
-  when 0...18.5 then "น้ำหนักต่ำกว่าเกณฑ์"
-  when 18.5...25 then "น้ำหนักปกติ"
-  when 25...30 then "น้ำหนักเกิน"
-  else "อ้วน"
-  end
-end
-
-[17.0, 22.5, 27.0, 32.0].each do |bmi|
-  puts "BMI #{bmi}: #{bmi_category(bmi)}"
-end
-
-# อายุ category
-def age_group(age)
-  case age
-  when 0..12    then "เด็ก"
-  when 13..17   then "วัยรุ่น"
-  when 18..59   then "ผู้ใหญ่"
-  when 60..Float::INFINITY then "ผู้สูงอายุ"
-  end
-end
-
-[5, 15, 30, 65].each do |age|
-  puts "อายุ #{age}: #{age_group(age)}"
-end
-```
-
----
-
-## ขั้นตอนที่ 357: Endless Ranges (Ruby 2.6+)
-
-```ruby
-# Endless range (1..) - ไม่มีจุดสิ้นสุด
-endless = (1..)
-puts endless.class   # => Range
-
-# ใช้ใน case/when
-def classify(n)
-  case n
-  when (..0)  then "ลบหรือศูนย์"
-  when 1..10  then "1 ถึง 10"
-  when 11..   then "มากกว่า 10"
-  end
-end
-
-[-1, 0, 5, 15].each { |n| puts "#{n}: #{classify(n)}" }
-
-# ใช้กับ Array slicing
-arr = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-puts arr[3..].inspect    # => [4, 5, 6, 7, 8, 9, 10] (จาก index 3 ถึงสุด)
-puts arr[..3].inspect    # => [1, 2, 3, 4] (ถึง index 3)
-puts arr[2..5].inspect   # => [3, 4, 5, 6]
-
-# select กับ endless range
-numbers = (1..100).to_a
-puts numbers.select { |n| (50..).include?(n) }.first(5).inspect
-# => [50, 51, 52, 53, 54]
-
-# ตัวอย่างจริง: pagination
-def paginate(items, page:, per_page: 10)
-  start = (page - 1) * per_page
-  items[start..(start + per_page - 1)] || []
-end
-
-items = (1..50).to_a
-puts "Page 1: #{paginate(items, page: 1, per_page: 5).inspect}"
-puts "Page 3: #{paginate(items, page: 3, per_page: 5).inspect}"
-```
-
----
-
-## ขั้นตอนที่ 358: Beginless Ranges (Ruby 2.7+)
-
-```ruby
-# Beginless range (..5) - ไม่มีจุดเริ่มต้น
-beginless = (..5)
-puts beginless.include?(5)    # => true
-puts beginless.include?(0)    # => true
-puts beginless.include?(-100) # => true
-puts beginless.include?(6)    # => false
-
-# ใช้ใน case/when
-def discount_tier(amount)
-  case amount
-  when ..999        then "0%"
-  when 1000..4999   then "5%"
-  when 5000..9999   then "10%"
-  when 10000..       then "15%"
-  end
-end
-
-[500, 2000, 7000, 15000].each do |amt|
-  puts "฿#{amt}: ลด #{discount_tier(amt)}"
-end
-
-# ใช้กับ Array
-arr = ['a', 'b', 'c', 'd', 'e']
-puts arr[..2].inspect    # => ["a", "b", "c"]
-puts arr[...2].inspect   # => ["a", "b"]
-
-# Filter ด้วย beginless range
-products = [
-  { name: "Item A", price: 100 },
-  { name: "Item B", price: 500 },
-  { name: "Item C", price: 1000 },
-  { name: "Item D", price: 2000 }
-]
-
-cheap = products.select { |p| (..499).include?(p[:price]) }
-puts cheap.map { |p| p[:name] }.inspect
-# => ["Item A"]
-
-budget = products.select { |p| (500..1000).include?(p[:price]) }
-puts budget.map { |p| p[:name] }.inspect
-# => ["Item B", "Item C"]
-```
-
----
-
-## ขั้นตอนที่ 359: Range กับ Strings
-
-```ruby
-# Range กับ String characters
-alpha_lower = ('a'..'z')
-puts alpha_lower.to_a.inspect
-# => ["a", "b", ..., "z"]
-
-alpha_upper = ('A'..'Z')
-puts alpha_upper.include?('M')   # => true
-
-# String range ใช้ succ method
-puts 'a'.succ   # => "b"
-puts 'z'.succ   # => "aa"
-puts '9'.succ   # => "10"
-
-# ใช้ range ในการ validate
-def valid_grade?(grade)
-  ('A'..'F').include?(grade.upcase)
-end
-
-puts valid_grade?('A')   # => true
-puts valid_grade?('C')   # => true
-puts valid_grade?('G')   # => false
-
-# สร้าง alphabet
-puts ('a'..'z').to_a.join(' ')
-# => a b c d e f g h i j k l m n o p q r s t u v w x y z
-
-# เลขโรมัน (อย่างง่าย)
-digits = ('0'..'9').to_a
-letters = [('a'..'z').to_a, ('A'..'Z').to_a].flatten
-alphanumeric = digits + letters
-puts alphanumeric.length   # => 62
-
-# Custom range คลาสสำหรับ version numbers
-# (ต้องการ Comparable)
-class Version
-  include Comparable
-  
-  attr_reader :major, :minor, :patch
-  
-  def initialize(version_string)
-    parts = version_string.split('.').map(&:to_i)
-    @major = parts[0] || 0
-    @minor = parts[1] || 0
-    @patch = parts[2] || 0
-  end
-  
-  def <=>(other)
-    return @major <=> other.major unless @major == other.major
-    return @minor <=> other.minor unless @minor == other.minor
-    @patch <=> other.patch
-  end
-  
-  def succ
-    Version.new("#{@major}.#{@minor}.#{@patch + 1}")
-  end
-  
-  def to_s
-    "#{@major}.#{@minor}.#{@patch}"
-  end
-end
-
-v1 = Version.new("1.0.0")
-v2 = Version.new("2.0.0")
-current = Version.new("1.5.3")
-
-puts (v1..v2).include?(current)  # => true
-```
-
----
-
-## ขั้นตอนที่ 360: Range ใน Array Operations
-
-```ruby
-arr = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
-
-# Slicing ด้วย range
-puts arr[2..5].inspect    # => [30, 40, 50, 60]
-puts arr[2...5].inspect   # => [30, 40, 50]
-puts arr[2..].inspect     # => [30, 40, 50, 60, 70, 80, 90, 100]
-puts arr[..3].inspect     # => [10, 20, 30, 40]
-
-# การแทนที่ด้วย range
-arr2 = arr.dup
-arr2[2..4] = [300, 400, 500]
-puts arr2.inspect   # => [10, 20, 300, 400, 500, 60, 70, 80, 90, 100]
-
-# Range ใน each_with_object
-result = (1..5).each_with_object([]) do |n, arr|
-  arr << n * n
-end
-puts result.inspect   # => [1, 4, 9, 16, 25]
-
-# Nested ranges
-matrix_range = (1..3).flat_map do |row|
-  (1..3).map { |col| [row, col] }
-end
-puts matrix_range.inspect
-# => [[1,1],[1,2],[1,3],[2,1],[2,2],[2,3],[3,1],[3,2],[3,3]]
-
-# สร้าง times table
-(1..9).each do |i|
-  row = (1..9).map { |j| (i * j).to_s.rjust(3) }.join
-  puts row
-end
-```
-
----
-
-## ขั้นตอนที่ 361: Range กับ each_slice และ each_cons
-
-```ruby
-# เมธอด Enumerable บน Range
-r = (1..10)
-
-# each_slice - แบ่งเป็น chunks
-r.each_slice(3) { |chunk| print chunk.inspect + " " }
-puts
-# => [1, 2, 3] [4, 5, 6] [7, 8, 9] [10]
-
-# each_cons - sliding window
-r.each_cons(3) { |window| print window.inspect + " " }
-puts
-# => [1, 2, 3] [2, 3, 4] [3, 4, 5] [4, 5, 6] [5, 6, 7] [6, 7, 8] [7, 8, 9] [8, 9, 10]
-
-# ตัวอย่างจริง: ตรวจสอบ trend
-prices = [100, 105, 110, 108, 112, 115, 113, 120]
-trends = []
-
-prices.each_cons(2) do |prev, curr|
-  if curr > prev
-    trends << :up
-  elsif curr < prev
-    trends << :down
-  else
-    trends << :flat
-  end
-end
-
-puts trends.inspect
-# => [:up, :up, :down, :up, :up, :down, :up]
-
-# ตัวอย่าง: moving average
-def moving_average(data, window_size)
-  data.each_cons(window_size).map do |window|
-    window.sum.to_f / window_size
-  end
-end
-
-data = [10, 20, 30, 40, 50, 60, 70]
-puts moving_average(data, 3).inspect
-# => [20.0, 30.0, 40.0, 50.0, 60.0]
-```
-
----
-
-## ขั้นตอนที่ 362: Range เป็น Lazy Enumerator
-
-```ruby
-# Range กับ lazy - สำหรับ infinite หรือ large ranges
-# ถ้าไม่ใช้ lazy จะพยายาม enumerate ทั้งหมด
-
-# ตัวอย่าง: หา 5 จำนวนเฉพาะแรกที่มากกว่า 100
-def prime?(n)
-  return false if n < 2
-  (2..Math.sqrt(n).to_i).none? { |i| n % i == 0 }
-end
-
-# แบบ lazy - efficient
-primes = (101..).lazy.select { |n| prime?(n) }.first(5)
-puts primes.inspect   # => [101, 103, 107, 109, 113]
-
-# แบบไม่ lazy จะ raise error สำหรับ infinite range
-# (101..).select { |n| prime?(n) }.first(5)  # infinite loop!
-
-# ตัวอย่าง: Fibonacci sequence
-fib = Enumerator.new do |y|
-  a, b = 0, 1
-  loop do
-    y << a
-    a, b = b, a + b
-  end
-end
-
-# หา Fibonacci ที่น้อยกว่า 100
-puts fib.lazy.select { |n| n < 100 }.to_a.inspect
-# => [0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89]
-
-# Range กับ lazy map
-result = (1..Float::INFINITY).lazy
-  .map { |n| n * n }
-  .select { |n| n % 3 == 0 }
-  .first(5)
-puts result.inspect   # => [9, 36, 81, 144, 225]
-```
-
----
-
-## ขั้นตอนที่ 363: ตัวอย่างการใช้งานจริง
-
-```ruby
-# 1. Date range iteration
-require 'date'
-
-start_date = Date.new(2024, 1, 1)
-end_date = Date.new(2024, 1, 7)
-
-(start_date..end_date).each do |date|
-  puts date.strftime("%A, %d %B %Y")
-end
-
-# 2. Business hours checker
-def business_hours?(hour)
-  (9..17).include?(hour)
-end
-
-(6..22).each do |hour|
-  status = business_hours?(hour) ? "เปิด" : "ปิด"
-  puts "#{hour}:00 - #{status}"
-end
-
-# 3. Pricing tiers
-PRICING_TIERS = [
-  { range: (..99),     name: "Basic",      price: 0 },
-  { range: (100..499), name: "Standard",   price: 99 },
-  { range: (500..999), name: "Pro",        price: 299 },
-  { range: (1000..),   name: "Enterprise", price: 999 }
-]
-
-def get_plan(usage)
-  tier = PRICING_TIERS.find { |t| t[:range].include?(usage) }
-  tier || { name: "Unknown", price: 0 }
-end
-
-[50, 200, 750, 1500].each do |usage|
-  plan = get_plan(usage)
-  puts "Usage #{usage}: #{plan[:name]} (฿#{plan[:price]}/เดือน)"
-end
-
-# 4. Color gradient
-def rgb_gradient(from_r, to_r, steps)
-  (0..steps).map do |step|
-    t = step.to_f / steps
-    r = (from_r + (to_r - from_r) * t).round
-    r
-  end
-end
-
-reds = rgb_gradient(0, 255, 10)
-puts reds.inspect
-```
-
----
-
-## ขั้นตอนที่ 364: Symbol และ Range ร่วมกัน
-
-```ruby
-# ใช้ Symbol สำหรับกำหนด ranges
-GRADE_RANGES = {
-  excellent: (90..100),
-  good:      (80...90),
-  average:   (70...80),
-  passing:   (60...70),
-  failing:   (0...60)
-}
-
-def letter_grade(score)
-  GRADE_RANGES.find { |grade, range| range.include?(score) }&.first
-end
-
-[95, 82, 73, 64, 45].each do |score|
+(0..100).step(10) do |score|
   puts "#{score}: #{letter_grade(score)}"
 end
 
-# Symbol เป็น keys ของ Range configuration
-TIME_RANGES = {
-  morning:   (6..11),
-  afternoon: (12..17),
-  evening:   (18..21),
-  night:     (22..23)
-}
-
-def time_of_day(hour)
-  TIME_RANGES.find { |_, range| range.include?(hour) }&.first || :midnight
+# ตัวอย่าง: ราคาส่งสินค้า
+def shipping_cost(weight_kg)
+  case weight_kg
+  when (0..0.5)  then 30
+  when (0.5..1)  then 50
+  when (1..5)    then 80
+  when (5..10)   then 150
+  when (10..)    then 300
+  end
 end
 
-[7, 14, 19, 23, 3].each do |hour|
-  puts "#{hour}:00 - #{time_of_day(hour)}"
+puts "ราคาส่ง 0.3 กก.: #{shipping_cost(0.3)} บาท"
+puts "ราคาส่ง 2 กก.: #{shipping_cost(2)} บาท"
+puts "ราคาส่ง 15 กก.: #{shipping_cost(15)} บาท"
+
+# ตัวอย่าง: เวลา
+def part_of_day(hour)
+  case hour
+  when 0..5   then "กลางคืน"
+  when 6..11  then "เช้า"
+  when 12..17 then "บ่าย"
+  when 18..21 then "เย็น"
+  when 22..23 then "ค่ำ"
+  end
 end
+
+(0..23).step(3) { |h| puts "#{h}:00 - #{part_of_day(h)}" }
 ```
 
 ---
 
-## ขั้นตอนที่ 365: Tips และ Tricks
+## Step 361: Range กับ grep
+
+`grep` ใช้ `===` ในการกรอง ซึ่ง Range ก็รองรับ `===`:
 
 ```ruby
-# 1. Range ในการสร้าง random number
-random = rand(1..6)
-puts "ทอยลูกเต๋า: #{random}"
+# === กับ Range
+puts (1..10) === 5    # true
+puts (1..10) === 11   # false
 
-# 2. Sample จาก range
-sample = (1..100).to_a.sample(5)
-puts sample.inspect
+# grep กับ Range
+numbers = [3, 15, 7, 42, 28, 1, 99, 50]
 
-# 3. Range เป็น infinite generator
-natural_numbers = (1..).lazy
-evens = natural_numbers.select(&:even?)
-puts evens.first(10).inspect
-# => [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
+# ตัวเลขในช่วง 1-20
+small = numbers.grep(1..20)
+puts small.inspect  # [3, 15, 7, 1]
 
-# 4. ใช้ Range กับ sprintf
-(1..5).each { |n| puts "Item %02d" % n }
+# ตัวเลขในช่วง 30+
+big = numbers.grep(30..)
+puts big.inspect  # [42, 99, 50]
 
-# 5. Flip-flop operator (deprecated แต่น่ารู้)
-# เก็บ state ระหว่าง start และ end condition
-text = ["apple", "---start---", "banana", "cherry", "---end---", "date"]
-in_section = false
-text.each do |line|
-  in_section = true if line == "---start---"
-  puts line if in_section && !line.start_with?("---")
-  in_section = false if line == "---end---"
-end
+# grep กับ String
+words = ["apple", "ant", "banana", "cat", "avocado"]
+a_words = words.grep(/^a/)
+puts a_words.inspect  # ["apple", "ant", "avocado"]
 
-# 6. Symbol ใน frozen string optimization
-# Ruby 3+ frozen string literal
-require 'set'
+# grep_v (opposite of grep)
+not_small = numbers.grep_v(1..20)
+puts not_small.inspect  # [42, 28, 99, 50]
 
-common_symbols = Set.new([:name, :age, :email, :phone, :address])
-puts common_symbols.include?(:name)  # => true
+# ตัวอย่างจริง: filter log levels
+log_entries = [
+  { level: 1, message: "Debug info" },
+  { level: 2, message: "Info message" },
+  { level: 3, message: "Warning!" },
+  { level: 4, message: "Error occurred" },
+  { level: 5, message: "Critical failure" }
+]
 
-# 7. Symbol comparison สำหรับ sort
-[:banana, :apple, :cherry, :date].sort.each { |s| puts s }
+critical_logs = log_entries.select { |e| (3..5) === e[:level] }
+critical_logs.each { |e| puts "[#{e[:level]}] #{e[:message]}" }
 ```
 
 ---
 
-## แบบฝึกหัด 20 ข้อ
+## Step 362: Range และ Numeric Operations
 
-### ข้อ 1-5: Symbols
+```ruby
+# สร้างตัวเลขสุ่มในช่วง
+range = 1..100
+random_num = rand(range)
+puts random_num
 
-**ข้อ 1:** สร้าง Hash ที่ใช้ Symbol keys เก็บข้อมูลนักศึกษา
+# sample จาก Range array
+puts (1..10).to_a.sample  # สุ่มหนึ่งตัว
+puts (1..10).to_a.sample(3).inspect  # สุ่ม 3 ตัว
+
+# Arithmetic Progression
+# สร้างลำดับเลขคณิต
+first_20_odd = (1..40).step(2).first(20)
+puts first_20_odd.inspect
+
+# Geometric progression (ต้องใช้ each_with_object)
+def geometric(start, ratio, count)
+  count.times.each_with_object([start]) do |_, arr|
+    arr << arr.last * ratio
+  end
+end
+
+puts geometric(1, 2, 8).inspect  # [1, 2, 4, 8, 16, 32, 64, 128, 256]
+
+# Range ในการ generate test data
+test_scores = (50..100).to_a.sample(20).sort
+puts test_scores.inspect
+puts "Average: #{test_scores.sum.to_f / test_scores.size}"
+puts "Min: #{test_scores.min}, Max: #{test_scores.max}"
+```
+
+---
+
+## Step 363: Range กับ String Operations
+
+```ruby
+# String Range
+alpha_lower = ('a'..'z').to_a
+alpha_upper = ('A'..'Z').to_a
+digits = ('0'..'9').to_a
+
+puts "Lowercase: #{alpha_lower.join}"
+puts "Uppercase: #{alpha_upper.join}"
+puts "Digits: #{digits.join}"
+
+# ตรวจสอบว่าเป็นตัวอักษรหรือไม่
+def is_letter?(char)
+  ('a'..'z').include?(char.downcase)
+end
+
+puts is_letter?('a')  # true
+puts is_letter?('Z')  # true
+puts is_letter?('1')  # false
+puts is_letter?('!')  # false
+
+# สร้าง Caesar cipher
+def caesar_cipher(text, shift)
+  text.chars.map do |char|
+    if ('a'..'z').include?(char)
+      shifted = ((char.ord - 'a'.ord + shift) % 26) + 'a'.ord
+      shifted.chr
+    elsif ('A'..'Z').include?(char)
+      shifted = ((char.ord - 'A'.ord + shift) % 26) + 'A'.ord
+      shifted.chr
+    else
+      char
+    end
+  end.join
+end
+
+message = "Hello, World!"
+encrypted = caesar_cipher(message, 3)
+decrypted = caesar_cipher(encrypted, -3)
+puts "Original: #{message}"
+puts "Encrypted: #{encrypted}"
+puts "Decrypted: #{decrypted}"
+```
+
+---
+
+## Step 364: Range กับ Custom Objects
+
+```ruby
+# สร้าง class ที่ใช้งานกับ Range ได้
+class Temperature
+  include Comparable
+
+  attr_reader :value
+
+  def initialize(value)
+    @value = value
+  end
+
+  def <=>(other)
+    @value <=> other.value
+  end
+
+  def to_s
+    "#{@value}°C"
+  end
+
+  def succ
+    Temperature.new(@value + 1)
+  end
+end
+
+# สร้าง Range ของ Temperature
+cold = Temperature.new(-10)
+hot = Temperature.new(40)
+temp_range = cold..hot
+
+# ตรวจสอบ
+normal = Temperature.new(20)
+puts temp_range.include?(normal)    # true
+puts temp_range.include?(Temperature.new(50))  # false
+
+# iterate ได้ถ้ามี succ method
+comfortable_range = Temperature.new(18)..Temperature.new(24)
+comfortable_range.each do |temp|
+  puts temp
+end
+# 18°C
+# 19°C
+# 20°C
+# 21°C
+# 22°C
+# 23°C
+# 24°C
+```
+
+---
+
+## Step 365: ตัวอย่างการใช้งานจริง
+
+```ruby
+# ตัวอย่าง 1: ระบบ Booking ห้องพัก
+class Hotel
+  PRICE_RANGES = {
+    standard: 1000..2000,
+    deluxe: 2001..4000,
+    suite: 4001..8000,
+    penthouse: 8001..Float::INFINITY
+  }.freeze
+
+  def categorize_room(price)
+    PRICE_RANGES.each do |category, range|
+      return category if range.cover?(price)
+    end
+    :unknown
+  end
+
+  def available_rooms_in_budget(rooms, budget_range)
+    rooms.select { |room| budget_range.cover?(room[:price]) }
+  end
+end
+
+hotel = Hotel.new
+puts hotel.categorize_room(1500)   # standard
+puts hotel.categorize_room(3000)   # deluxe
+puts hotel.categorize_room(10000)  # penthouse
+
+rooms = [
+  { id: 101, price: 1200, type: "standard" },
+  { id: 201, price: 3500, type: "deluxe" },
+  { id: 301, price: 5000, type: "suite" },
+  { id: 401, price: 9000, type: "penthouse" }
+]
+
+budget_rooms = hotel.available_rooms_in_budget(rooms, 1000..4000)
+budget_rooms.each { |r| puts "Room #{r[:id]}: #{r[:price]} บาท" }
+
+# ตัวอย่าง 2: Pagination
+class Paginator
+  def initialize(total_items, per_page = 10)
+    @total_items = total_items
+    @per_page = per_page
+  end
+
+  def page_range(page_number)
+    start_index = (page_number - 1) * @per_page
+    end_index = [start_index + @per_page - 1, @total_items - 1].min
+    start_index..end_index
+  end
+
+  def total_pages
+    (@total_items.to_f / @per_page).ceil
+  end
+end
+
+paginator = Paginator.new(100, 10)
+puts "Total pages: #{paginator.total_pages}"
+puts "Page 1 range: #{paginator.page_range(1)}"
+puts "Page 5 range: #{paginator.page_range(5)}"
+puts "Last page range: #{paginator.page_range(10)}"
+
+# ตัวอย่าง 3: Validation
+module Validators
+  AGE_RANGE = 0..150
+  PRICE_RANGE = 0.01..1_000_000.00
+  SCORE_RANGE = 0..100
+
+  def self.valid_age?(age)
+    AGE_RANGE.cover?(age)
+  end
+
+  def self.valid_price?(price)
+    PRICE_RANGE.cover?(price)
+  end
+
+  def self.valid_score?(score)
+    SCORE_RANGE.cover?(score)
+  end
+end
+
+puts Validators.valid_age?(25)     # true
+puts Validators.valid_age?(-1)     # false
+puts Validators.valid_age?(200)    # false
+puts Validators.valid_price?(99.99) # true
+puts Validators.valid_score?(85)   # true
+puts Validators.valid_score?(101)  # false
+```
+
+---
+
+## แบบฝึกหัด: Symbols และ Ranges (20 ข้อ)
+
+### ข้อที่ 1-5: Symbols
+
+**ข้อ 1:** สร้าง array ของ Symbols แทนวันในสัปดาห์ (7 วัน) โดยใช้ `%i[]` syntax
+
+```ruby
+# เฉลย
+days = %i[monday tuesday wednesday thursday friday saturday sunday]
+puts days.inspect
+puts days.class  # Array
+puts days.first.class  # Symbol
+```
+
+**ข้อ 2:** เขียน method ที่รับ String และแปลงเป็น Symbol แบบ snake_case (เช่น "Hello World" -> :hello_world)
+
+```ruby
+# เฉลย
+def to_snake_sym(str)
+  str.downcase.gsub(/\s+/, '_').to_sym
+end
+
+puts to_snake_sym("Hello World")    # :hello_world
+puts to_snake_sym("First Name")     # :first_name
+puts to_snake_sym("Product ID")     # :product_id
+```
+
+**ข้อ 3:** สร้าง Hash ที่มี Symbol keys แทนข้อมูลนักศึกษา และเข้าถึงค่าต่างๆ
+
 ```ruby
 # เฉลย
 student = {
   name: "สมชาย ใจดี",
-  id: "63001234",
-  gpa: 3.5,
-  major: :computer_science,
-  year: 3
+  student_id: "ST001",
+  gpa: 3.75,
+  year: 3,
+  major: :computer_science
 }
 
 puts student[:name]
-puts student[:major]
+puts student[:gpa]
+puts student[:major].to_s.gsub('_', ' ').capitalize
 ```
 
-**ข้อ 2:** ใช้ Symbol#to_proc กับ Array
+**ข้อ 4:** ใช้ Symbol#to_proc กับ map เพื่อแปลง array ของ String เป็นตัวพิมพ์ใหญ่ทั้งหมด
+
 ```ruby
 # เฉลย
-words = ["hello", "world", "ruby", "programming"]
-
-# แปลงเป็นตัวใหญ่ทั้งหมด
-puts words.map(&:upcase).inspect
-
-# เรียงลำดับตาม length
-puts words.sort_by(&:length).inspect
-
-# filter เฉพาะที่ length > 4
-puts words.select { |w| w.length > 4 }.inspect
+fruits = ["apple", "banana", "cherry", "date", "elderberry"]
+upper_fruits = fruits.map(&:upcase)
+puts upper_fruits.inspect
 ```
 
-**ข้อ 3:** สร้าง method ที่รับ Symbol และ call method ที่ชื่อนั้นบน object
+**ข้อ 5:** สร้าง method ที่ใช้ `send` กับ Symbol เพื่อเรียก math operations
+
 ```ruby
 # เฉลย
-def apply_transformation(str, *methods)
-  methods.reduce(str) { |result, method| result.send(method) }
+def calculate(a, b, operation)
+  valid_ops = %i[+ - * /]
+  raise "Invalid operation" unless valid_ops.include?(operation)
+  a.send(operation, b)
 end
 
-puts apply_transformation("hello world", :capitalize, :reverse)
-# => "dlrow olleH"
+puts calculate(10, 5, :+)  # 15
+puts calculate(10, 5, :-)  # 5
+puts calculate(10, 5, :*)  # 50
+puts calculate(10, 5, :/)  # 2
 ```
 
-**ข้อ 4:** เปรียบเทียบ performance ของ Symbol กับ String ใน Hash lookup
+### ข้อที่ 6-10: Ranges (Basic)
+
+**ข้อ 6:** สร้าง Range ของตัวอักษรพิมพ์ใหญ่ A-Z และนับจำนวน vowels ที่อยู่ใน range
+
 ```ruby
 # เฉลย
-require 'benchmark'
-
-n = 1_000_000
-hash_sym = { name: "Ruby", age: 30 }
-hash_str = { "name" => "Ruby", "age" => 30 }
-
-Benchmark.bm(15) do |x|
-  x.report("Symbol lookup:") { n.times { hash_sym[:name] } }
-  x.report("String lookup:") { n.times { hash_str["name"] } }
-end
+uppercase = ('A'..'Z').to_a
+vowels = uppercase.select { |char| "AEIOU".include?(char) }
+puts "Total letters: #{uppercase.size}"
+puts "Vowels: #{vowels.inspect}"
+puts "Consonants: #{uppercase.size - vowels.size}"
 ```
 
-**ข้อ 5:** สร้าง enum-like module ด้วย Symbols
+**ข้อ 7:** สร้าง Range 1..50 และหา: ผลรวม, ค่าเฉลี่ย, ตัวเลขคี่, ตัวเลขที่หาร 3 ลงตัว
+
 ```ruby
 # เฉลย
-module Color
-  RED    = :red
-  GREEN  = :green
-  BLUE   = :blue
-  
-  ALL = [RED, GREEN, BLUE].freeze
-  
-  def self.valid?(color)
-    ALL.include?(color)
-  end
-end
+range = 1..50
+numbers = range.to_a
 
-puts Color.valid?(:red)     # => true
-puts Color.valid?(:purple)  # => false
+puts "ผลรวม: #{numbers.sum}"
+puts "ค่าเฉลี่ย: #{numbers.sum.to_f / numbers.size}"
+puts "ตัวเลขคี่: #{numbers.select(&:odd?).inspect}"
+puts "หาร 3 ลงตัว: #{numbers.select { |n| n % 3 == 0 }.inspect}"
 ```
 
-### ข้อ 6-10: Ranges
+**ข้อ 8:** เขียน method ที่ตรวจสอบว่า IP address อยู่ในช่วงที่กำหนดหรือไม่ (อิงแค่ octet แรก)
 
-**ข้อ 6:** ใช้ Range ใน case/when สำหรับ BMI calculator
 ```ruby
 # เฉลย
-def bmi_status(height_cm, weight_kg)
-  bmi = weight_kg / (height_cm / 100.0) ** 2
-  
-  status = case bmi.round(1)
-  when (..18.4) then "น้ำหนักต่ำกว่าเกณฑ์"
-  when 18.5..24.9 then "น้ำหนักปกติ"
-  when 25.0..29.9 then "น้ำหนักเกิน"
-  when 30.0.. then "อ้วน"
-  end
-  
-  "BMI: #{bmi.round(1)} - #{status}"
+def private_network?(ip)
+  first_octet = ip.split('.').first.to_i
+  private_ranges = [(10..10), (172..172), (192..192)]
+  private_ranges.any? { |range| range.cover?(first_octet) }
 end
 
-puts bmi_status(170, 60)
-puts bmi_status(170, 85)
+puts private_network?("10.0.0.1")    # true
+puts private_network?("192.168.1.1") # true
+puts private_network?("8.8.8.8")     # false
 ```
 
-**ข้อ 7:** สร้าง method ที่คืน range ของ working days
-```ruby
-# เฉลย
-require 'date'
+**ข้อ 9:** สร้าง method ที่สร้าง multiplication table ด้วย Range
 
-def working_days_count(start_date, end_date)
-  (start_date..end_date).count do |date|
-    date.monday? || date.tuesday? || date.wednesday? ||
-    date.thursday? || date.friday?
-  end
-end
-
-start_d = Date.new(2024, 1, 1)
-end_d   = Date.new(2024, 1, 31)
-puts "วันทำงานใน Jan 2024: #{working_days_count(start_d, end_d)} วัน"
-```
-
-**ข้อ 8:** ใช้ step range สร้าง multiplication table
 ```ruby
 # เฉลย
 def multiplication_table(n)
-  puts "  " + (1..n).map { |i| i.to_s.rjust(4) }.join
-  (1..n).each do |i|
-    row = (1..n).map { |j| (i * j).to_s.rjust(4) }.join
-    puts "#{i.to_s.rjust(2)}#{row}"
+  (1..10).each do |i|
+    puts "#{n} × #{i} = #{n * i}"
   end
 end
 
-multiplication_table(5)
+multiplication_table(7)
 ```
 
-**ข้อ 9:** ใช้ endless range เพื่อ validate input
+**ข้อ 10:** ใช้ Range กับ `step` เพื่อสร้าง array ของตัวเลขทศนิยม 0.0 ถึง 1.0 ทีละ 0.1
+
 ```ruby
 # เฉลย
-def validate_age(age)
-  case age
-  when (..0)   then raise ArgumentError, "อายุต้องมากกว่า 0"
-  when 1..120  then age
-  when (121..) then raise ArgumentError, "อายุสูงสุด 120 ปี"
-  end
-end
-
-begin
-  puts validate_age(25)
-  puts validate_age(-1)
-rescue ArgumentError => e
-  puts "Error: #{e.message}"
-end
+decimals = []
+(0.0..1.0).step(0.1) { |n| decimals << n.round(1) }
+puts decimals.inspect
+# [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 ```
 
-**ข้อ 10:** สร้าง paginator ด้วย Range
-```ruby
-# เฉลย
-class Paginator
-  def initialize(total, per_page: 10)
-    @total = total
-    @per_page = per_page
-  end
+### ข้อที่ 11-15: Ranges (Intermediate)
 
-  def page_range(page)
-    start = (page - 1) * @per_page
-    finish = [start + @per_page - 1, @total - 1].min
-    (start..finish)
-  end
+**ข้อ 11:** เขียน class `DateRange` ที่ wraps Date Range และมี method นับ weekdays และ weekends
 
-  def total_pages
-    (@total.to_f / @per_page).ceil
-  end
-end
-
-pager = Paginator.new(53, per_page: 10)
-puts "Total pages: #{pager.total_pages}"
-(1..pager.total_pages).each do |page|
-  range = pager.page_range(page)
-  puts "Page #{page}: items #{range.begin + 1} to #{range.end + 1}"
-end
-```
-
-### ข้อ 11-15: Advanced
-
-**ข้อ 11:** สร้าง countdown timer ด้วย range
-```ruby
-# เฉลย
-def countdown(from)
-  (0..from).to_a.reverse.each do |n|
-    print "#{n}... "
-    sleep(0.1)  # ลด delay สำหรับ demo
-  end
-  puts "เริ่ม!"
-end
-
-countdown(5)
-```
-
-**ข้อ 12:** ใช้ lazy range หาจำนวนเฉพาะ
-```ruby
-# เฉลย
-def prime?(n)
-  return false if n < 2
-  (2..Math.sqrt(n).to_i).none? { |i| n % i == 0 }
-end
-
-# หา prime 10 ตัวแรกที่มากกว่า 1000
-primes = (1001..).lazy.select { |n| prime?(n) }.first(10)
-puts primes.inspect
-```
-
-**ข้อ 13:** สร้าง range ของ dates และ format
 ```ruby
 # เฉลย
 require 'date'
 
-def date_range_thai(start_date, days)
-  months_th = %w[ม.ค. ก.พ. มี.ค. เม.ย. พ.ค. มิ.ย. ก.ค. ส.ค. ก.ย. ต.ค. พ.ย. ธ.ค.]
-  
-  (start_date...(start_date + days)).map do |date|
-    "#{date.day} #{months_th[date.month - 1]} #{date.year + 543}"
+class DateRange
+  def initialize(start_date, end_date)
+    @range = start_date..end_date
+  end
+
+  def weekdays
+    @range.select { |d| d.wday.between?(1, 5) }
+  end
+
+  def weekends
+    @range.select { |d| d.wday == 0 || d.wday == 6 }
+  end
+
+  def count_weekdays
+    weekdays.count
+  end
+
+  def count_weekends
+    weekends.count
   end
 end
 
-start = Date.new(2024, 12, 29)
-puts date_range_thai(start, 5).inspect
+start = Date.new(2024, 1, 1)
+finish = Date.new(2024, 1, 31)
+dr = DateRange.new(start, finish)
+puts "Weekdays in January 2024: #{dr.count_weekdays}"
+puts "Weekends in January 2024: #{dr.count_weekends}"
 ```
 
-**ข้อ 14:** เขียน method ที่รับ Symbol และคืนผลลัพธ์
+**ข้อ 12:** สร้าง Endless Range classifier สำหรับ BMI
+
 ```ruby
 # เฉลย
-class NumberAnalyzer
-  def initialize(numbers)
-    @numbers = numbers
-  end
-
-  def analyze(*operations)
-    operations.each_with_object({}) do |op, results|
-      results[op] = @numbers.send(op)
-    end
+def bmi_category(bmi)
+  case bmi
+  when (..18.4)   then "น้ำหนักน้อยกว่าเกณฑ์"
+  when (18.5..24.9) then "น้ำหนักปกติ"
+  when (25.0..29.9) then "น้ำหนักเกิน"
+  when (30.0..34.9) then "โรคอ้วนระดับ 1"
+  when (35.0..)     then "โรคอ้วนระดับ 2+"
   end
 end
 
-analyzer = NumberAnalyzer.new([3, 1, 4, 1, 5, 9, 2, 6, 5, 3])
-puts analyzer.analyze(:sum, :min, :max, :count).inspect
+[15.0, 22.5, 27.0, 32.5, 40.0].each do |bmi|
+  puts "BMI #{bmi}: #{bmi_category(bmi)}"
+end
 ```
 
-**ข้อ 15:** สร้าง range validator
+**ข้อ 13:** ใช้ grep กับหลาย Range เพื่อ categorize numbers
+
 ```ruby
 # เฉลย
-class RangeValidator
-  def initialize(ranges)
-    @ranges = ranges
-  end
+numbers = (1..100).to_a.sample(20).sort
 
-  def valid?(value)
-    @ranges.any? { |range| range.include?(value) }
-  end
+small  = numbers.grep(1..25)
+medium = numbers.grep(26..75)
+large  = numbers.grep(76..100)
 
-  def category(value)
-    @ranges.find { |range| range.include?(value) }&.then do |r|
-      "Range #{r}"
-    end || "ไม่อยู่ใน range ใดเลย"
-  end
-end
-
-validator = RangeValidator.new([1..10, 20..30, 50..100])
-puts validator.valid?(5)    # => true
-puts validator.valid?(15)   # => false
-puts validator.category(25) # => "Range 20..30"
+puts "Small (1-25): #{small.inspect}"
+puts "Medium (26-75): #{medium.inspect}"
+puts "Large (76-100): #{large.inspect}"
 ```
 
-### ข้อ 16-20: Applications
+**ข้อ 14:** สร้าง Range ที่ cover? ตรวจสอบ time window
 
-**ข้อ 16:** สร้าง grade book ด้วย Range
 ```ruby
 # เฉลย
-class GradeBook
-  GRADES = {
-    A: (90..100),
-    B: (80...90),
-    C: (70...80),
-    D: (60...70),
-    F: (0...60)
-  }
+class BusinessHours
+  MORNING = (9..12)
+  AFTERNOON = (13..17)
 
-  def initialize
-    @scores = {}
+  def self.open?(hour)
+    MORNING.cover?(hour) || AFTERNOON.cover?(hour)
   end
 
-  def add_score(student, score)
-    @scores[student] = score
-  end
-
-  def grade(student)
-    score = @scores[student]
-    GRADES.find { |_, range| range.include?(score) }&.first
-  end
-
-  def report
-    @scores.map do |name, score|
-      "#{name}: #{score} (#{grade(name)})"
+  def self.period(hour)
+    case hour
+    when MORNING    then "เช้า"
+    when AFTERNOON  then "บ่าย"
+    else "นอกเวลาทำการ"
     end
   end
 end
 
-book = GradeBook.new
-book.add_score("สมชาย", 92)
-book.add_score("สมหญิง", 78)
-book.add_score("สมศรี", 65)
-puts book.report.join("\n")
+(8..18).each do |hour|
+  status = BusinessHours.open?(hour) ? "เปิด" : "ปิด"
+  puts "#{hour}:00 - #{status} (#{BusinessHours.period(hour)})"
+end
 ```
 
-**ข้อ 17:** ใช้ Symbol และ Range ใน DSL
+**ข้อ 15:** สร้าง Beginless Range สำหรับ filter ราคาสินค้า
+
 ```ruby
 # เฉลย
-class Rule
-  attr_reader :field, :validations
+products = [
+  { name: "ดินสอ", price: 10 },
+  { name: "สมุด", price: 45 },
+  { name: "กระเป๋า", price: 350 },
+  { name: "นาฬิกา", price: 1200 },
+  { name: "โทรศัพท์", price: 15000 }
+]
 
-  def initialize(field)
-    @field = field
-    @validations = {}
-  end
-
-  def in_range(range)
-    @validations[:range] = range
-    self
-  end
-
-  def required
-    @validations[:required] = true
-    self
-  end
-
-  def validate(value)
-    errors = []
-    errors << "#{@field} จำเป็นต้องมีค่า" if @validations[:required] && value.nil?
-    if @validations[:range] && value
-      errors << "#{@field} ต้องอยู่ใน #{@validations[:range]}" unless @validations[:range].include?(value)
-    end
-    errors
-  end
+def filter_by_price(products, range)
+  products.select { |p| range.cover?(p[:price]) }
 end
 
-age_rule = Rule.new(:age).required.in_range(0..120)
-puts age_rule.validate(nil)
-puts age_rule.validate(25)
-puts age_rule.validate(150)
+cheap     = filter_by_price(products, ..100)
+mid_range = filter_by_price(products, 101..2000)
+expensive = filter_by_price(products, 2001..)
+
+puts "ราคาถูก (ต่ำกว่า 100): #{cheap.map { |p| p[:name] }.join(', ')}"
+puts "ราคากลาง (101-2000): #{mid_range.map { |p| p[:name] }.join(', ')}"
+puts "ราคาแพง (2001+): #{expensive.map { |p| p[:name] }.join(', ')}"
 ```
 
-**ข้อ 18-20:** เพิ่มเติม (ฝึกเอง)
+### ข้อที่ 16-20: รวม Symbols และ Ranges
+
+**ข้อ 16:** สร้าง Hash ที่ map Symbol category ไปยัง Range ของ salary
 
 ```ruby
-# ข้อ 18: สร้าง TimeSlot class ด้วย Range
-class TimeSlot
-  def initialize(start_hour, end_hour)
-    @range = (start_hour..end_hour)
-  end
+# เฉลย
+SALARY_GRADES = {
+  junior:   20_000..35_000,
+  mid:      35_001..60_000,
+  senior:   60_001..100_000,
+  lead:     100_001..150_000,
+  director: 150_001..Float::INFINITY
+}.freeze
 
-  def available?(hour)
-    @range.include?(hour)
-  end
-
-  def overlaps?(other)
-    @range.include?(other.begin) || other.include?(@range.begin)
-  end
-
-  def to_s
-    "#{@range.begin}:00 - #{@range.end}:00"
-  end
-
-  protected
-  def begin = @range.begin
-  def include?(hour) = @range.include?(hour)
+def job_grade(salary)
+  SALARY_GRADES.find { |grade, range| range.cover?(salary) }&.first
 end
 
-morning = TimeSlot.new(9, 12)
-afternoon = TimeSlot.new(13, 17)
-
-puts morning.available?(10)   # => true
-puts morning.available?(14)   # => false
-puts "Morning: #{morning}"
-puts "Afternoon: #{afternoon}"
-
-# ข้อ 19: Symbol dispatch table
-COMMANDS = {
-  greet:   -> (name) { "สวัสดี #{name}!" },
-  farewell: -> (name) { "ลาก่อน #{name}!" },
-  ask:      -> (name) { "#{name} เป็นอย่างไรบ้าง?" }
-}
-
-def dispatch(command_sym, name)
-  COMMANDS[command_sym]&.call(name) || "ไม่รู้จักคำสั่ง #{command_sym}"
+[25000, 45000, 80000, 120000, 200000].each do |salary|
+  grade = job_grade(salary)
+  puts "เงินเดือน #{salary}: #{grade}"
 end
+```
 
-puts dispatch(:greet, "สมชาย")
-puts dispatch(:farewell, "สมหญิง")
-puts dispatch(:unknown, "ใครก็ตาม")
+**ข้อ 17:** สร้าง method ที่ใช้ทั้ง Symbol และ Range ในการ validate
 
-# ข้อ 20: Range-based configuration
-class Config
-  VALID_PORT_RANGE    = (1..65535)
-  VALID_TIMEOUT_RANGE = (1..300)
-  
-  attr_reader :port, :timeout
+```ruby
+# เฉลย
+class UserValidator
+  RULES = {
+    username: { range: (3..20), pattern: /\A[a-z_]\w*\z/ },
+    age:      { range: (13..120) },
+    score:    { range: (0..100) }
+  }.freeze
 
-  def initialize(port: 3000, timeout: 30)
-    self.port = port
-    self.timeout = timeout
-  end
+  def self.valid?(field, value)
+    rules = RULES[field]
+    return false unless rules
 
-  def port=(value)
-    unless VALID_PORT_RANGE.include?(value)
-      raise ArgumentError, "Port ต้องอยู่ใน #{VALID_PORT_RANGE}"
+    if rules[:range]
+      return false unless rules[:range].cover?(value.is_a?(String) ? value.length : value)
     end
-    @port = value
-  end
 
-  def timeout=(value)
-    unless VALID_TIMEOUT_RANGE.include?(value)
-      raise ArgumentError, "Timeout ต้องอยู่ใน #{VALID_TIMEOUT_RANGE}"
+    if rules[:pattern]
+      return false unless value.match?(rules[:pattern])
     end
-    @timeout = value
+
+    true
   end
 end
 
-config = Config.new(port: 8080, timeout: 60)
-puts "Port: #{config.port}, Timeout: #{config.timeout}"
+puts UserValidator.valid?(:username, "alice")      # true
+puts UserValidator.valid?(:username, "ab")         # false (too short)
+puts UserValidator.valid?(:username, "123bad")     # false (pattern)
+puts UserValidator.valid?(:age, 25)                # true
+puts UserValidator.valid?(:age, 5)                 # false
+puts UserValidator.valid?(:score, 85)              # true
+puts UserValidator.valid?(:score, 101)             # false
+```
 
-begin
-  Config.new(port: 99999)
-rescue ArgumentError => e
-  puts "Error: #{e.message}"
+**ข้อ 18:** สร้าง program ที่แสดง calendar สำหรับเดือน
+
+```ruby
+# เฉลย
+require 'date'
+
+def print_month_calendar(year, month)
+  first_day = Date.new(year, month, 1)
+  last_day = Date.new(year, month, -1)
+
+  puts "#{first_day.strftime("%B %Y")}"
+  puts "จ อ พ พฤ ศ ส อา"
+  puts "-" * 20
+
+  # เริ่ม padding
+  start_pad = first_day.wday == 0 ? 6 : first_day.wday - 1
+  print "   " * start_pad
+
+  (first_day..last_day).each do |date|
+    print "#{date.day.to_s.rjust(2)} "
+    puts if date.wday == 0  # Sunday = end of week
+  end
+  puts
+end
+
+print_month_calendar(2024, 1)
+```
+
+**ข้อ 19:** สร้าง generator ที่ใช้ Range สร้าง test data
+
+```ruby
+# เฉลย
+class TestDataGenerator
+  FIRST_NAMES = %w[สมชาย สมหญิง วิทยา อรุณ ภาวนา].freeze
+  LAST_NAMES  = %w[ใจดี มีสุข เจริญ รุ่งเรือง สมบูรณ์].freeze
+  AGE_RANGE   = (18..65).freeze
+  SCORE_RANGE = (50..100).freeze
+
+  def self.generate_students(count)
+    count.times.map do |i|
+      {
+        id:    "ST#{(i + 1).to_s.rjust(3, '0')}",
+        name:  "#{FIRST_NAMES.sample} #{LAST_NAMES.sample}",
+        age:   rand(AGE_RANGE),
+        score: rand(SCORE_RANGE)
+      }
+    end
+  end
+end
+
+students = TestDataGenerator.generate_students(5)
+students.each do |s|
+  puts "#{s[:id]}: #{s[:name]}, อายุ #{s[:age]}, คะแนน #{s[:score]}"
+end
+```
+
+**ข้อ 20:** สร้าง Rate Limiter ที่ใช้ Range ในการ check
+
+```ruby
+# เฉลย
+class RateLimiter
+  LIMITS = {
+    free:       1..10,
+    basic:      1..100,
+    pro:        1..1000,
+    enterprise: 1..Float::INFINITY
+  }.freeze
+
+  def initialize(plan)
+    @plan = plan
+    @requests = 0
+  end
+
+  def allow_request?
+    @requests += 1
+    limit_range = LIMITS[@plan]
+    limit_range.cover?(@requests)
+  end
+
+  def remaining
+    limit = LIMITS[@plan].last
+    return Float::INFINITY if limit == Float::INFINITY
+    [limit - @requests, 0].max
+  end
+end
+
+limiter = RateLimiter.new(:basic)
+15.times do |i|
+  if limiter.allow_request?
+    puts "Request #{i + 1}: Allowed (remaining: #{limiter.remaining})"
+  else
+    puts "Request #{i + 1}: Rate limited!"
+  end
 end
 ```
 
 ---
 
-## สรุปบทที่ 17
+## สรุป
 
-ในบทนี้เราได้เรียนรู้:
+ในตอนนี้เราได้เรียนรู้:
 
-**Symbols:**
-- Symbol คือ immutable identifier ที่ share instance ในหน่วยความจำ
-- เร็วกว่าและเบากว่า String สำหรับ comparison และ Hash keys
-- `to_sym` / `to_s` สำหรับแปลงระหว่าง Symbol และ String
-- `Symbol#to_proc` กับ `&:method_name` เป็น shorthand ที่ทรงพลัง
-- ใช้เป็น enum-like constants, options, และ method names
+### Symbol
+- **คืออะไร**: Object แทนชื่อ ที่มีความเป็น unique และ immutable
+- **สร้างได้หลายวิธี**: `:name`, `:"complex name"`, `"name".to_sym`, `%i[...]`
+- **Methods**: `to_s`, `to_proc`, `id2name`, `upcase`, `downcase`, `length`
+- **ใช้ทำอะไร**: Hash keys, method names, callbacks, options
+- **ข้อดี**: ประหยัด memory, เร็วกว่า String ในการเปรียบเทียบ
 
-**Ranges:**
-- Inclusive `(..)` และ Exclusive `(...)` ranges
-- Endless ranges `(1..)` ใน Ruby 2.6+
-- Beginless ranges `(..5)` ใน Ruby 2.7+
-- Range methods: `include?`, `cover?`, `each`, `to_a`, `step`
-- ใช้ใน `case/when`, Array slicing, และ validation
-- Lazy ranges สำหรับ infinite sequences
+### Range
+- **คืออะไร**: Object แทนช่วงค่า ระหว่าง begin และ end
+- **สองประเภท**: `..` (inclusive), `...` (exclusive)
+- **Methods**: `include?`, `cover?`, `each`, `to_a`, `size`, `step`, `min`, `max`
+- **Endless Range** (`1..`): Ruby 2.6+ สำหรับ "1 ขึ้นไป"
+- **Beginless Range** (`..10`): Ruby 2.7+ สำหรับ "จนถึง 10"
+- **ใน case/when**: ทำงานได้ดีมาก
+- **กับ grep**: กรอง array ด้วย Range
+
+ทั้งสองเป็น tools ที่ทรงพลังใน Ruby ที่ช่วยให้โค้ดอ่านง่ายและทำงานได้อย่างมีประสิทธิภาพ
+
+---
+
+*ตอนถัดไป: ตอนที่ 18 - Enumerables*
