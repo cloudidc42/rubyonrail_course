@@ -1,46 +1,34 @@
-# ตอนที่ 7: Control Flow (ขั้นตอนที่ 101-120)
+# ตอนที่ 7: Control Flow (Steps 101-120)
 
-## บทนำ
-
-Control Flow คือการควบคุมทิศทางการทำงานของโปรแกรม Ruby มีเครื่องมือหลากหลายในการตัดสินใจและแยกทิศทางการทำงาน ตั้งแต่ `if/else` พื้นฐาน ไปจนถึง Pattern Matching ที่ทรงพลังใน Ruby 3+
-
-ในบทนี้เราจะเรียนรู้:
-- if/elsif/else
-- unless
-- Ternary operator
-- case/when
-- Inline conditions
-- Guard clauses
-- Logical operators
-- Short-circuit evaluation
-- Truthiness ใน Ruby
-- Flip-flop operator
-- Pattern matching (Ruby 3+)
+> **เป้าหมาย**: เรียนรู้การควบคุมทิศทางการทำงานของโปรแกรม Ruby ด้วย conditions, case statements, pattern matching และ logical operators
 
 ---
 
-## ขั้นตอนที่ 101: if/elsif/else - พื้นฐาน
+## Step 101: if / elsif / else / end — พื้นฐานการตัดสินใจ
+
+`if` คือคำสั่งพื้นฐานที่สุดในการควบคุมการทำงานของโปรแกรม Ruby ใช้สำหรับตรวจสอบเงื่อนไขและสั่งให้ทำงานเฉพาะเมื่อเงื่อนไขเป็นจริง
+
+### รูปแบบพื้นฐาน
 
 ```ruby
-# โครงสร้างพื้นฐาน
-age = 25
-
+# รูปแบบที่ 1: if เดี่ยว
+age = 20
 if age >= 18
-  puts "ผู้ใหญ่"
+  puts "คุณเป็นผู้ใหญ่แล้ว"
 end
+# Output: คุณเป็นผู้ใหญ่แล้ว
 
-# if-else
+# รูปแบบที่ 2: if / else
 score = 75
-
 if score >= 60
   puts "ผ่าน"
 else
   puts "ไม่ผ่าน"
 end
+# Output: ผ่าน
 
-# if-elsif-else
+# รูปแบบที่ 3: if / elsif / else
 grade = 85
-
 if grade >= 90
   puts "A"
 elsif grade >= 80
@@ -52,815 +40,705 @@ elsif grade >= 60
 else
   puts "F"
 end
-
-# การใช้ then (optional แต่ไม่แนะนำ)
-if age >= 18 then puts "ผู้ใหญ่" end
+# Output: B
 ```
 
----
+### if เป็น Expression (มีค่า return)
 
-## ขั้นตอนที่ 102: if เป็น Expression ที่คืนค่า
-
-ใน Ruby, `if` คือ expression ที่คืนค่าได้ ไม่ใช่แค่ statement
+ใน Ruby, `if` เป็น expression หมายความว่ามันมีค่า return เสมอ
 
 ```ruby
-# if expression คืนค่า
+# if statement มีค่า return
 age = 25
-status = if age >= 18
-  "ผู้ใหญ่"
-else
-  "เด็ก"
-end
-puts status   # => ผู้ใหญ่
+result = if age >= 18
+           "ผู้ใหญ่"
+         else
+           "เด็ก"
+         end
+puts result  # Output: ผู้ใหญ่
 
-# กำหนดค่าจาก if
-message = if score >= 90
-  "ยอดเยี่ยม"
-elsif score >= 70
-  "ดี"
-else
-  "ต้องพัฒนา"
-end
+# ใช้กับ assignment โดยตรง
+temperature = 35
+weather = if temperature > 30
+            "ร้อนมาก"
+          elsif temperature > 25
+            "ร้อน"
+          elsif temperature > 20
+            "อบอุ่น"
+          else
+            "เย็น"
+          end
+puts weather  # Output: ร้อนมาก
+```
 
-# ถ้า branch ที่ทำงานไม่มี explicit value
-result = if false
-  "ไม่ถึง"
-end
-puts result.inspect   # => nil
+### ตัวอย่างจริง: ตรวจสอบราคาสมาชิก
 
-# ใช้กับ method ที่คืนค่า
-def classify(n)
-  if n > 0
-    "บวก"
-  elsif n < 0
-    "ลบ"
+```ruby
+def membership_price(age, is_student)
+  if age < 18
+    price = 100
+    type = "เยาวชน"
+  elsif is_student
+    price = 150
+    type = "นักศึกษา"
+  elsif age >= 60
+    price = 120
+    type = "ผู้สูงอายุ"
   else
-    "ศูนย์"
+    price = 300
+    type = "ทั่วไป"
+  end
+  "ราคาสมาชิกแบบ#{type}: #{price} บาท/เดือน"
+end
+
+puts membership_price(15, false)   # ราคาสมาชิกแบบเยาวชน: 100 บาท/เดือน
+puts membership_price(22, true)    # ราคาสมาชิกแบบนักศึกษา: 150 บาท/เดือน
+puts membership_price(65, false)   # ราคาสมาชิกแบบผู้สูงอายุ: 120 บาท/เดือน
+puts membership_price(35, false)   # ราคาสมาชิกแบบทั่วไป: 300 บาท/เดือน
+```
+
+### ข้อควรระวัง: nested if
+
+```ruby
+# หลีกเลี่ยง nested if ลึกเกินไป (ทำให้อ่านยาก)
+# ❌ ไม่ดี
+if user
+  if user.active?
+    if user.admin?
+      puts "Admin ที่ active"
+    end
   end
 end
 
-puts classify(5)    # => บวก
-puts classify(-3)   # => ลบ
-puts classify(0)    # => ศูนย์
+# ✅ ดีกว่า: ใช้ && เชื่อมเงื่อนไข
+if user && user.active? && user.admin?
+  puts "Admin ที่ active"
+end
 ```
 
 ---
 
-## ขั้นตอนที่ 103: unless - ตรงข้ามกับ if
+## Step 102: unless — ตรงข้ามกับ if
 
-`unless condition` เหมือนกับ `if !condition` แต่อ่านง่ายกว่า
+`unless` ทำงานเมื่อเงื่อนไขเป็น **เท็จ** (false) ตรงข้ามกับ `if` ที่ทำงานเมื่อเงื่อนไขเป็นจริง
 
 ```ruby
+# unless = if not
 logged_in = false
 
-# unless = if not
 unless logged_in
-  puts "กรุณาเข้าสู่ระบบ"
+  puts "กรุณาเข้าสู่ระบบก่อน"
 end
+# Output: กรุณาเข้าสู่ระบบก่อน
 
-# เปรียบเทียบกับ if
+# เทียบเท่ากับ
 if !logged_in
-  puts "กรุณาเข้าสู่ระบบ"
+  puts "กรุณาเข้าสู่ระบบก่อน"
 end
+```
 
-# unless with else
-unless logged_in
-  puts "กรุณาเข้าสู่ระบบ"
+### unless / else
+
+```ruby
+is_weekend = false
+
+unless is_weekend
+  puts "วันทำงาน — ไปทำงานกัน!"
 else
-  puts "ยินดีต้อนรับ!"
+  puts "วันหยุด — พักผ่อนได้แล้ว!"
+end
+# Output: วันทำงาน — ไปทำงานกัน!
+```
+
+### เมื่อไหร่ควรใช้ unless?
+
+```ruby
+# ✅ ใช้ unless เมื่อเงื่อนไขเป็นการ "ไม่มี" หรือ "ไม่ได้"
+items = []
+unless items.empty?
+  puts "มีสินค้าในตะกร้า"
 end
 
-# Inline unless
-puts "กรุณาเข้าสู่ระบบ" unless logged_in
-redirect_to_home unless logged_in  # Rails pattern
-
-# หลีกเลี่ยงการใช้ unless กับ complex conditions
-# ไม่ดี - อ่านยาก
-unless !logged_in && age >= 18
-  puts "ผ่านการตรวจสอบ"
+# ✅ ใช้ unless กับ boolean flag
+maintenance_mode = false
+unless maintenance_mode
+  start_application
 end
 
-# ดีกว่า
-if logged_in || age < 18
-  # ...
+# ❌ อย่าใช้ unless กับ else เมื่อ logic ซับซ้อน (ทำให้งงได้)
+# เพราะมันจะกลายเป็น "unless...else" ซึ่งอ่านยาก
+
+# ❌ อย่าใช้ unless กับ && หรือ ||
+# unless x && y  <-- อ่านยากมาก ใช้ if !(x && y) แทน
+```
+
+### ตัวอย่างจริง: ตรวจสอบ input
+
+```ruby
+def process_order(items, payment_confirmed)
+  unless items && !items.empty?
+    puts "ไม่มีสินค้าในตะกร้า"
+    return
+  end
+
+  unless payment_confirmed
+    puts "การชำระเงินยังไม่ได้รับการยืนยัน"
+    return
+  end
+
+  puts "กำลังประมวลผลออเดอร์ #{items.length} รายการ..."
 end
 
-# ไม่ควรใช้ unless กับ else (สับสน)
-# หลีกเลี่ยง:
-unless condition
-  # ทำถ้า false
-else
-  # ทำถ้า true  # อ่านยากมาก!
-end
+process_order([], true)
+# Output: ไม่มีสินค้าในตะกร้า
+
+process_order(["กาแฟ", "เค้ก"], false)
+# Output: การชำระเงินยังไม่ได้รับการยืนยัน
+
+process_order(["กาแฟ", "เค้ก"], true)
+# Output: กำลังประมวลผลออเดอร์ 2 รายการ...
 ```
 
 ---
 
-## ขั้นตอนที่ 104: Ternary Operator
+## Step 103: Ternary Operator — เงื่อนไขในบรรทัดเดียว
 
-สำหรับ conditions ง่าย ๆ บนบรรทัดเดียว
+Ternary operator ช่วยเขียน if/else แบบสั้นในบรรทัดเดียว รูปแบบคือ:
+`condition ? value_if_true : value_if_false`
 
 ```ruby
-# syntax: condition ? true_value : false_value
+# รูปแบบพื้นฐาน
 age = 20
 status = age >= 18 ? "ผู้ใหญ่" : "เด็ก"
-puts status   # => ผู้ใหญ่
+puts status  # Output: ผู้ใหญ่
+
+# เทียบเท่ากับ
+status = if age >= 18 then "ผู้ใหญ่" else "เด็ก" end
 
 # ใช้ใน string interpolation
-name = "Alice"
-greeting = "สวัสดี #{name.length > 5 ? "คุณ" : ""}#{name}!"
-puts greeting   # => สวัสดี Alice!
+score = 85
+puts "คะแนน: #{score} — #{score >= 60 ? 'ผ่าน' : 'ไม่ผ่าน'}"
+# Output: คะแนน: 85 — ผ่าน
+```
 
-# ใน method call
-def discount_price(price, member)
-  price * (member ? 0.9 : 1.0)
+### ตัวอย่างการใช้งานจริง
+
+```ruby
+# กำหนดค่า default
+name = nil
+display_name = name ? name : "ไม่ระบุชื่อ"
+puts display_name  # Output: ไม่ระบุชื่อ
+
+# (Ruby มี || สำหรับกรณีนี้ด้วย)
+display_name = name || "ไม่ระบุชื่อ"
+puts display_name  # Output: ไม่ระบุชื่อ
+
+# ใช้กับ method
+def discount_price(price, is_member)
+  discounted = is_member ? price * 0.8 : price
+  "ราคา: #{discounted.round(2)} บาท #{is_member ? '(ลด 20%)' : ''}"
 end
 
-puts discount_price(1000, true)   # => 900.0
-puts discount_price(1000, false)  # => 1000.0
+puts discount_price(100, true)   # ราคา: 80.0 บาท (ลด 20%)
+puts discount_price(100, false)  # ราคา: 100 บาท
 
-# ซ้อนกัน (แต่หลีกเลี่ยง!)
-score = 85
-grade = score >= 90 ? "A" : score >= 80 ? "B" : score >= 70 ? "C" : "F"
-puts grade   # => B
-# ดีกว่าถ้าใช้ case/when แทน
+# Nested ternary (ใช้ด้วยความระมัดระวัง)
+score = 75
+grade = score >= 80 ? "ดีมาก" : (score >= 60 ? "ผ่าน" : "ไม่ผ่าน")
+puts grade  # Output: ผ่าน
+```
 
-# ใช้กับ puts
-puts (temperature > 30 ? "ร้อน" : "เย็น")
+### ข้อแนะนำในการใช้ Ternary
 
-# เมื่อไรควรใช้ Ternary?
-# - เมื่อ condition ง่ายมาก
-# - เมื่อ ternary ทำให้โค้ดอ่านง่ายขึ้น
-# - เมื่อใช้ใน string interpolation หรือ argument
+```ruby
+# ✅ ดี: เงื่อนไขสั้น ค่าสั้น
+label = active ? "เปิด" : "ปิด"
 
-# เมื่อไรไม่ควรใช้?
-# - เมื่อ condition ซับซ้อน
-# - เมื่อ true/false branch ยาว
+# ✅ ดี: ใน string interpolation
+puts "สถานะ: #{connected ? 'ออนไลน์' : 'ออฟไลน์'}"
+
+# ❌ หลีกเลี่ยง: ternary ที่ซับซ้อนเกินไป
+# result = a > b ? (c > d ? "x" : "y") : (e > f ? "p" : "q")
+# ควรใช้ if/elsif แทน
 ```
 
 ---
 
-## ขั้นตอนที่ 105: case/when - Pattern Matching แบบ Classic
+## Step 104: One-line Conditions — เงื่อนไขท้ายคำสั่ง
+
+Ruby อนุญาตให้เขียนเงื่อนไข **หลัง** คำสั่งในบรรทัดเดียว ซึ่งเป็นสไตล์ที่นิยมมากใน Ruby
 
 ```ruby
-# Basic case/when
+# รูปแบบ: statement if condition
+puts "สวัสดี!" if true
+puts "ผ่านแล้ว!" if score >= 60
+puts "ยังไม่ผ่าน" unless score >= 60
+
+# ตัวอย่างจริง
+age = 17
+puts "คุณยังเด็กอยู่" if age < 18
+puts "ยังไม่บรรลุนิติภาวะ" unless age >= 18
+
+# ใช้กับ assignment
+discount = nil
+discount = 0.2 if is_member
+discount = 0.1 if order_total > 500
+```
+
+### การใช้งานทั่วไป
+
+```ruby
+# Return early
+def login(username, password)
+  return "กรุณาระบุ username" if username.nil? || username.empty?
+  return "กรุณาระบุ password" if password.nil? || password.empty?
+  return "Username/Password ไม่ถูกต้อง" unless authenticate(username, password)
+  
+  "เข้าสู่ระบบสำเร็จ! ยินดีต้อนรับ #{username}"
+end
+
+# Raise errors
+def divide(a, b)
+  raise ArgumentError, "ห้ามหารด้วยศูนย์" if b == 0
+  a / b.to_f
+end
+
+# Object modification
+items = [1, 2, 3, 4, 5]
+items.delete(3) if items.include?(3)
+puts items.inspect  # [1, 2, 4, 5]
+```
+
+### One-line unless
+
+```ruby
+numbers = [1, 2, 3, 4, 5]
+total = 0
+numbers.each { |n| total += n unless n.even? }
+puts total  # Output: 9 (1 + 3 + 5)
+
+# ใช้ใน Guard clause
+def process(data)
+  return unless data
+  return unless data.valid?
+  data.save!
+end
+```
+
+---
+
+## Step 105: case / when — Ruby's Switch Statement
+
+`case/when` ใช้เมื่อต้องการเปรียบเทียบค่าหนึ่งกับหลายๆ ค่า มีความสะอาดกว่าการใช้ if/elsif หลายชั้น
+
+```ruby
+# รูปแบบพื้นฐาน
 day = "Monday"
 
 case day
-when "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"
-  puts "วันทำงาน"
+when "Monday"
+  puts "วันจันทร์ — เริ่มต้นสัปดาห์ใหม่"
+when "Friday"
+  puts "วันศุกร์ — ใกล้จะหยุดแล้ว!"
 when "Saturday", "Sunday"
-  puts "วันหยุด"
+  puts "วันหยุดสุดสัปดาห์!"
 else
-  puts "ไม่รู้จัก"
+  puts "วันธรรมดา"
+end
+# Output: วันจันทร์ — เริ่มต้นสัปดาห์ใหม่
+```
+
+### case เป็น Expression
+
+```ruby
+# case สามารถคืนค่าได้
+month = 8
+season = case month
+         when 12, 1, 2
+           "ฤดูหนาว"
+         when 3, 4, 5
+           "ฤดูใบไม้ผลิ"
+         when 6, 7, 8
+           "ฤดูร้อน"
+         when 9, 10, 11
+           "ฤดูใบไม้ร่วง"
+         end
+puts season  # Output: ฤดูร้อน
+```
+
+### case ใช้ === (triple equals)
+
+ความพิเศษของ Ruby คือ `case/when` ใช้ `===` (triple equals) แทน `==` ซึ่งทำให้ยืดหยุ่นมาก
+
+```ruby
+# === กับ Integer จะเป็น == ธรรมดา
+case 5
+when 5
+  puts "เป็น 5"
 end
 
-# case กับ Range
-score = 85
+# === กับ String จะเป็น == ธรรมดา
+case "hello"
+when "hello"
+  puts "สวัสดี"
+end
+
+# === กับ Symbol
+status = :active
+case status
+when :active
+  puts "กำลังทำงาน"
+when :inactive
+  puts "หยุดทำงาน"
+when :pending
+  puts "รอดำเนินการ"
+end
+# Output: กำลังทำงาน
+```
+
+### ตัวอย่างจริง: HTTP Status Codes
+
+```ruby
+def handle_response(status_code)
+  message = case status_code
+            when 200
+              "สำเร็จ"
+            when 201
+              "สร้างข้อมูลสำเร็จ"
+            when 400
+              "Bad Request — ข้อมูลไม่ถูกต้อง"
+            when 401
+              "Unauthorized — กรุณาเข้าสู่ระบบ"
+            when 403
+              "Forbidden — ไม่มีสิทธิ์"
+            when 404
+              "Not Found — ไม่พบข้อมูล"
+            when 500
+              "Internal Server Error"
+            else
+              "Unknown Status: #{status_code}"
+            end
+  puts "Status #{status_code}: #{message}"
+end
+
+handle_response(200)  # Status 200: สำเร็จ
+handle_response(404)  # Status 404: Not Found — ไม่พบข้อมูล
+handle_response(403)  # Status 403: Forbidden — ไม่มีสิทธิ์
+```
+
+---
+
+## Step 106: case กับ Range — ตรวจสอบช่วงค่า
+
+`case/when` กับ Range ใช้ `===` ซึ่งใน Range หมายความว่า "อยู่ในช่วงนี้ไหม"
+
+```ruby
+# ตรวจสอบคะแนน
+score = 78
 
 grade = case score
-when 90..100
-  "A"
-when 80..89
-  "B"
-when 70..79
-  "C"
-when 60..69
-  "D"
-else
-  "F"
-end
-
-puts grade   # => B
-
-# case กับ Regex
-input = "user@example.com"
-
-case input
-when /\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/i
-  puts "เป็น Email"
-when /\A\d{10}\z/
-  puts "เป็นหมายเลขโทรศัพท์"
-else
-  puts "ไม่รู้จักรูปแบบ"
-end
-
-# case กับ Class
-def describe(value)
-  case value
-  when String
-    puts "เป็น String: #{value}"
-  when Integer
-    puts "เป็น Integer: #{value}"
-  when Array
-    puts "เป็น Array ที่มี #{value.length} elements"
-  when Hash
-    puts "เป็น Hash ที่มี #{value.size} pairs"
-  when NilClass
-    puts "เป็น nil"
-  else
-    puts "ไม่รู้จักประเภท: #{value.class}"
-  end
-end
-
-describe("hello")   # => เป็น String: hello
-describe(42)        # => เป็น Integer: 42
-describe([1,2,3])   # => เป็น Array ที่มี 3 elements
-describe(nil)       # => เป็น nil
-```
-
----
-
-## ขั้นตอนที่ 106: case/when ที่ซับซ้อนกว่า
-
-```ruby
-# case โดยไม่มี expression (เหมือน if-elsif)
-temperature = 35
-
-case
-when temperature > 35
-  puts "ร้อนมาก"
-when temperature > 28
-  puts "ร้อน"
-when temperature > 20
-  puts "อากาศดี"
-when temperature > 10
-  puts "เย็น"
-else
-  puts "หนาว"
-end
-
-# case กับ Proc/Lambda
-valid_email = ->(s) { s.include?("@") }
-valid_phone = ->(s) { s.match?(/^\d{10}$/) }
-
-contact = "0812345678"
-
-case contact
-when valid_email
-  puts "Email"
-when valid_phone
-  puts "โทรศัพท์"   # => โทรศัพท์
-end
-
-# case คืนค่า
-def http_status_message(code)
-  case code
-  when 200 then "OK"
-  when 201 then "Created"
-  when 400 then "Bad Request"
-  when 401 then "Unauthorized"
-  when 403 then "Forbidden"
-  when 404 then "Not Found"
-  when 500 then "Internal Server Error"
-  else "Unknown Status"
-  end
-end
-
-puts http_status_message(404)   # => Not Found
-puts http_status_message(200)   # => OK
-
-# case กับ then บน single line
-status = 200
-message = case status
-  when 200 then "Success"
-  when 404 then "Not Found"
-  when 500 then "Server Error"
-  else "Unknown"
-end
-puts message
-```
-
----
-
-## ขั้นตอนที่ 107: Inline Conditions (One-liners)
-
-```ruby
-# Inline if
-age = 20
-puts "ผู้ใหญ่" if age >= 18
-return if user.nil?  # ใช้บ่อยใน methods
-
-# Inline unless
-puts "ยังไม่เข้าสู่ระบบ" unless logged_in
-
-# เหมาะกับ:
-# 1. Guard clauses
-raise ArgumentError, "Name required" if name.nil?
-return [] if items.empty?
-
-# 2. Simple conditions
-x += 1 if condition
-arr << item unless arr.include?(item)
-
-# 3. ใน loop
-items.each { |item| puts item if item.positive? }
-
-# Inline while / until (ไม่ค่อยใช้)
-count = 0
-count += 1 while count < 5
-puts count   # => 5
-
-count = 10
-count -= 1 until count <= 5
-puts count   # => 5
-
-# begin/end while (do-while equivalent)
-count = 0
-begin
-  puts count
-  count += 1
-end while count < 3
-# 0, 1, 2
-
-# begin/end until
-count = 0
-begin
-  puts count
-  count += 1
-end until count >= 3
-# 0, 1, 2
-```
-
----
-
-## ขั้นตอนที่ 108: Guard Clauses
-
-Guard clauses เป็น pattern ที่ดีในการลด nesting และทำให้โค้ดอ่านง่าย
-
-```ruby
-# ไม่ดี - nested conditions
-def process_order(order)
-  if order
-    if order[:items]
-      if order[:items].any?
-        if order[:total] > 0
-          # process order
-          puts "Processing order..."
+        when 90..100
+          "A"
+        when 80...90
+          "B"
+        when 70...80
+          "C"
+        when 60...70
+          "D"
+        when 0...60
+          "F"
         else
-          puts "Total must be positive"
+          "คะแนนไม่ถูกต้อง"
         end
-      else
-        puts "Cart is empty"
-      end
+puts "เกรด: #{grade}"  # เกรด: C
+```
+
+### ความแตกต่างระหว่าง .. และ ...
+
+```ruby
+# .. (inclusive) รวมค่าสุดท้าย
+(1..5).include?(5)   # true
+
+# ... (exclusive) ไม่รวมค่าสุดท้าย
+(1...5).include?(5)  # false
+(1...5).include?(4)  # true
+```
+
+### ตัวอย่างจริง: ราคาสินค้าตามปริมาณ
+
+```ruby
+def calculate_price(quantity, unit_price)
+  discount = case quantity
+             when 1..9
+               0.0     # ไม่ลด
+             when 10..49
+               0.05    # ลด 5%
+             when 50..99
+               0.10    # ลด 10%
+             when 100..499
+               0.15    # ลด 15%
+             when 500..Float::INFINITY
+               0.20    # ลด 20%
+             else
+               0.0
+             end
+
+  total = quantity * unit_price * (1 - discount)
+  discount_percent = (discount * 100).to_i
+
+  puts "จำนวน: #{quantity} ชิ้น"
+  puts "ส่วนลด: #{discount_percent}%"
+  puts "ราคารวม: #{total.round(2)} บาท"
+  puts "---"
+end
+
+calculate_price(5, 100)
+# จำนวน: 5 ชิ้น
+# ส่วนลด: 0%
+# ราคารวม: 500.0 บาท
+
+calculate_price(25, 100)
+# จำนวน: 25 ชิ้น
+# ส่วนลด: 5%
+# ราคารวม: 2375.0 บาท
+
+calculate_price(100, 100)
+# จำนวน: 100 ชิ้น
+# ส่วนลด: 15%
+# ราคารวม: 8500.0 บาท
+```
+
+### case กับ Range สำหรับ BMI
+
+```ruby
+def bmi_category(bmi)
+  case bmi
+  when Float::INFINITY..Float::INFINITY
+    "ค่า BMI ไม่ถูกต้อง"
+  when 0...18.5
+    "น้ำหนักน้อยกว่าเกณฑ์"
+  when 18.5...25.0
+    "น้ำหนักปกติ"
+  when 25.0...30.0
+    "น้ำหนักเกิน"
+  when 30.0..Float::INFINITY
+    "อ้วน"
+  else
+    "ค่า BMI ไม่ถูกต้อง"
+  end
+end
+
+puts bmi_category(17.5)  # น้ำหนักน้อยกว่าเกณฑ์
+puts bmi_category(22.0)  # น้ำหนักปกติ
+puts bmi_category(27.5)  # น้ำหนักเกิน
+puts bmi_category(32.0)  # อ้วน
+```
+
+---
+
+## Step 107: case กับ Regex — Pattern Matching บน String
+
+`case/when` กับ Regular Expression (Regex) ใช้ `===` ซึ่งใน Regex หมายความว่า "ตรงกับ pattern นี้ไหม"
+
+```ruby
+# ตรวจสอบรูปแบบ string
+phone = "0812345678"
+
+phone_type = case phone
+             when /^0[689]\d{8}$/
+               "มือถือ"
+             when /^0[2-5]\d{7}$/
+               "บ้าน/ออฟฟิศ"
+             when /^1\d{3}$/
+               "เบอร์สายด่วน"
+             else
+               "ไม่ทราบประเภท"
+             end
+puts phone_type  # Output: มือถือ
+```
+
+### ตัวอย่างจริง: ตรวจสอบ Email Format
+
+```ruby
+def classify_email(email)
+  case email
+  when /\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/i
+    case email
+    when /@gmail\.com$/i
+      "Gmail account"
+    when /@yahoo\.com$/i
+      "Yahoo account"
+    when /@hotmail\.com$/i, /@outlook\.com$/i
+      "Microsoft account"
+    when /\.(ac|edu)\./i, /\.edu$/i
+      "Educational institution"
+    when /\.(co\.th|or\.th|ac\.th)$/i
+      "Thai domain"
     else
-      puts "No items"
+      "Email ทั่วไป"
     end
   else
-    puts "No order"
+    "รูปแบบ Email ไม่ถูกต้อง"
   end
 end
 
-# ดีกว่า - Guard clauses
-def process_order(order)
-  return "No order" unless order
-  return "No items" unless order[:items]
-  return "Cart is empty" unless order[:items].any?
-  return "Total must be positive" unless order[:total] > 0
-
-  # ตอนนี้เราแน่ใจว่าทุกอย่างถูกต้อง
-  puts "Processing order..."
-  "Order processed"
-end
-
-# อีกตัวอย่าง
-def calculate_discount(user, product)
-  return 0 unless user
-  return 0 unless user[:member]
-  return 0 unless product[:discountable]
-  return 0 if product[:price] < 100
-
-  # คำนวณ discount
-  product[:price] * 0.1
-end
-
-# Guard clauses ใน Rails
-def create
-  @user = User.new(user_params)
-  return render :new, status: :unprocessable_entity unless @user.valid?
-  
-  @user.save
-  redirect_to @user, notice: "สร้าง user สำเร็จ"
-end
+puts classify_email("user@gmail.com")         # Gmail account
+puts classify_email("student@ku.ac.th")       # Thai domain
+puts classify_email("not-an-email")           # รูปแบบ Email ไม่ถูกต้อง
 ```
 
----
-
-## ขั้นตอนที่ 109: Logical Operators - && และ ||
+### ตัวอย่างจริง: Parser อย่างง่าย
 
 ```ruby
-# && (and) - ทั้งคู่ต้องเป็น true
-puts true && true    # => true
-puts true && false   # => false
-puts false && true   # => false
-puts false && false  # => false
-
-# || (or) - อย่างน้อยหนึ่งเป็น true
-puts true || true    # => true
-puts true || false   # => true
-puts false || true   # => true
-puts false || false  # => false
-
-# ! (not)
-puts !true    # => false
-puts !false   # => true
-puts !nil     # => true
-
-# ใน conditions
-age = 25
-has_id = true
-
-if age >= 18 && has_id
-  puts "เข้าได้"
-end
-
-member = false
-vip = true
-
-if member || vip
-  puts "รับสิทธิพิเศษ"
-end
-
-# && และ || return actual values (ไม่ใช่แค่ true/false)
-puts (nil && "hello")     # => nil (คืน left เพราะ falsy)
-puts (false && "hello")   # => false
-puts ("world" && "hello") # => hello (คืน right เพราะ left truthy)
-
-puts (nil || "default")   # => default (คืน right เพราะ left falsy)
-puts (false || "value")   # => value
-puts ("first" || "second") # => first (คืน left เพราะ truthy)
-
-# ใช้ || สำหรับ default values
-name = params[:name] || "Anonymous"
-config = user_config || DEFAULT_CONFIG
-```
-
----
-
-## ขั้นตอนที่ 110: and, or, not - Low Precedence Operators
-
-```ruby
-# and, or, not มี precedence ต่ำกว่า &&, ||, !
-# ใช้เป็น flow control ไม่ใช่ boolean operations
-
-# and - เหมือน && แต่ precedence ต่ำกว่า
-x = true and false    # x = true (เพราะ = มี precedence สูงกว่า and)
-x = true && false     # x = false (เพราะ && มี precedence สูงกว่า =)
-
-puts x   # แสดงให้เห็นความแตกต่าง
-
-# การใช้ and สำหรับ flow control
-result = find_user(id) and return result
-# เหมือน:
-result = find_user(id)
-return result if result
-
-# การใช้ or สำหรับ fallback
-record = find_in_cache(id) or record = find_in_db(id)
-# หรือ
-user = User.find_by(id: id) or raise "User not found"
-
-# not
-not true    # => false
-not false   # => true
-
-# ตัวอย่างการใช้ not ที่สร้างสับสน
-# x = not true  # SyntaxError
-x = (not true)  # ต้องมี parentheses
-
-# Recommendation:
-# ใช้ && || ! สำหรับ boolean operations
-# ใช้ and or not สำหรับ flow control (เฉพาะกรณีที่ชัดเจน)
-```
-
----
-
-## ขั้นตอนที่ 111: Short-Circuit Evaluation
-
-```ruby
-# && short-circuits: ถ้า left เป็น falsy จะไม่ evaluate right
-def expensive_check
-  puts "กำลังตรวจสอบ..."
-  true
-end
-
-false && expensive_check   # "กำลังตรวจสอบ..." ไม่แสดง
-nil && expensive_check     # ไม่ evaluate
-
-# || short-circuits: ถ้า left เป็น truthy จะไม่ evaluate right
-true || expensive_check    # "กำลังตรวจสอบ..." ไม่แสดง
-"value" || expensive_check # ไม่ evaluate
-
-# ประโยชน์ของ Short-circuit
-
-# 1. ป้องกัน nil errors
-user = nil
-# user.name  # NoMethodError!
-user && user.name  # => nil (ปลอดภัย)
-user&.name  # Safe navigation operator (Ruby 2.3+)
-
-# 2. Default values
-def greet(name = nil)
-  name ||= "Anonymous"
-  puts "สวัสดี #{name}!"
-end
-
-greet("Alice")  # => สวัสดี Alice!
-greet           # => สวัสดี Anonymous!
-
-# 3. Conditional execution
-config[:debug] && puts("Debug mode on")
-admin? && send_notification
-
-# 4. ||= operator (assign unless truthy)
-@cache ||= {}            # initialize เฉพาะครั้งแรก
-result ||= compute_result  # memoization
-
-# 5. &&= operator (assign only if truthy)
-user &&= user.update(name: "New Name")  # เฉพาะถ้า user ไม่ nil
-
-# ตัวอย่างจริง
-def find_user_email(user_id)
-  user = User.find_by(id: user_id)
-  user && user.email
-  # หรือ: user&.email
-end
-```
-
----
-
-## ขั้นตอนที่ 112: Truthiness ใน Ruby
-
-ใน Ruby มีเพียง `nil` และ `false` เท่านั้นที่เป็น falsy ทุกอย่างอื่นเป็น truthy
-
-```ruby
-# Falsy values ใน Ruby (มีแค่ 2 อย่าง!)
-puts "nil is falsy" unless nil     # => nil is falsy
-puts "false is falsy" unless false # => false is falsy
-
-# Truthy values (ทุกอย่างที่ไม่ใช่ nil และ false)
-puts "0 is truthy" if 0           # => 0 is truthy (ต่างจาก JavaScript!)
-puts "'' is truthy" if ""         # => '' is truthy (ต่างจาก Python!)
-puts "[] is truthy" if []         # => [] is truthy
-puts "{} is truthy" if {}         # => {} is truthy
-
-# ตัวอย่างที่อาจสร้างความสับสน
-value = 0
-if value   # 0 เป็น truthy ใน Ruby!
-  puts "0 เป็น truthy"
-end
-
-empty_string = ""
-if empty_string  # "" เป็น truthy ใน Ruby!
-  puts "String ว่างเป็น truthy"
-end
-
-# การตรวจสอบที่ถูกต้อง
-puts value.zero?                # => true
-puts empty_string.empty?        # => true
-puts [].empty?                  # => true
-puts {}.empty?                  # => true
-puts nil.nil?                   # => true
-
-# !! (double bang) - แปลงเป็น boolean
-puts !!nil    # => false
-puts !!false  # => false
-puts !!0      # => true
-puts !!""     # => true
-puts !![]     # => true
-
-# เปรียบเทียบกับภาษาอื่น
-# Python: 0, "", [], {} เป็น falsy
-# JavaScript: 0, "", null, undefined, NaN เป็น falsy
-# Ruby: nil, false เท่านั้น!
-```
-
----
-
-## ขั้นตอนที่ 113: Comparison Operators
-
-```ruby
-# Equality
-puts 1 == 1      # => true
-puts 1 == "1"    # => false (ต่างประเภท)
-puts 1.eql?(1)   # => true (type-strict)
-puts 1.eql?(1.0) # => false (ต่างประเภท)
-puts 1.equal?(1) # => true (same object)
-
-# Comparison
-puts 1 < 2    # => true
-puts 2 > 1    # => true
-puts 1 <= 1   # => true
-puts 1 >= 2   # => false
-puts 1 != 2   # => true
-
-# Spaceship operator <=>
-puts 1 <=> 2   # => -1 (น้อยกว่า)
-puts 2 <=> 2   # => 0 (เท่ากัน)
-puts 3 <=> 2   # => 1 (มากกว่า)
-puts 1 <=> "a" # => nil (ไม่สามารถเปรียบเทียบได้)
-
-# ใช้ <=> กับ sort
-names = ["Charlie", "Alice", "Bob"]
-puts names.sort { |a, b| a <=> b }.inspect
-# => ["Alice", "Bob", "Charlie"]
-
-# ใช้ sort_by แทน (สะดวกกว่า)
-puts names.sort_by { |name| name }.inspect
-
-# === operator (used in case/when)
-puts (1..10) === 5      # => true (range membership)
-puts String === "hello" # => true (type check)
-puts /\d+/ === "abc123" # => true (regex match)
-puts :foo === :foo      # => true
-
-# Comparable module
-class Temperature
-  include Comparable
-  attr_reader :degrees
-
-  def initialize(degrees)
-    @degrees = degrees
-  end
-
-  def <=>(other)
-    degrees <=> other.degrees
+def parse_command(input)
+  case input.strip.downcase
+  when /^help(\s.*)?$/
+    show_help($1&.strip)
+  when /^quit|^exit|^bye/
+    puts "ลาก่อน! 👋"
+    exit
+  when /^add\s+(.+)$/
+    item = $1
+    puts "เพิ่ม: #{item}"
+  when /^delete\s+(\d+)$/
+    id = $1.to_i
+    puts "ลบรายการ ##{id}"
+  when /^list(\s+all)?$/
+    show_all = !$1.nil?
+    puts show_all ? "แสดงทั้งหมด" : "แสดงรายการ"
+  else
+    puts "ไม่รู้จักคำสั่ง: '#{input}'"
+    puts "พิมพ์ 'help' เพื่อดูคำสั่งที่ใช้ได้"
   end
 end
 
-temps = [Temperature.new(30), Temperature.new(25), Temperature.new(35)]
-puts temps.sort.map(&:degrees).inspect   # => [25, 30, 35]
-puts temps.max.degrees   # => 35
+parse_command("add กาแฟ")     # เพิ่ม: กาแฟ
+parse_command("delete 3")     # ลบรายการ #3
+parse_command("list all")     # แสดงทั้งหมด
 ```
 
 ---
 
-## ขั้นตอนที่ 114: Safe Navigation Operator (&.)
+## Step 108: case กับ Class — Type Checking
 
-Ruby 2.3 เพิ่ม `&.` (safe navigation operator หรือ "lonely operator")
+`case/when` ใช้กับ Class เพื่อตรวจสอบประเภทของ object โดยใช้ `===` ซึ่งใน Class หมายความว่า `is_a?`
 
 ```ruby
-# ปัญหาก่อน Ruby 2.3
-user = nil
-# user.name  # NoMethodError!
-
-# วิธีเดิม
-puts user && user.name  # => nil (ปลอดภัย แต่ verbose)
-
-# Safe Navigation Operator
-puts user&.name   # => nil (เรียบง่าย)
-
-# ตัวอย่างใช้งาน
-class User
-  attr_accessor :name, :address
-
-  def initialize(name, address = nil)
-    @name = name
-    @address = address
+# ตรวจสอบประเภทข้อมูล
+def describe(value)
+  case value
+  when Integer
+    "#{value} เป็นจำนวนเต็ม"
+  when Float
+    "#{value} เป็นทศนิยม"
+  when String
+    "\"#{value}\" เป็น String (ยาว #{value.length} ตัว)"
+  when Array
+    "Array มี #{value.length} สมาชิก"
+  when Hash
+    "Hash มี #{value.length} คู่ key-value"
+  when Symbol
+    ":#{value} เป็น Symbol"
+  when NilClass
+    "nil (ไม่มีค่า)"
+  when TrueClass, FalseClass
+    "#{value} เป็น Boolean"
+  else
+    "#{value.class} — ไม่รู้จักประเภท"
   end
 end
 
-class Address
-  attr_accessor :city
+puts describe(42)              # 42 เป็นจำนวนเต็ม
+puts describe(3.14)            # 3.14 เป็นทศนิยม
+puts describe("สวัสดี")        # "สวัสดี" เป็น String (ยาว 7 ตัว)
+puts describe([1, 2, 3])       # Array มี 3 สมาชิก
+puts describe({a: 1})          # Hash มี 1 คู่ key-value
+puts describe(:name)           # :name เป็น Symbol
+puts describe(nil)             # nil (ไม่มีค่า)
+puts describe(true)            # true เป็น Boolean
+```
 
-  def initialize(city)
-    @city = city
-  end
+### ตัวอย่างจริง: Polymorphic Calculator
+
+```ruby
+def calculate(a, b, operation)
+  # ตรวจสอบประเภทของ operation
+  result = case operation
+           when String
+             case operation
+             when "+"   then a + b
+             when "-"   then a - b
+             when "*"   then a * b
+             when "/"   then b != 0 ? a.to_f / b : "หารด้วยศูนย์ไม่ได้"
+             else "ไม่รู้จัก operation: #{operation}"
+             end
+           when Symbol
+             case operation
+             when :add      then a + b
+             when :subtract then a - b
+             when :multiply then a * b
+             when :divide   then b != 0 ? a.to_f / b : "หารด้วยศูนย์ไม่ได้"
+             end
+           when Proc, Method
+             operation.call(a, b)
+           else
+             "operation ต้องเป็น String, Symbol, หรือ Proc"
+           end
+  result
 end
 
-alice = User.new("Alice", Address.new("Bangkok"))
-bob = User.new("Bob")
+puts calculate(10, 5, "+")          # 15
+puts calculate(10, 5, :multiply)    # 50
+puts calculate(10, 5, ->(a, b) { a ** b })  # 100000
+```
 
-puts alice&.name              # => Alice
-puts alice&.address&.city     # => Bangkok
-puts bob&.name                # => Bob
-puts bob&.address&.city       # => nil (ไม่ error!)
+### ใช้ case กับ inheritance
 
-# ใน chaining
-users = [alice, nil, bob, nil]
-names = users.map { |u| u&.name }
-puts names.inspect   # => ["Alice", nil, "Bob", nil]
+```ruby
+class Animal
+  def speak; "..."; end
+end
 
-# กับ compact
-names_clean = users.map { |u| u&.name }.compact
-puts names_clean.inspect   # => ["Alice", "Bob"]
+class Dog < Animal
+  def speak; "โฮ่ง!"; end
+end
 
-# เปรียบเทียบกับ dig
-data = { user: { name: "Alice" } }
-puts data.dig(:user, :name)    # => Alice
-puts data.dig(:user, :email)   # => nil
+class Cat < Animal
+  def speak; "เมี้ยว!"; end
+end
+
+class Bird < Animal
+  def speak; "จีจ๊า!"; end
+end
+
+def describe_animal(animal)
+  sound = animal.speak
+  type = case animal
+         when Dog   then "สุนัข"
+         when Cat   then "แมว"
+         when Bird  then "นก"
+         when Animal then "สัตว์ทั่วไป"
+         else "ไม่รู้จัก"
+         end
+  puts "#{type} พูดว่า: #{sound}"
+end
+
+describe_animal(Dog.new)    # สุนัข พูดว่า: โฮ่ง!
+describe_animal(Cat.new)    # แมว พูดว่า: เมี้ยว!
+describe_animal(Bird.new)   # นก พูดว่า: จีจ๊า!
 ```
 
 ---
 
-## ขั้นตอนที่ 115: Conditional Assignment Operators
+## Step 109: Pattern Matching (Ruby 3+) — in operator
+
+Pattern Matching เป็นฟีเจอร์ใหม่ใน Ruby 2.7+ (stable ใน Ruby 3.0) ช่วยให้ตรวจสอบ structure ของ data ได้อย่างทรงพลัง
+
+### รูปแบบพื้นฐาน: case/in
 
 ```ruby
-# ||= (or-assign) - assign ถ้า current value เป็น nil หรือ false
-cache = nil
-cache ||= {}
-puts cache.inspect   # => {}
-
-cache ||= { key: "value" }  # ไม่ assign อีกแล้วเพราะ {} truthy
-puts cache.inspect   # => {}
-
-# ใช้บ่อยสำหรับ memoization
-def expensive_calculation
-  @result ||= begin
-    # คำนวณที่ใช้เวลานาน
-    sleep(1)
-    42
-  end
-end
-
-# ครั้งแรก: คำนวณ
-# ครั้งถัดไป: ใช้ค่าที่ cache ไว้
-
-# &&= (and-assign) - assign ถ้า current value เป็น truthy
-name = "Alice"
-name &&= name.upcase
-puts name   # => ALICE
-
-name = nil
-name &&= name.upcase  # ไม่ทำอะไรเพราะ nil เป็น falsy
-puts name.inspect   # => nil
-
-# ใช้สำหรับ conditional transformation
-user = { name: "alice", age: 25 }
-user[:name] &&= user[:name].capitalize
-puts user[:name]   # => Alice
-
-# ||= กับ Hash defaults
-scores = {}
-scores[:alice] ||= 0
-scores[:alice] += 10
-scores[:bob] ||= 0
-scores[:bob] += 20
-puts scores.inspect   # => {:alice=>10, :bob=>20}
-```
-
----
-
-## ขั้นตอนที่ 116: Flip-Flop Operator (Advanced)
-
-Flip-flop เป็น operator ที่ไม่ค่อยถูกใช้ แต่มีประโยชน์ในบางกรณี
-
-```ruby
-# Flip-flop ใช้ .. หรือ ... ใน if condition
-# เปิดใช้เมื่อ left condition เป็น true
-# ปิดใช้เมื่อ right condition เป็น true
-
-# ตัวอย่าง: แสดง lines ระหว่าง "START" และ "END"
-lines = [
-  "header",
-  "START",
-  "line 1",
-  "line 2",
-  "END",
-  "footer"
-]
-
-lines.each do |line|
-  if (line == "START")..(line == "END")
-    puts line
-  end
-end
-# => START
-# => line 1
-# => line 2
-# => END
-
-# .. ทดสอบ end condition หลัง flip เป็น true
-# ... ไม่ทดสอบ end condition จนกว่าจะถึง iteration ถัดไป
-
-lines.each do |line|
-  if (line == "START")...(line == "END")
-    puts line
-  end
-end
-# => START
-# => line 1
-# => line 2
-# (ไม่มี END เพราะใช้ ...)
-
-# ตัวอย่างใช้ $. (line number)
-# มักใช้กับ STDIN
-# STDIN.each_line { |line| puts line if ($. == 3)..($. == 7) }
-
-# ปัจจุบัน flip-flop เป็น deprecated ใน Ruby 2.6
-# และถูก un-deprecated ใน Ruby 2.7
-# แต่ยังไม่ค่อยแนะนำให้ใช้ในโค้ด production
-```
-
----
-
-## ขั้นตอนที่ 117: Pattern Matching - Basic (Ruby 2.7+)
-
-Pattern matching เป็น feature ที่ทรงพลังมากใน Ruby 3+
-
-```ruby
-# ใช้ case/in แทน case/when
-data = { name: "Alice", age: 30, role: "admin" }
+# ใช้ in แทน when
+data = { name: "สมชาย", age: 25, role: "admin" }
 
 case data
 in { name: String => name, role: "admin" }
@@ -870,83 +748,679 @@ in { name: String => name, role: "user" }
 in { name: String => name }
   puts "Unknown role: #{name}"
 end
-# => Admin: Alice
+# Output: Admin: สมชาย
+```
 
-# Pattern matching กับ Array
-numbers = [1, 2, 3, 4, 5]
+### Pattern Matching กับ Array
 
-case numbers
-in [Integer => first, *rest]
-  puts "First: #{first}, Rest: #{rest.inspect}"
+```ruby
+# Match array patterns
+point = [3, 4]
+
+case point
+in [0, 0]
+  puts "จุดกำเนิด"
+in [x, 0]
+  puts "บนแกน X ที่ #{x}"
+in [0, y]
+  puts "บนแกน Y ที่ #{y}"
+in [x, y]
+  puts "จุดที่ (#{x}, #{y})"
 end
-# => First: 1, Rest: [2, 3, 4, 5]
+# Output: จุดที่ (3, 4)
+```
 
-# Pattern matching กับ types
-def process(value)
-  case value
-  in Integer => n if n > 0
-    puts "บวก Integer: #{n}"
-  in Integer => n
-    puts "ลบหรือศูนย์ Integer: #{n}"
-  in String => s if s.empty?
-    puts "String ว่าง"
-  in String => s
-    puts "String: #{s}"
-  in nil
-    puts "nil"
-  end
+### Pattern Matching กับ Hash
+
+```ruby
+# Match hash patterns
+response = { status: 200, body: { users: ["Alice", "Bob"] } }
+
+case response
+in { status: 200, body: { users: [first, *rest] } }
+  puts "สำเร็จ! User แรก: #{first}, เหลือ: #{rest.length} คน"
+in { status: 404 }
+  puts "ไม่พบข้อมูล"
+in { status: (500..), body: { error: message } }
+  puts "Server error: #{message}"
+in { status: Integer => code }
+  puts "Status: #{code}"
 end
+# Output: สำเร็จ! User แรก: Alice, เหลือ: 1 คน
+```
 
-process(42)     # => บวก Integer: 42
-process(-5)     # => ลบหรือศูนย์ Integer: -5
-process("hi")   # => String: hi
-process(nil)    # => nil
+### Find Pattern
+
+```ruby
+# หา pattern ในกลาง array
+users = [
+  { name: "Alice", role: :user },
+  { name: "Bob", role: :admin },
+  { name: "Charlie", role: :user }
+]
+
+case users
+in [*, { name: String => admin_name, role: :admin }, *]
+  puts "พบ admin: #{admin_name}"
+end
+# Output: พบ admin: Bob
+```
+
+### One-line Pattern Matching (Ruby 3.0+)
+
+```ruby
+# => pattern (จะ raise error ถ้าไม่ match)
+{ name: "Alice", age: 30 } => { name: String => name }
+puts name  # Alice
+
+# in pattern (return true/false)
+if { name: "Alice", age: 30 } in { name: /^A/ => name }
+  puts "ชื่อขึ้นต้นด้วย A: #{name}"
+end
 ```
 
 ---
 
-## ขั้นตอนที่ 118: Pattern Matching - Advanced (Ruby 3.0+)
+## Step 110: Logical Operators — &&, ||, !, and, or, not
+
+Ruby มี logical operators 2 ชุด: `&&, ||, !` (operator ทั่วไป) และ `and, or, not` (คำสงวน)
+
+### && (AND) และ || (OR) และ ! (NOT)
 
 ```ruby
-# Find pattern - หา pattern ใน array
-numbers = [1, 2, "three", 4, 5]
+# && (AND) — ทั้งสองต้องจริง
+puts true && true    # true
+puts true && false   # false
+puts false && true   # false
+puts false && false  # false
 
-case numbers
-in [*, String => s, *]
-  puts "พบ String: #{s}"
+# || (OR) — อย่างน้อยหนึ่งอย่างต้องจริง
+puts true || false   # true
+puts false || true   # true
+puts false || false  # false
+puts true || true    # true
+
+# ! (NOT) — กลับค่า
+puts !true   # false
+puts !false  # true
+puts !nil    # true
+puts !0      # false (0 เป็น truthy ใน Ruby!)
+```
+
+### การใช้งานจริง
+
+```ruby
+# ตรวจสอบหลายเงื่อนไขพร้อมกัน
+age = 25
+income = 50000
+has_job = true
+
+eligible_for_loan = age >= 20 && income >= 30000 && has_job
+puts "สิทธิ์กู้เงิน: #{eligible_for_loan ? 'ใช่' : 'ไม่ใช่'}"
+# Output: สิทธิ์กู้เงิน: ใช่
+
+# ตรวจสอบว่า valid
+def valid_user?(user)
+  !user.nil? && !user[:name].nil? && user[:age] >= 18
 end
-# => พบ String: three
 
-# Deconstruct keys (Hash patterns)
-user = { name: "Alice", age: 30, address: { city: "Bangkok" } }
+puts valid_user?({ name: "Alice", age: 25 })  # true
+puts valid_user?({ name: "Bob", age: 15 })    # false
+puts valid_user?(nil)                          # false
+```
 
-case user
-in { name:, address: { city: } }
-  puts "#{name} อยู่ที่ #{city}"
+### and, or, not — ใช้สำหรับ control flow
+
+```ruby
+# and, or, not มี precedence ต่ำกว่า = จึงนิยมใช้กับ control flow
+
+# Pattern: do_something or raise_error
+result = find_user or raise "ไม่พบ user"
+
+# Pattern: do_something and do_next
+user = find_user and user.activate!
+
+# ข้อควรระวัง: and/or มี precedence ต่ำกว่า &&/||
+x = true && false   # x = (true && false) = false
+x = true and false  # x = true   (x = true ทำก่อน แล้วค่อย and false)
+```
+
+### ตารางความแตกต่าง
+
+```ruby
+# &&, || มี precedence สูงกว่า and, or
+# ใช้ &&, || สำหรับ boolean expressions
+# ใช้ and, or สำหรับ control flow (แต่ไม่แนะนำใน code สมัยใหม่)
+
+# ตัวอย่างที่อาจงงได้
+a = false || true    # a = true (|| มี precedence สูงกว่า =)
+a = false or true    # a = false! (= มี precedence สูงกว่า or)
+
+puts a  # false (เพราะ a = false รัน ก่อน แล้ว or true ไม่มีผล)
+```
+
+---
+
+## Step 111: Short-circuit Evaluation — การประเมินแบบ lazy
+
+Short-circuit evaluation หมายความว่า Ruby จะหยุดประเมินเงื่อนไขทันทีที่รู้ผลแล้ว
+
+```ruby
+# && หยุดเมื่อพบ false ตัวแรก
+def check_a
+  puts "ตรวจสอบ A"
+  false
 end
-# => Alice อยู่ที่ Bangkok
 
-# Pin operator (^) - ใช้ค่าที่มีอยู่แล้ว
-expected = 42
-result = 42
-
-case result
-in ^expected
-  puts "ตรงกับที่คาดหวัง!"
+def check_b
+  puts "ตรวจสอบ B"
+  true
 end
 
-# Rightward assignment (Ruby 3.0+)
-# value => pattern
-{ name: "Alice", age: 30 } => { name:, age: }
-puts name   # => Alice
-puts age    # => 30
+result = check_a && check_b
+# Output: ตรวจสอบ A  (check_b ไม่ถูกเรียก!)
+puts result  # false
 
-# One-line pattern matching (Ruby 3.0+)
-# in แทน case..in สำหรับ single pattern
-{ name: "Bob", role: "admin" } in { name:, role: "admin" }
-puts name if $~   # ตรวจสอบว่า match สำเร็จ
+# || หยุดเมื่อพบ true ตัวแรก
+result = check_b || check_a
+# Output: ตรวจสอบ B  (check_a ไม่ถูกเรียก!)
+puts result  # true
+```
 
-# Pattern matching กับ class deconstruct
+### การใช้ Short-circuit สำหรับ Safety Check
+
+```ruby
+# Guard against nil
+user = nil
+# ❌ อันตราย — จะ raise NoMethodError
+# puts user.name
+
+# ✅ ปลอดภัย — short-circuit จะหยุดก่อน
+puts user && user.name  # nil (ไม่ raise error)
+
+# ใช้ && chain
+puts user && user.address && user.address.city  # nil
+
+# ✅ หรือใช้ &. (safe navigation)
+puts user&.name  # nil
+
+# Default values ด้วย ||
+config = nil
+timeout = config || 30
+puts timeout  # 30
+
+# Multiple fallbacks
+env_value = ENV["TIMEOUT"]
+config_value = nil
+default_value = 30
+timeout = env_value || config_value || default_value
+```
+
+### ระวัง: 0 และ "" เป็น truthy ใน Ruby!
+
+```ruby
+# ใน Ruby: false และ nil เท่านั้นที่ falsy!
+# ทุกอย่างอื่น (รวมถึง 0, "", [], {}) เป็น truthy
+
+value = 0
+result = value || "default"
+puts result  # 0  (ไม่ใช่ "default"!)
+
+value = ""
+result = value || "default"
+puts result  # ""  (ไม่ใช่ "default"!)
+
+# ถ้าต้องการ default เมื่อ nil เท่านั้น
+value = 0
+result = value.nil? ? "default" : value
+puts result  # 0
+
+# หรือใช้
+result = value || "default"  # ใช้ได้เฉพาะเมื่อ 0 ไม่ใช่ค่า valid
+```
+
+---
+
+## Step 112: Truthiness ใน Ruby — false และ nil เท่านั้นที่ falsy
+
+นี่คือหนึ่งในสิ่งที่สำคัญที่สุดใน Ruby: **มีแค่ `false` และ `nil` เท่านั้นที่เป็น falsy**
+
+```ruby
+# Falsy values ใน Ruby (มีแค่ 2)
+puts !!false   # false
+puts !!nil     # false
+
+# Truthy values ใน Ruby (ทุกอย่างอื่น!)
+puts !!true    # true
+puts !!0       # true  ← ต่างจาก JavaScript!
+puts !!""      # true  ← ต่างจาก JavaScript!
+puts !![]      # true
+puts !!{}      # true
+puts !!:sym    # true
+```
+
+### ความแตกต่างจาก JavaScript
+
+```ruby
+# JavaScript: 0, "", null, undefined, NaN, false เป็น falsy
+# Ruby: nil, false เท่านั้นที่ falsy
+
+# ดังนั้นต้องระวัง!
+items = []
+if items
+  puts "มีรายการ"  # ← พิมพ์นี้! เพราะ [] เป็น truthy
+else
+  puts "ไม่มีรายการ"
+end
+
+# ควรใช้
+if items.any?
+  puts "มีรายการ"
+else
+  puts "ไม่มีรายการ"
+end
+```
+
+### ตัวอย่างที่อาจงงได้
+
+```ruby
+# ระวัง: 0 เป็น truthy
+count = 0
+if count
+  puts "count มีค่า"  # ← พิมพ์นี้! (0 เป็น truthy)
+end
+
+# ถ้าต้องการตรวจสอบว่า "มีค่าและไม่ใช่ 0"
+if count && count > 0
+  puts "count มากกว่า 0"
+end
+
+# ระวัง: "" เป็น truthy
+name = ""
+if name
+  puts "มีชื่อ"  # ← พิมพ์นี้! ("" เป็น truthy)
+end
+
+# ถ้าต้องการตรวจสอบว่า "มีชื่อและไม่ว่างเปล่า"
+if name && !name.empty?
+  puts "มีชื่อ"
+end
+
+# หรือ
+if name.present?  # Rails method
+  puts "มีชื่อ"
+end
+```
+
+---
+
+## Step 113: Guard Clauses Pattern — เขียนโค้ดที่สะอาดขึ้น
+
+Guard clause คือการตรวจสอบเงื่อนไข "ล้มเหลว" ก่อน แล้ว return เลย เพื่อลด nesting และทำให้โค้ดอ่านง่ายขึ้น
+
+### ปัญหา: Nested Conditions
+
+```ruby
+# ❌ ไม่ดี: deep nesting
+def process_payment(user, amount, card)
+  if user
+    if user.active?
+      if amount > 0
+        if card
+          if card.valid?
+            if card.has_sufficient_funds?(amount)
+              charge_card(card, amount)
+              send_receipt(user, amount)
+              "ชำระเงินสำเร็จ"
+            else
+              "ยอดเงินในบัตรไม่เพียงพอ"
+            end
+          else
+            "บัตรไม่ถูกต้อง"
+          end
+        else
+          "ไม่พบข้อมูลบัตร"
+        end
+      else
+        "จำนวนเงินต้องมากกว่า 0"
+      end
+    else
+      "บัญชีไม่ได้ใช้งาน"
+    end
+  else
+    "ไม่พบผู้ใช้"
+  end
+end
+```
+
+### วิธีแก้: Guard Clauses
+
+```ruby
+# ✅ ดี: Guard clauses
+def process_payment(user, amount, card)
+  return "ไม่พบผู้ใช้" unless user
+  return "บัญชีไม่ได้ใช้งาน" unless user.active?
+  return "จำนวนเงินต้องมากกว่า 0" unless amount > 0
+  return "ไม่พบข้อมูลบัตร" unless card
+  return "บัตรไม่ถูกต้อง" unless card.valid?
+  return "ยอดเงินในบัตรไม่เพียงพอ" unless card.has_sufficient_funds?(amount)
+
+  charge_card(card, amount)
+  send_receipt(user, amount)
+  "ชำระเงินสำเร็จ"
+end
+```
+
+### ตัวอย่างจริง: User Validation
+
+```ruby
+def create_user(params)
+  return { error: "params ต้องเป็น Hash" } unless params.is_a?(Hash)
+  return { error: "ต้องระบุชื่อ" } if params[:name].nil? || params[:name].empty?
+  return { error: "ต้องระบุ email" } if params[:email].nil? || params[:email].empty?
+  return { error: "Email ไม่ถูกต้อง" } unless params[:email].include?("@")
+  return { error: "อายุต้องมากกว่า 0" } if params[:age] && params[:age] <= 0
+  return { error: "Email นี้ถูกใช้แล้ว" } if User.exists?(email: params[:email])
+
+  user = User.new(params)
+  user.save!
+  { success: true, user: user }
+end
+```
+
+### Guard Clauses ใน loops
+
+```ruby
+# ข้ามรายการที่ไม่ต้องการ
+def process_orders(orders)
+  results = []
+  orders.each do |order|
+    next if order[:status] == :cancelled  # ข้ามที่ยกเลิกแล้ว
+    next unless order[:payment_confirmed]  # ข้ามที่ยังไม่ชำระ
+    next if order[:items].empty?           # ข้ามที่ไม่มีสินค้า
+    
+    results << process_single_order(order)
+  end
+  results
+end
+```
+
+---
+
+## Step 114: Safe Navigation Operator (&.) — Nil-safe Method Calls
+
+`&.` (ampersand dot หรือ "safe navigation operator") ช่วยเรียก method บน object ที่อาจเป็น nil ได้อย่างปลอดภัย
+
+```ruby
+# ❌ อันตราย
+user = nil
+user.name  # NoMethodError: undefined method 'name' for nil:NilClass
+
+# ✅ ปลอดภัยด้วย &.
+user = nil
+puts user&.name   # nil (ไม่ raise error)
+
+user = { name: "Alice", age: 25 }
+# user.name จะ error เพราะ Hash ไม่มี method .name
+# ถ้าเป็น object ที่มี .name method:
+# puts user&.name  # "Alice"
+```
+
+### ตัวอย่างการใช้งานจริง
+
+```ruby
+# โดยปกติต้องเขียนแบบนี้ (ยาวและซ้ำ)
+city = user && user.address && user.address.city
+
+# ด้วย &. เขียนสั้นกว่า
+city = user&.address&.city
+puts city  # nil ถ้า user หรือ address เป็น nil
+
+# ตัวอย่างจริง
+class User
+  attr_reader :name, :address
+
+  def initialize(name, address = nil)
+    @name = name
+    @address = address
+  end
+end
+
+class Address
+  attr_reader :city, :zip_code
+
+  def initialize(city, zip_code)
+    @city = city
+    @zip_code = zip_code
+  end
+end
+
+# User มี address
+alice = User.new("Alice", Address.new("กรุงเทพ", "10100"))
+puts alice&.address&.city     # กรุงเทพ
+puts alice&.address&.zip_code # 10100
+
+# User ไม่มี address
+bob = User.new("Bob")
+puts bob&.address&.city  # nil (ไม่ error!)
+
+# User เป็น nil
+no_user = nil
+puts no_user&.name&.upcase  # nil (ไม่ error!)
+```
+
+### ใช้กับ Arrays
+
+```ruby
+# &. กับ methods ทั่วไป
+names = ["Alice", "Bob", nil, "Charlie"]
+processed = names.map { |name| name&.upcase }
+puts processed.inspect  # ["ALICE", "BOB", nil, "CHARLIE"]
+
+# &. กับ block
+response = nil
+items = response&.fetch(:items, []) || []
+puts items.inspect  # []
+```
+
+### &. กับ Assignment
+
+```ruby
+# กำหนดค่าเฉพาะเมื่อ object ไม่เป็น nil
+user = nil
+user&.name = "Alice"  # ไม่ทำอะไร ไม่ error
+
+user = User.new("Bob")
+user&.update(name: "Charlie")  # ทำงานปกติ
+```
+
+---
+
+## Step 115: ตัวอย่าง종합 (Comprehensive Examples)
+
+### ตัวอย่างที่ 1: Game State Machine
+
+```ruby
+def handle_game_event(state, event)
+  case [state, event]
+  in [:idle, :start]
+    puts "เกมเริ่มต้น!"
+    :playing
+  in [:playing, :pause]
+    puts "หยุดพักชั่วคราว"
+    :paused
+  in [:paused, :resume]
+    puts "เล่นต่อ!"
+    :playing
+  in [:playing, :game_over]
+    puts "เกมจบแล้ว"
+    :game_over
+  in [:playing, :win]
+    puts "ชนะ! ยินดีด้วย!"
+    :win
+  in [state, event]
+    puts "ไม่สามารถ #{event} ใน state: #{state}"
+    state
+  end
+end
+
+state = :idle
+state = handle_game_event(state, :start)    # เกมเริ่มต้น!
+state = handle_game_event(state, :pause)    # หยุดพักชั่วคราว
+state = handle_game_event(state, :resume)   # เล่นต่อ!
+state = handle_game_event(state, :win)      # ชนะ! ยินดีด้วย!
+```
+
+### ตัวอย่างที่ 2: Form Validator
+
+```ruby
+def validate_registration(data)
+  errors = []
+
+  # ตรวจสอบ name
+  case data[:name]
+  in nil | ""
+    errors << "ชื่อต้องไม่ว่างเปล่า"
+  in String => name if name.length < 2
+    errors << "ชื่อต้องมีอย่างน้อย 2 ตัวอักษร"
+  in String => name if name.length > 50
+    errors << "ชื่อต้องไม่เกิน 50 ตัวอักษร"
+  end
+
+  # ตรวจสอบ email
+  case data[:email]
+  in nil | ""
+    errors << "Email ต้องไม่ว่างเปล่า"
+  in String => email unless email.match?(/\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/i)
+    errors << "รูปแบบ Email ไม่ถูกต้อง"
+  end
+
+  # ตรวจสอบ age
+  case data[:age]
+  in nil
+    errors << "กรุณาระบุอายุ"
+  in Integer => age if age < 18
+    errors << "ต้องมีอายุ 18 ปีขึ้นไป"
+  in Integer => age if age > 120
+    errors << "อายุไม่ถูกต้อง"
+  end
+
+  if errors.empty?
+    { valid: true, message: "ข้อมูลถูกต้อง" }
+  else
+    { valid: false, errors: errors }
+  end
+end
+
+result = validate_registration({ name: "A", email: "invalid", age: 15 })
+puts result[:errors].join(", ")
+# ชื่อต้องมีอย่างน้อย 2 ตัวอักษร, รูปแบบ Email ไม่ถูกต้อง, ต้องมีอายุ 18 ปีขึ้นไป
+
+result = validate_registration({ name: "สมชาย", email: "somchai@example.com", age: 25 })
+puts result[:message]  # ข้อมูลถูกต้อง
+```
+
+---
+
+## Step 116–120: เทคนิคขั้นสูงและ Best Practices
+
+### Step 116: Combining Conditions
+
+```ruby
+# ใช้ Array#include? แทน multiple ||
+def valid_status?(status)
+  [:active, :pending, :inactive].include?(status)
+end
+
+puts valid_status?(:active)   # true
+puts valid_status?(:deleted)  # false
+
+# ใช้ Range#cover? สำหรับตรวจสอบช่วง
+def valid_score?(score)
+  (0..100).cover?(score)
+end
+
+puts valid_score?(85)   # true
+puts valid_score?(105)  # false
+
+# ใช้ Regex match?
+def valid_phone?(phone)
+  phone.match?(/^0[689]\d{8}$/)
+end
+```
+
+### Step 117: Conditional Assignment
+
+```ruby
+# ||= กำหนดค่าเฉพาะเมื่อ nil หรือ false
+@cache ||= {}
+@cache[:key] ||= expensive_calculation()
+
+# &&= กำหนดค่าเฉพาะเมื่อไม่ nil และไม่ false
+user.name &&= user.name.strip.downcase
+
+# ตัวอย่างจริง: memoization
+def expensive_result
+  @result ||= begin
+    # การคำนวณที่ใช้เวลานาน
+    sleep(2)
+    42
+  end
+end
+
+# ครั้งแรกจะใช้เวลา 2 วินาที
+# ครั้งถัดไปจะคืนค่าจาก cache ทันที
+```
+
+### Step 118: Conditional Methods
+
+```ruby
+# สร้าง method ที่ทำงานตามเงื่อนไข
+class Order
+  attr_reader :status, :total
+
+  def initialize(total)
+    @total = total
+    @status = :pending
+  end
+
+  def process!
+    validate! or return false
+    calculate_tax!
+    apply_discounts! if eligible_for_discount?
+    charge_payment! and update_status!(:paid)
+    true
+  end
+
+  private
+
+  def validate!
+    return false unless @total > 0
+    true
+  end
+
+  def eligible_for_discount?
+    @total >= 500
+  end
+
+  def calculate_tax!
+    @tax = @total * 0.07
+  end
+
+  def apply_discounts!
+    @discount = @total >= 1000 ? @total * 0.10 : @total * 0.05
+  end
+
+  def update_status!(new_status)
+    @status = new_status
+  end
+end
+```
+
+### Step 119: Pattern Matching กับ Deconstruct
+
+```ruby
+# สร้าง class ที่ support pattern matching
 class Point
   attr_reader :x, :y
 
@@ -955,345 +1429,282 @@ class Point
     @y = y
   end
 
+  # สำหรับ array pattern matching
   def deconstruct
-    [@x, @y]  # สำหรับ Array pattern
+    [@x, @y]
   end
 
+  # สำหรับ hash pattern matching
   def deconstruct_keys(keys)
-    { x: @x, y: @y }  # สำหรับ Hash pattern
+    { x: @x, y: @y }
   end
 end
 
-point = Point.new(1, 2)
+point = Point.new(3, 4)
 
+# Array pattern
 case point
+in [0, 0]
+  puts "จุดกำเนิด"
 in [x, y]
-  puts "Array: (#{x}, #{y})"
+  puts "จุดที่ (#{x}, #{y})"
 end
+# Output: จุดที่ (3, 4)
 
+# Hash pattern
 case point
+in { x: 0, y: }
+  puts "บนแกน Y ที่ #{y}"
+in { x:, y: 0 }
+  puts "บนแกน X ที่ #{x}"
 in { x:, y: }
-  puts "Hash: x=#{x}, y=#{y}"
+  puts "จุดที่ x=#{x}, y=#{y}"
 end
+# Output: จุดที่ x=3, y=4
+```
+
+### Step 120: Best Practices Summary
+
+```ruby
+# 1. ใช้ Guard Clauses แทน deep nesting
+def good_example(x, y)
+  return "x ต้องเป็นบวก" unless x > 0
+  return "y ต้องเป็นบวก" unless y > 0
+  x * y
+end
+
+# 2. ใช้ ternary สำหรับ simple conditions เท่านั้น
+label = enabled ? "เปิด" : "ปิด"  # ✅
+
+# 3. ใช้ unless เมื่อมีเงื่อนไขเดียวและเป็น negation
+return unless valid?  # ✅
+
+# 4. ใช้ &. เพื่อหลีกเลี่ยง nil check
+city = user&.address&.city  # ✅
+
+# 5. ใช้ case/in (pattern matching) กับ complex data
+case response
+in { status: 200, data: { users: [*, { admin: true, name: }, *] } }
+  puts "มี admin ชื่อ #{name}"
+end
+
+# 6. อย่าลืม: 0 และ "" เป็น truthy!
+count = 0
+if count                  # ❌ จะเป็น true!
+if count.positive?        # ✅ ถูกต้อง
+
+# 7. ใช้ ||= สำหรับ memoization
+@cache ||= {}  # ✅
 ```
 
 ---
 
-## ขั้นตอนที่ 119: Pattern Matching - Guard Clauses และ Error Handling
+## แบบฝึกหัดตอนที่ 7 (20 ข้อ)
+
+### ข้อ 1: เกรดนักเรียน
+เขียน method `calculate_grade(score)` ที่รับคะแนน 0-100 และคืนเกรด A, B, C, D, F พร้อม GPA (4.0, 3.0, 2.0, 1.0, 0.0)
 
 ```ruby
-# Guard clauses ใน pattern matching (if)
-scores = [85, 92, 67, 98, 75]
-
-scores.each do |score|
+# เฉลย
+def calculate_grade(score)
+  return { grade: "Invalid", gpa: nil } unless score.is_a?(Numeric) && (0..100).cover?(score)
+  
   case score
-  in Integer => n if n >= 90
-    puts "#{n}: เกรด A"
-  in Integer => n if n >= 80
-    puts "#{n}: เกรด B"
-  in Integer => n if n >= 70
-    puts "#{n}: เกรด C"
-  in Integer => n
-    puts "#{n}: เกรด F"
+  when 80..100 then { grade: "A", gpa: 4.0 }
+  when 70...80 then { grade: "B", gpa: 3.0 }
+  when 60...70 then { grade: "C", gpa: 2.0 }
+  when 50...60 then { grade: "D", gpa: 1.0 }
+  else              { grade: "F", gpa: 0.0 }
   end
 end
 
-# NoMatchingPatternError
-begin
-  case 42
-  in String
-    puts "String"
-  end
-rescue NoMatchingPatternError => e
-  puts "ไม่ match: #{e.message}"
-end
-
-# in? หรือ case ที่ไม่ raise (Ruby 3.0+)
-data = { type: "unknown" }
-if data in { type: "admin" | "superadmin" }
-  puts "สิทธิ์สูง"
-else
-  puts "สิทธิ์ปกติ"
-end
-
-# Pattern matching กับ Response objects
-def parse_response(response)
-  case response
-  in { status: 200, body: String => body }
-    { success: true, data: body }
-  in { status: 404 }
-    { success: false, error: "Not found" }
-  in { status: 500, error: String => msg }
-    { success: false, error: "Server error: #{msg}" }
-  in { status: Integer => code }
-    { success: false, error: "HTTP #{code}" }
-  end
-end
-
-puts parse_response({ status: 200, body: "OK" }).inspect
-# => {:success=>true, :data=>"OK"}
-
-puts parse_response({ status: 404 }).inspect
-# => {:success=>false, :error=>"Not found"}
+puts calculate_grade(92).inspect  # {:grade=>"A", :gpa=>4.0}
+puts calculate_grade(75).inspect  # {:grade=>"B", :gpa=>3.0}
+puts calculate_grade(45).inspect  # {:grade=>"F", :gpa=>0.0}
 ```
 
----
-
-## ขั้นตอนที่ 120: Control Flow Best Practices
-
-```ruby
-# 1. ใช้ Guard clauses แทน nested if
-# ไม่ดี
-def process(user)
-  if user
-    if user.active?
-      if user.has_permission?(:admin)
-        do_admin_work
-      end
-    end
-  end
-end
-
-# ดีกว่า
-def process(user)
-  return unless user
-  return unless user.active?
-  return unless user.has_permission?(:admin)
-
-  do_admin_work
-end
-
-# 2. ใช้ case/when แทน if-elsif ยาว ๆ
-# ไม่ดี
-def categorize(value)
-  if value.is_a?(String)
-    "string"
-  elsif value.is_a?(Integer)
-    "integer"
-  elsif value.is_a?(Float)
-    "float"
-  elsif value.is_a?(Array)
-    "array"
-  else
-    "other"
-  end
-end
-
-# ดีกว่า
-def categorize(value)
-  case value
-  when String then "string"
-  when Integer then "integer"
-  when Float then "float"
-  when Array then "array"
-  else "other"
-  end
-end
-
-# 3. ใช้ &&= และ ||= อย่างเหมาะสม
-# สำหรับ memoization
-def user_name
-  @user_name ||= fetch_user_name
-end
-
-# 4. ใช้ Safe Navigation Operator
-# แทน: user && user.profile && user.profile.avatar
-user&.profile&.avatar
-
-# 5. ระวัง unless กับ complex condition
-# ไม่ดี
-unless !active && !admin
-  process
-end
-
-# ดีกว่า
-if active || admin
-  process
-end
-
-# 6. Ternary สำหรับ simple assignment
-label = count == 1 ? "item" : "items"
-
-# ไม่ใช้ ternary สำหรับ side effects
-# ไม่ดี
-condition ? puts("yes") : puts("no")
-
-# ดีกว่า
-if condition
-  puts "yes"
-else
-  puts "no"
-end
-
-# 7. Pattern matching สำหรับ complex data destructuring
-def handle_event(event)
-  case event
-  in { type: "user.created", data: { name:, email: } }
-    welcome_user(name, email)
-  in { type: "order.placed", data: { order_id:, total: } }
-    process_payment(order_id, total)
-  in { type: "error", message: }
-    log_error(message)
-  end
-end
-```
-
----
-
-## แบบฝึกหัด (ขั้นตอนที่ 101-120)
-
-### ข้อที่ 1: BMI Calculator
-คำนวณ BMI และแสดงผลการประเมิน
+### ข้อ 2: FizzBuzz
+เขียน method `fizzbuzz(n)` ที่คืน "Fizz" ถ้าหารด้วย 3 ลงตัว, "Buzz" ถ้าหารด้วย 5 ลงตัว, "FizzBuzz" ถ้าหารด้วย 15 ลงตัว, ไม่งั้นคืนตัวเลขนั้น
 
 ```ruby
 # เฉลย
-def calculate_bmi(weight_kg, height_m)
-  bmi = weight_kg / (height_m ** 2)
-  
-  category = case bmi
-  when 0...18.5 then "น้ำหนักต่ำกว่าเกณฑ์"
-  when 18.5...25 then "น้ำหนักปกติ"
-  when 25...30 then "น้ำหนักเกิน"
-  else "อ้วน"
-  end
-  
-  { bmi: bmi.round(2), category: category }
-end
-
-result = calculate_bmi(70, 1.75)
-puts "BMI: #{result[:bmi]} - #{result[:category]}"
-```
-
-### ข้อที่ 2: FizzBuzz
-ปัญหา FizzBuzz คลาสสิก
-
-```ruby
-# เฉลย
-(1..30).each do |n|
-  result = case
-  when (n % 15).zero? then "FizzBuzz"
-  when (n % 3).zero? then "Fizz"
-  when (n % 5).zero? then "Buzz"
+def fizzbuzz(n)
+  case n
+  when ->(x) { x % 15 == 0 } then "FizzBuzz"
+  when ->(x) { x % 3 == 0 }  then "Fizz"
+  when ->(x) { x % 5 == 0 }  then "Buzz"
   else n.to_s
   end
-  print "#{result} "
 end
-puts
+
+(1..20).each { |i| print "#{fizzbuzz(i)} " }
+# 1 2 Fizz 4 Buzz Fizz 7 8 Fizz Buzz 11 Fizz 13 14 FizzBuzz 16 17 Fizz 19 Buzz
 ```
 
-### ข้อที่ 3: Temperature Converter
-แปลงอุณหภูมิระหว่าง Celsius, Fahrenheit, Kelvin
+### ข้อ 3: วันในสัปดาห์ภาษาไทย
+เขียน method ที่รับ Integer 1-7 (1=จันทร์) และคืนชื่อวันภาษาไทยพร้อมสีประจำวัน
 
 ```ruby
 # เฉลย
+def day_info(day_number)
+  case day_number
+  when 1 then { name: "จันทร์", color: "เหลือง" }
+  when 2 then { name: "อังคาร", color: "ชมพู" }
+  when 3 then { name: "พุธ", color: "เขียว" }
+  when 4 then { name: "พฤหัสบดี", color: "ส้ม" }
+  when 5 then { name: "ศุกร์", color: "ฟ้า" }
+  when 6 then { name: "เสาร์", color: "ม่วง" }
+  when 7 then { name: "อาทิตย์", color: "แดง" }
+  else { name: "ไม่ทราบ", color: "ไม่ทราบ" }
+  end
+end
+
+(1..7).each do |d|
+  info = day_info(d)
+  puts "วัน#{info[:name]}: สี#{info[:color]}"
+end
+```
+
+### ข้อ 4: ตรวจสอบ Palindrome
+เขียน method ที่ตรวจสอบว่า string เป็น palindrome (อ่านหน้าหลังเหมือนกัน) หรือไม่
+
+```ruby
+# เฉลย
+def palindrome?(str)
+  return false unless str.is_a?(String)
+  cleaned = str.downcase.gsub(/[^a-z0-9ก-ฮ]/, "")
+  cleaned == cleaned.reverse
+end
+
+puts palindrome?("racecar")   # true
+puts palindrome?("hello")     # false
+puts palindrome?("A man a plan a canal Panama".gsub(" ", "").downcase)  # true
+```
+
+### ข้อ 5: ระบบ ATM อย่างง่าย
+เขียน class ATM ที่มี method withdraw(amount) ที่ตรวจสอบเงื่อนไขต่างๆ
+
+```ruby
+# เฉลย
+class ATM
+  def initialize(balance)
+    @balance = balance
+  end
+
+  def withdraw(amount)
+    return "จำนวนเงินต้องเป็นบวก" unless amount > 0
+    return "จำนวนเงินต้องเป็นทวีคูณของ 100" unless amount % 100 == 0
+    return "จำนวนเงินเกินวงเงินต่อครั้ง (20,000)" if amount > 20_000
+    return "ยอดเงินไม่เพียงพอ" if amount > @balance
+    
+    @balance -= amount
+    "ถอนเงิน #{amount} บาท สำเร็จ ยอดคงเหลือ: #{@balance} บาท"
+  end
+end
+
+atm = ATM.new(5000)
+puts atm.withdraw(1000)   # ถอนเงิน 1000 บาท สำเร็จ ยอดคงเหลือ: 4000 บาท
+puts atm.withdraw(150)    # จำนวนเงินต้องเป็นทวีคูณของ 100
+puts atm.withdraw(5000)   # ยอดเงินไม่เพียงพอ
+```
+
+### ข้อ 6–10: โจทย์ปฏิบัติ
+
+```ruby
+# ข้อ 6: ตรวจสอบปีอธิกสุรทิน (Leap Year)
+def leap_year?(year)
+  return false unless year.is_a?(Integer) && year > 0
+  (year % 400 == 0) || (year % 4 == 0 && year % 100 != 0)
+end
+
+puts leap_year?(2000)  # true
+puts leap_year?(1900)  # false
+puts leap_year?(2024)  # true
+
+# ข้อ 7: คำนวณค่า Shipping
+def shipping_cost(weight_kg, distance_km)
+  return "น้ำหนักไม่ถูกต้อง" unless weight_kg > 0
+  return "ระยะทางไม่ถูกต้อง" unless distance_km > 0
+  
+  base_cost = case weight_kg
+              when 0...1   then 30
+              when 1...5   then 50
+              when 5...20  then 80
+              else              150
+              end
+  
+  distance_multiplier = case distance_km
+                        when 0...50     then 1.0
+                        when 50...200   then 1.5
+                        when 200...500  then 2.0
+                        else                 3.0
+                        end
+  
+  (base_cost * distance_multiplier).round(2)
+end
+
+puts shipping_cost(0.5, 30)   # 30.0
+puts shipping_cost(3, 100)    # 75.0
+puts shipping_cost(10, 300)   # 160.0
+
+# ข้อ 8: แปลงอุณหภูมิ
 def convert_temperature(value, from:, to:)
   celsius = case from
-  when :celsius then value
-  when :fahrenheit then (value - 32) * 5.0 / 9
-  when :kelvin then value - 273.15
-  end
-
+            when :celsius    then value
+            when :fahrenheit then (value - 32) * 5.0 / 9
+            when :kelvin     then value - 273.15
+            else return "หน่วยต้นทางไม่รู้จัก"
+            end
+  
   case to
-  when :celsius then celsius.round(2)
+  when :celsius    then celsius.round(2)
   when :fahrenheit then (celsius * 9.0 / 5 + 32).round(2)
-  when :kelvin then (celsius + 273.15).round(2)
+  when :kelvin     then (celsius + 273.15).round(2)
+  else "หน่วยปลายทางไม่รู้จัก"
   end
 end
 
-puts convert_temperature(100, from: :celsius, to: :fahrenheit)   # => 212.0
-puts convert_temperature(32, from: :fahrenheit, to: :celsius)    # => 0.0
-puts convert_temperature(0, from: :celsius, to: :kelvin)         # => 273.15
-```
+puts convert_temperature(100, from: :celsius, to: :fahrenheit)  # 212.0
+puts convert_temperature(32, from: :fahrenheit, to: :celsius)   # 0.0
+puts convert_temperature(0, from: :celsius, to: :kelvin)        # 273.15
 
-### ข้อที่ 4: Day Checker
-ตรวจสอบว่าวันนั้นเป็นวันทำงาน วันหยุด หรืออื่น ๆ
-
-```ruby
-# เฉลย
-WEEKDAYS = %w[Monday Tuesday Wednesday Thursday Friday]
-WEEKENDS = %w[Saturday Sunday]
-
-def day_type(day)
-  case day.capitalize
-  when *WEEKDAYS
-    "วันทำงาน"
-  when *WEEKENDS
-    "วันหยุดสุดสัปดาห์"
-  else
-    "ไม่รู้จักวัน"
+# ข้อ 9: ตรวจสอบรหัสผ่าน
+def password_strength(password)
+  return "ต้องระบุรหัสผ่าน" if password.nil? || password.empty?
+  
+  score = 0
+  score += 1 if password.length >= 8
+  score += 1 if password.length >= 12
+  score += 1 if password.match?(/[A-Z]/)
+  score += 1 if password.match?(/[a-z]/)
+  score += 1 if password.match?(/\d/)
+  score += 1 if password.match?(/[!@#$%^&*]/)
+  
+  case score
+  when 0..2 then "อ่อนแอมาก"
+  when 3    then "อ่อนแอ"
+  when 4    then "ปานกลาง"
+  when 5    then "แข็งแกร่ง"
+  when 6    then "แข็งแกร่งมาก"
   end
 end
 
-puts day_type("Monday")   # => วันทำงาน
-puts day_type("sunday")   # => วันหยุดสุดสัปดาห์
-puts day_type("Holiday")  # => ไม่รู้จักวัน
-```
+puts password_strength("abc")              # อ่อนแอมาก
+puts password_strength("abcdefgh")         # อ่อนแอ
+puts password_strength("Abcdefgh1")        # ปานกลาง
+puts password_strength("Abcdefgh1!")       # แข็งแกร่ง
+puts password_strength("Ab1!cdefghijkl")  # แข็งแกร่งมาก
 
-### ข้อที่ 5: Input Validator
-ตรวจสอบความถูกต้องของ input
-
-```ruby
-# เฉลย
-def validate_input(value, type:)
-  case type
-  when :email
-    value.match?(/\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/i)
-  when :phone
-    value.match?(/\A\d{10}\z/)
-  when :age
-    value.is_a?(Integer) && (0..120).include?(value)
-  when :name
-    value.is_a?(String) && !value.empty? && value.length <= 100
-  else
-    false
-  end
-end
-
-puts validate_input("user@example.com", type: :email)  # => true
-puts validate_input("invalid", type: :email)            # => false
-puts validate_input("0812345678", type: :phone)         # => true
-puts validate_input(25, type: :age)                     # => true
-```
-
-### ข้อที่ 6: Safe User Access
-เขียน method ที่ safely access nested user data
-
-```ruby
-# เฉลย
-def user_city(user)
-  user&.dig(:profile, :address, :city) || "ไม่ระบุ"
-end
-
-users = [
-  { name: "Alice", profile: { address: { city: "Bangkok" } } },
-  { name: "Bob", profile: { address: {} } },
-  { name: "Carol", profile: {} },
-  nil
-]
-
-users.each do |user|
-  name = user&.dig(:name) || "Unknown"
-  city = user_city(user)
-  puts "#{name}: #{city}"
-end
-```
-
-### ข้อที่ 7: Roman Numerals
-แปลตัวเลข 1-3999 เป็น Roman Numerals
-
-```ruby
-# เฉลย
+# ข้อ 10: Roman Numerals
 def to_roman(number)
-  return "Invalid" unless (1..3999).include?(number)
-
-  numerals = {
-    1000 => "M", 900 => "CM", 500 => "D", 400 => "CD",
-    100 => "C", 90 => "XC", 50 => "L", 40 => "XL",
-    10 => "X", 9 => "IX", 5 => "V", 4 => "IV", 1 => "I"
-  }
-
+  return "ตัวเลขต้องอยู่ระหว่าง 1-3999" unless (1..3999).cover?(number)
+  
+  values = [[1000, "M"], [900, "CM"], [500, "D"], [400, "CD"],
+            [100, "C"], [90, "XC"], [50, "L"], [40, "XL"],
+            [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"]]
+  
   result = ""
-  numerals.each do |value, numeral|
+  values.each do |value, numeral|
     while number >= value
       result += numeral
       number -= value
@@ -1302,324 +1713,119 @@ def to_roman(number)
   result
 end
 
-puts to_roman(1)     # => I
-puts to_roman(4)     # => IV
-puts to_roman(9)     # => IX
-puts to_roman(2024)  # => MMXXIV
+puts to_roman(2024)  # MMXXIV
+puts to_roman(1999)  # MCMXCIX
+puts to_roman(42)    # XLII
 ```
 
-### ข้อที่ 8: Ticket Price
-คำนวณราคาตั๋วตามอายุและประเภท
+### ข้อ 11–20: โจทย์ขั้นสูง
 
 ```ruby
-# เฉลย
-def ticket_price(age:, type: :regular)
-  base = case type
-  when :regular then 300
-  when :vip then 500
-  when :premium then 800
-  else raise ArgumentError, "ประเภทตั๋วไม่ถูกต้อง"
-  end
-
-  discount = case age
-  when 0..3 then 1.0  # ฟรี
-  when 4..12 then 0.5  # เด็ก 50%
-  when 13..17 then 0.75 # วัยรุ่น 25%
-  when 60.. then 0.8   # ผู้สูงอายุ 20%
-  else 1.0             # ราคาเต็ม
-  end
-
-  (base * discount).round
-end
-
-puts ticket_price(age: 5, type: :regular)    # => 150
-puts ticket_price(age: 25, type: :vip)       # => 500
-puts ticket_price(age: 65, type: :premium)   # => 640
-```
-
-### ข้อที่ 9: Login System
-จำลอง login system ด้วย guard clauses
-
-```ruby
-# เฉลย
-class LoginSystem
-  MAX_ATTEMPTS = 3
-  
-  def initialize
-    @users = { "admin" => "password123", "user1" => "pass456" }
-    @attempts = Hash.new(0)
-    @locked = []
-  end
-
-  def login(username, password)
-    return "บัญชีถูกล็อก" if @locked.include?(username)
-    return "ไม่พบผู้ใช้" unless @users.key?(username)
-    
-    if @users[username] == password
-      @attempts.delete(username)
-      "เข้าสู่ระบบสำเร็จ"
-    else
-      @attempts[username] += 1
-      if @attempts[username] >= MAX_ATTEMPTS
-        @locked << username
-        "บัญชีถูกล็อก (เกินจำนวนครั้งที่กำหนด)"
-      else
-        "รหัสผ่านไม่ถูกต้อง (#{MAX_ATTEMPTS - @attempts[username]} ครั้งที่เหลือ)"
-      end
-    end
+# ข้อ 11: Traffic Light System
+def next_traffic_light(current)
+  case current
+  when :red    then :green
+  when :green  then :yellow
+  when :yellow then :red
+  else raise ArgumentError, "ไฟจราจรไม่รู้จัก: #{current}"
   end
 end
 
-system = LoginSystem.new
-puts system.login("admin", "wrong")       # => รหัสผ่านไม่ถูกต้อง (2 ครั้งที่เหลือ)
-puts system.login("admin", "wrong")       # => รหัสผ่านไม่ถูกต้อง (1 ครั้งที่เหลือ)
-puts system.login("admin", "wrong")       # => บัญชีถูกล็อก
-puts system.login("admin", "password123") # => บัญชีถูกล็อก
-```
-
-### ข้อที่ 10: Pattern Matching JSON
-ใช้ pattern matching เพื่อ parse JSON data
-
-```ruby
-# เฉลย
-def process_api_response(response)
-  case response
-  in { status: "success", data: { users: [*, { name:, email: }, *] } }
-    puts "พบ user: #{name} (#{email})"
-  in { status: "success", data: Hash => data }
-    puts "ข้อมูล: #{data.inspect}"
-  in { status: "error", message: String => msg }
-    puts "Error: #{msg}"
-  in { status: "error" }
-    puts "Error ไม่มีรายละเอียด"
-  else
-    puts "Response ไม่รู้จัก"
-  end
-end
-
-process_api_response({
-  status: "success",
-  data: { users: [{ name: "Alice", email: "a@example.com" }] }
-})
-
-process_api_response({
-  status: "error",
-  message: "Unauthorized"
-})
-```
-
-### ข้อที่ 11-20: แบบฝึกหัดเพิ่มเติม
-
-**ข้อที่ 11:** เขียน method `classify_number` ที่รับตัวเลขและบอกว่าเป็นจำนวนบวก/ลบ/ศูนย์/คี่/คู่/ไพรม์
-
-```ruby
-def classify_number(n)
-  traits = []
-  traits << (n > 0 ? "บวก" : n < 0 ? "ลบ" : "ศูนย์")
-  traits << (n.even? ? "คู่" : "คี่") unless n.zero?
-  traits << "จำนวนเฉพาะ" if prime?(n)
-  traits.join(", ")
-end
-
-def prime?(n)
-  return false if n < 2
-  (2..Math.sqrt(n)).none? { |i| n % i == 0 }
-end
-
-puts classify_number(7)    # => บวก, คี่, จำนวนเฉพาะ
-puts classify_number(10)   # => บวก, คู่
-puts classify_number(-3)   # => ลบ, คี่
-```
-
-**ข้อที่ 12:** เขียน method `season` ที่รับเดือน (1-12) และคืนค่า season
-
-```ruby
-def season(month)
-  case month
-  when 3..5 then "ฤดูร้อน"
-  when 6..8 then "ฤดูฝน"
-  when 9..11 then "ฤดูหนาว"
-  when 12, 1..2 then "ฤดูหนาวกลาง"
-  else "เดือนไม่ถูกต้อง"
-  end
-end
-```
-
-**ข้อที่ 13:** Short-circuit evaluation เพื่อ validate form
-
-```ruby
-def validate_form(name:, email:, age:)
-  errors = []
-  errors << "ชื่อจำเป็น" if name.nil? || name.empty?
-  errors << "Email ไม่ถูกต้อง" unless email&.include?("@")
-  errors << "อายุต้องเป็นตัวเลข" unless age.is_a?(Integer)
-  errors << "อายุต้อง 0-120" if age.is_a?(Integer) && !(0..120).include?(age)
-  errors.empty? ? { valid: true } : { valid: false, errors: errors }
-end
-```
-
-**ข้อที่ 14:** Simple calculator ด้วย case/when
-
-```ruby
-def calculate(a, operator, b)
-  case operator
-  when "+" then a + b
-  when "-" then a - b
-  when "*" then a * b
-  when "/" then b.zero? ? "หารด้วยศูนย์ไม่ได้" : a.to_f / b
-  when "**" then a ** b
-  when "%" then b.zero? ? "หารด้วยศูนย์ไม่ได้" : a % b
-  else "ไม่รู้จัก operator"
-  end
-end
-
-puts calculate(10, "+", 5)    # => 15
-puts calculate(10, "/", 0)    # => หารด้วยศูนย์ไม่ได้
-puts calculate(2, "**", 10)   # => 1024
-```
-
-**ข้อที่ 15:** Traffic light simulation
-
-```ruby
-class TrafficLight
-  STATES = [:red, :green, :yellow]
-  DURATIONS = { red: 30, green: 25, yellow: 5 }
-
-  def initialize
-    @state = :red
-  end
-
-  def next_state
-    current_index = STATES.index(@state)
-    @state = STATES[(current_index + 1) % STATES.size]
-  end
-
-  def message
-    case @state
-    when :red then "หยุด"
-    when :green then "ไปได้"
-    when :yellow then "ระวัง"
-    end
-  end
-
-  def duration
-    DURATIONS[@state]
-  end
-end
-
-light = TrafficLight.new
+light = :red
 5.times do
-  puts "#{light.message} (#{light.duration} วินาที)"
-  light.next_state
+  puts "ไฟ: #{light}"
+  light = next_traffic_light(light)
 end
-```
 
-**ข้อที่ 16-20:** แบบฝึกหัดเพิ่มเติม (สั้น ๆ)
-
-```ruby
-# ข้อ 16: Password Strength
-def password_strength(password)
-  return :invalid if password.length < 8
-  has_upper = password =~ /[A-Z]/
-  has_lower = password =~ /[a-z]/
-  has_digit = password =~ /\d/
-  has_symbol = password =~ /[!@#$%^&*]/
+# ข้อ 12: JSON-like Data Processor
+def extract_value(data, path)
+  return nil unless data && path
   
-  score = [has_upper, has_lower, has_digit, has_symbol].count(&:itself)
-  case score
-  when 4 then :strong
-  when 3 then :medium
-  when 2 then :weak
-  else :very_weak
-  end
-end
-
-# ข้อ 17: Age Group
-def age_group(age)
-  case age
-  when 0..12 then "เด็ก"
-  when 13..17 then "วัยรุ่น"
-  when 18..25 then "วัยหนุ่มสาว"
-  when 26..60 then "วัยทำงาน"
-  else "ผู้สูงอายุ"
-  end
-end
-
-# ข้อ 18: Direction Calculator
-def turn(current, direction)
-  directions = [:north, :east, :south, :west]
-  idx = directions.index(current)
-  case direction
-  when :right then directions[(idx + 1) % 4]
-  when :left then directions[(idx - 1) % 4]
-  when :back then directions[(idx + 2) % 4]
-  else current
-  end
-end
-
-# ข้อ 19: Simple State Machine
-class Door
-  def initialize
-    @state = :closed
-  end
-
-  def action(input)
-    case [@state, input]
-    in [:closed, :open] then @state = :open
-    in [:open, :close] then @state = :closed
-    in [:closed, :lock] then @state = :locked
-    in [:locked, :unlock] then @state = :closed
-    else puts "ไม่สามารถทำ #{input} ได้ในสถานะ #{@state}"
+  parts = path.split(".")
+  current = data
+  
+  parts.each do |part|
+    case current
+    when Hash   then current = current[part.to_sym] || current[part]
+    when Array  then current = current[part.to_i]
+    else return nil
     end
-    puts "สถานะ: #{@state}"
+    return nil unless current
   end
-end
-
-# ข้อ 20: Multi-condition Validator
-def validate_age_for_activity(age, activity)
-  requirements = {
-    driving: 18..,
-    voting: 18..,
-    alcohol: 20..,
-    senior_discount: 60..,
-    children_program: 0..12
-  }
   
-  range = requirements[activity]
-  return "ไม่รู้จักกิจกรรม" unless range
-  range.include?(age) ? "อนุญาต" : "ไม่อนุญาต"
+  current
 end
 
-puts validate_age_for_activity(25, :driving)          # => อนุญาต
-puts validate_age_for_activity(16, :driving)          # => ไม่อนุญาต
-puts validate_age_for_activity(65, :senior_discount)  # => อนุญาต
+data = {
+  user: {
+    name: "Alice",
+    address: {
+      city: "กรุงเทพ",
+      zip: "10100"
+    },
+    scores: [95, 87, 92]
+  }
+}
+
+puts extract_value(data, "user.name")            # Alice
+puts extract_value(data, "user.address.city")    # กรุงเทพ
+puts extract_value(data, "user.scores.0")        # 95
+puts extract_value(data, "user.phone")           # nil
+
+# ข้อ 13: Currency Converter
+EXCHANGE_RATES = {
+  THB: 1.0,
+  USD: 0.028,
+  EUR: 0.026,
+  JPY: 4.2,
+  GBP: 0.022
+}
+
+def convert_currency(amount, from:, to:)
+  return "สกุลเงินต้นทางไม่รู้จัก" unless EXCHANGE_RATES.key?(from)
+  return "สกุลเงินปลายทางไม่รู้จัก" unless EXCHANGE_RATES.key?(to)
+  return "จำนวนเงินต้องเป็นบวก" unless amount > 0
+  
+  in_thb = amount / EXCHANGE_RATES[from]
+  result = in_thb * EXCHANGE_RATES[to]
+  result.round(4)
+end
+
+puts convert_currency(1000, from: :THB, to: :USD)  # 28.0
+puts convert_currency(100, from: :USD, to: :THB)   # 3571.4286
+puts convert_currency(1, from: :USD, to: :EUR)      # 0.9286
+
+# ข้อ 14-20: โจทย์ให้ผู้เรียนลองทำเอง
+# ข้อ 14: สร้าง Morse Code converter
+# ข้อ 15: เขียน method ตรวจสอบ Credit Card number (Luhn algorithm)
+# ข้อ 16: สร้าง simple calculator ที่รับ expression เป็น string เช่น "5 + 3"
+# ข้อ 17: เขียน Binary Search ที่ใช้ pattern matching
+# ข้อ 18: สร้าง Discount calculator ที่มีหลายประเภทส่วนลด
+# ข้อ 19: เขียน method แปลงตัวเลขเป็นภาษาไทย (1 = หนึ่ง, 2 = สอง, ...)
+# ข้อ 20: สร้าง simple State Machine ด้วย case/when
 ```
 
 ---
 
-## สรุปบทที่ 7
+## สรุป Control Flow ใน Ruby
 
-| Operator/Statement | การใช้งาน |
-|-------------------|-----------|
-| `if/elsif/else` | พื้นฐาน conditional |
-| `unless` | ตรงข้าม if, ใช้เมื่อ condition เป็น negative |
-| `? :` | Ternary, สำหรับ simple conditional |
-| `case/when` | หลาย conditions, range, regex, types |
-| `case/in` | Pattern matching (Ruby 2.7+) |
-| `&&` / `\|\|` | Boolean AND/OR, short-circuit |
-| `and` / `or` | Low precedence, flow control |
-| `&.` | Safe navigation, nil-safe |
-| `\|\|=` / `&&=` | Conditional assignment |
-| Inline conditions | `if` / `unless` หลัง statement |
-| Guard clauses | `return unless condition` |
+| คำสั่ง | การใช้งาน |
+|--------|----------|
+| `if/elsif/else` | เงื่อนไขพื้นฐาน |
+| `unless` | เงื่อนไขแบบ negation |
+| `? :` | ternary สำหรับ simple condition |
+| `statement if cond` | one-line condition |
+| `case/when` | multiple conditions |
+| `case/in` | pattern matching (Ruby 3+) |
+| `&&, \|\|, !` | logical operators |
+| `&.` | safe navigation |
+| `\|\|=` | conditional assignment |
 
-**Key Takeaways:**
-1. ใน Ruby มีเพียง `nil` และ `false` เท่านั้นที่เป็น falsy
-2. Guard clauses ทำให้โค้ดอ่านง่ายและลด nesting
-3. `case/when` ใช้ `===` operator ซึ่งทำงานต่างกันตาม type
-4. Pattern matching (Ruby 3+) ทรงพลังมากสำหรับ complex data
-5. `&.` ช่วยป้องกัน NoMethodError จาก nil
+**หลักการที่ควรจำ:**
+1. ใน Ruby มีแค่ `false` และ `nil` ที่เป็น falsy
+2. ใช้ Guard Clauses เพื่อลด nesting
+3. `case/when` ใช้ `===` ที่ยืดหยุ่น (range, regex, class)
+4. `&.` ช่วยหลีกเลี่ยง nil errors
+5. Short-circuit evaluation ช่วยเพิ่ม performance
 
----
-
-*ถัดไป: ตอนที่ 8 - Loops and Iterators (ขั้นตอนที่ 121-145)*
+> ⬅️ [ตอนที่ 6: Hashes](part-06-hashes.md) | ➡️ [ตอนที่ 8: Loops](part-08-loops.md)

@@ -1,1596 +1,1497 @@
-# ส่วนที่ 2: Variables และ Data Types - ขั้นตอนที่ 11-25
+# ตอนที่ 2: Variables และ Data Types
+
+## Ruby Programming Course สำหรับผู้เริ่มต้นภาษาไทย
+
+---
 
 ## บทนำ
 
-ตัวแปร (Variables) และชนิดข้อมูล (Data Types) คือรากฐานของการเขียนโปรแกรม ใน Ruby ทุกสิ่งทุกอย่างเป็น Object ไม่ว่าจะเป็นตัวเลข สตริง หรือแม้แต่ค่า nil ก็ล้วนเป็น Object ทั้งสิ้น
+ในตอนที่ 2 นี้ เราจะเรียนรู้เกี่ยวกับ Variables (ตัวแปร) และ Data Types (ประเภทข้อมูล) ซึ่งเป็นพื้นฐานที่สำคัญที่สุดในการเขียนโปรแกรมภาษา Ruby
+
+**สิ่งที่จะได้เรียนรู้ในตอนนี้:**
+- ประเภทของ Variables ใน Ruby
+- การตั้งชื่อตัวแปรตาม Convention
+- ประเภทข้อมูลพื้นฐาน (Integer, Float, String, Boolean, Nil, Symbol)
+- การแปลงประเภทข้อมูล
+- การตรวจสอบประเภทข้อมูล
+- Frozen Objects
+- การกำหนดค่าหลายตัวแปรพร้อมกัน
 
 ---
 
-## ขั้นตอนที่ 11: Variable Naming Conventions
+## Step 11: ประเภทของ Variables ใน Ruby
 
-### กฎการตั้งชื่อตัวแปรใน Ruby
+ใน Ruby มี Variables หลายประเภท แต่ละประเภทมี Scope (ขอบเขต) การใช้งานที่แตกต่างกัน
 
-Ruby มีกฎการตั้งชื่อตัวแปรที่ชัดเจนและใช้ประเภทตัวแปรแยกกันด้วยรูปแบบของชื่อ
+### 1.1 Local Variables (ตัวแปรท้องถิ่น)
 
-```ruby
-# ถูกต้อง - ชื่อตัวแปรที่ดี
-user_name = "Alice"          # snake_case (แนะนำ)
-first_name = "Bob"
-age_in_years = 25
-is_active = true
-total_price = 99.99
+Local Variables เป็นตัวแปรที่ใช้งานได้เฉพาะภายใน Block, Method, หรือ Scope ที่ประกาศไว้เท่านั้น
 
-# ผิด - ชื่อตัวแปรที่ไม่ดี
-# userName = "Alice"       # camelCase (ไม่แนะนำใน Ruby)
-# FirstName = "Bob"        # ขึ้นต้นด้วยตัวพิมพ์ใหญ่ = Constant ใน Ruby
-# 1name = "test"           # ขึ้นต้นด้วยตัวเลข (Error!)
-# my-name = "test"         # มี hyphen (Error!)
-# my name = "test"         # มี space (Error!)
-
-# ชื่อพิเศษที่ Ruby ใช้
-# _ สามารถใช้ได้ (convention สำหรับตัวแปรที่ไม่ใช้)
-_ = "ไม่สนใจค่านี้"
-_unused = "ตัวแปรที่ไม่ได้ใช้"
-
-# ตัวแปรที่ขึ้นต้นและลงท้ายด้วย __ (double underscore)
-__method__  # method ปัจจุบัน (built-in)
-__LINE__    # บรรทัดปัจจุบัน
-__FILE__    # ไฟล์ปัจจุบัน
-__dir__     # directory ปัจจุบัน
-```
-
-### Ruby Naming Conventions ที่ควรรู้
+**กฎการตั้งชื่อ:**
+- ต้องขึ้นต้นด้วยตัวอักษรพิมพ์เล็ก หรือ underscore (_)
+- ประกอบด้วยตัวอักษร ตัวเลข และ underscore
 
 ```ruby
-# snake_case สำหรับ:
-# - Local variables
-user_email = "test@example.com"
-# - Method names
-def calculate_total_price(items)
-  items.sum
-end
-# - Symbols
-:user_name
-:first_name
+# ตัวอย่าง Local Variables
+name = "สมชาย"
+age = 25
+_temp_value = 100
+student_name = "นักเรียน A"
 
-# CamelCase (PascalCase) สำหรับ:
-# - Class names
-class UserAccount; end
-class HttpRequest; end
-# - Module names
-module DatabaseHelper; end
+puts name        # => สมชาย
+puts age         # => 25
+puts _temp_value # => 100
 
-# SCREAMING_SNAKE_CASE สำหรับ:
-# - Constants
-MAX_SIZE = 100
-API_BASE_URL = "https://api.example.com"
-DEFAULT_TIMEOUT = 30
-
-# ตัวอย่างครบถ้วน
-class BankAccount  # PascalCase class
-  MAX_WITHDRAWAL = 10_000  # SCREAMING_SNAKE for constants
-
-  attr_reader :account_number, :balance  # snake_case for methods
-
-  def initialize(account_number, initial_balance)
-    @account_number = account_number  # @ = instance variable
-    @balance = initial_balance
-    @@total_accounts += 1             # @@ = class variable
-  end
-
-  def withdraw_money(amount)          # snake_case method
-    @balance -= amount
-  end
-end
-```
-
----
-
-## ขั้นตอนที่ 12: Local Variables (ตัวแปรท้องถิ่น)
-
-### ลักษณะของ Local Variables
-
-```ruby
-# Local variable ขึ้นต้นด้วยตัวพิมพ์เล็กหรือ underscore
-name = "Alice"
-_private_var = "ส่วนตัว"
-counter = 0
-
-# Scope ของ local variable
-def show_name
-  local_var = "ฉันอยู่ใน method นี้เท่านั้น"
+# Local Variable ไม่สามารถเข้าถึงจากนอก Scope ได้
+def my_method
+  local_var = "ฉันอยู่ใน method"
   puts local_var
 end
 
-show_name
-# puts local_var  # Error! ไม่สามารถเข้าถึงได้นอก method
-
-# Local variable ใน block
-[1, 2, 3].each do |number|
-  block_var = number * 2
-  puts block_var
-end
-# puts block_var  # Error! ออกจาก block แล้วไม่มีแล้ว
-
-# ยกเว้น: ตัวแปรที่ประกาศก่อน block สามารถเข้าถึงได้ใน block
-total = 0
-[1, 2, 3, 4, 5].each do |n|
-  total += n  # ใช้ total ที่ประกาศข้างนอกได้
-end
-puts total  # => 15
-
-# การกำหนดค่าหลายตัวพร้อมกัน
-a, b, c = 1, 2, 3
-puts "#{a}, #{b}, #{c}"  # => 1, 2, 3
-
-# Multiple assignment จาก Array
-first, second, *rest = [1, 2, 3, 4, 5]
-puts first   # => 1
-puts second  # => 2
-puts rest    # => [3, 4, 5]
+my_method  # => ฉันอยู่ใน method
+# puts local_var  # => NameError: undefined local variable
 ```
-
-### การตรวจสอบตัวแปรที่กำหนดแล้ว
 
 ```ruby
-# defined? บอกว่าตัวแปรมีอยู่หรือไม่
-x = 10
-puts defined?(x)       # => "local-variable"
-puts defined?(y)       # => nil (ยังไม่กำหนด)
-puts defined?(puts)    # => "method"
-puts defined?(String)  # => "constant"
+# ตัวอย่างการใช้ Local Variable ใน Block
+[1, 2, 3].each do |number|
+  square = number ** 2
+  puts "#{number} ยกกำลังสอง = #{square}"
+end
+# => 1 ยกกำลังสอง = 1
+# => 2 ยกกำลังสอง = 4
+# => 3 ยกกำลังสอง = 9
 
-# local_variables แสดง local variables ทั้งหมด
-a = 1
-b = 2
-c = 3
-puts local_variables.inspect  # => [:a, :b, :c]
+# ตัวแปร square ไม่สามารถเข้าถึงจากนอก block ได้ใน Ruby 1.9+
 ```
 
----
+### 1.2 Instance Variables (ตัวแปร Instance)
 
-## ขั้นตอนที่ 13: Instance Variables (ตัวแปร Instance)
-
-### ตัวแปรที่เป็นของ Object แต่ละชิ้น
+Instance Variables ใช้เก็บข้อมูลของ Object แต่ละตัว ขึ้นต้นด้วย `@`
 
 ```ruby
 class Person
   def initialize(name, age)
-    @name = name  # @ นำหน้า = instance variable
-    @age = age
+    @name = name  # Instance Variable
+    @age = age    # Instance Variable
   end
-
+  
   def introduce
     puts "สวัสดี ฉันชื่อ #{@name} อายุ #{@age} ปี"
   end
-
+  
   def birthday
     @age += 1
-    puts "สุขสันต์วันเกิด #{@name}! อายุ #{@age} ปีแล้ว"
-  end
-
-  # Getter method
-  def name
-    @name
-  end
-
-  # Setter method
-  def name=(new_name)
-    @name = new_name
+    puts "อายุใหม่: #{@age}"
   end
 end
 
-alice = Person.new("Alice", 25)
-bob = Person.new("Bob", 30)
+person1 = Person.new("สมชาย", 25)
+person2 = Person.new("สมหญิง", 22)
 
-alice.introduce  # => สวัสดี ฉันชื่อ Alice อายุ 25 ปี
-bob.introduce    # => สวัสดี ฉันชื่อ Bob อายุ 30 ปี
+person1.introduce  # => สวัสดี ฉันชื่อ สมชาย อายุ 25 ปี
+person2.introduce  # => สวัสดี ฉันชื่อ สมหญิง อายุ 22 ปี
 
-alice.birthday   # => สุขสันต์วันเกิด Alice! อายุ 26 ปีแล้ว
-bob.introduce    # => สวัสดี ฉันชื่อ Bob อายุ 30 ปี (ไม่เปลี่ยน)
-
-# ใช้ attr_accessor สร้าง getter/setter อัตโนมัติ
-class Car
-  attr_accessor :brand, :model, :year  # สร้าง getter + setter
-  attr_reader :vin                      # getter only
-  attr_writer :color                    # setter only
-
-  def initialize(brand, model, year, vin)
-    @brand = brand
-    @model = model
-    @year = year
-    @vin = vin
-    @color = "white"
-  end
-
-  def info
-    "#{@year} #{@brand} #{@model}"
-  end
-end
-
-car = Car.new("Toyota", "Camry", 2023, "VIN123456")
-puts car.info           # => 2023 Toyota Camry
-puts car.brand          # => Toyota
-
-car.brand = "Honda"
-puts car.brand          # => Honda
-
-puts car.vin            # => VIN123456
-# car.vin = "NEW_VIN"  # Error! ไม่มี setter สำหรับ vin
-
-# Instance variable ที่ไม่ได้กำหนด = nil
-class Example
-  def check_variable
-    puts @undefined_var.inspect  # => nil (ไม่ error!)
-    puts @undefined_var.nil?     # => true
-  end
-end
-
-Example.new.check_variable
+person1.birthday   # => อายุใหม่: 26
+person1.introduce  # => สวัสดี ฉันชื่อ สมชาย อายุ 26 ปี
+person2.introduce  # => สวัสดี ฉันชื่อ สมหญิง อายุ 22 ปี (ไม่เปลี่ยน)
 ```
 
----
+```ruby
+# Instance Variable ที่ไม่ได้กำหนดค่า จะมีค่าเป็น nil
+class Dog
+  def show_info
+    puts @name.inspect  # => nil
+    puts @breed.inspect # => nil
+  end
+  
+  def set_name(name)
+    @name = name
+  end
+end
 
-## ขั้นตอนที่ 14: Class Variables (ตัวแปร Class)
+dog = Dog.new
+dog.show_info   # => nil, nil
+dog.set_name("บัดดี้")
+dog.show_info   # => "บัดดี้", nil
+```
 
-### ตัวแปรที่แชร์กันทุก instance
+### 1.3 Class Variables (ตัวแปร Class)
+
+Class Variables ใช้เก็บข้อมูลที่ใช้ร่วมกันในทุก Instance ของ Class ขึ้นต้นด้วย `@@`
 
 ```ruby
 class BankAccount
-  @@total_accounts = 0     # @@ นำหน้า = class variable
-  @@total_deposits = 0
-
-  def initialize(owner, balance = 0)
+  @@total_accounts = 0    # Class Variable
+  @@total_balance = 0.0   # Class Variable
+  
+  def initialize(owner, balance)
     @owner = owner
     @balance = balance
     @@total_accounts += 1
-    puts "สร้างบัญชีสำหรับ #{@owner} แล้ว"
+    @@total_balance += balance
   end
-
-  def deposit(amount)
-    @balance += amount
-    @@total_deposits += amount
-    puts "ฝากเงิน #{amount} บาท (ยอดรวม: #{@balance} บาท)"
-  end
-
+  
   def self.total_accounts
     @@total_accounts
   end
-
-  def self.total_deposits
-    @@total_deposits
+  
+  def self.total_balance
+    @@total_balance
   end
-
-  def balance
-    @balance
-  end
-end
-
-account1 = BankAccount.new("Alice", 1000)
-account2 = BankAccount.new("Bob", 500)
-
-account1.deposit(500)
-account2.deposit(1000)
-
-puts "จำนวนบัญชีทั้งหมด: #{BankAccount.total_accounts}"  # => 2
-puts "ยอดฝากทั้งหมด: #{BankAccount.total_deposits}"      # => 1500
-
-# ปัญหาของ Class Variable กับ Inheritance
-class Animal
-  @@count = 0
-
-  def initialize
-    @@count += 1
-  end
-
-  def self.count
-    @@count
+  
+  def deposit(amount)
+    @balance += amount
+    @@total_balance += amount
   end
 end
 
-class Dog < Animal; end
-class Cat < Animal; end
+acc1 = BankAccount.new("สมชาย", 1000.0)
+acc2 = BankAccount.new("สมหญิง", 2000.0)
+acc3 = BankAccount.new("สมศรี", 500.0)
 
-Dog.new
-Dog.new
-Cat.new
+puts "จำนวนบัญชีทั้งหมด: #{BankAccount.total_accounts}"  # => 3
+puts "ยอดเงินรวมทั้งหมด: #{BankAccount.total_balance}"   # => 3500.0
 
-puts Animal.count  # => 3 (แชร์กันทุก subclass!)
-puts Dog.count     # => 3 (ไม่ใช่ count เฉพาะ Dog)
-puts Cat.count     # => 3
-
-# ใช้ instance variable ของ class แทนจะดีกว่า
-class Vehicle
-  @count = 0  # นี่คือ instance variable ของ class object
-
-  class << self
-    attr_accessor :count
-  end
-
-  def initialize
-    self.class.count += 1
-  end
-end
-
-class Truck < Vehicle
-  @count = 0
-end
-
-class Bus < Vehicle
-  @count = 0
-end
-
-Truck.new
-Truck.new
-Bus.new
-
-puts Truck.count   # => 2
-puts Bus.count     # => 1
+acc1.deposit(500.0)
+puts "ยอดเงินรวมทั้งหมด: #{BankAccount.total_balance}"   # => 4000.0
 ```
 
----
+### 1.4 Global Variables (ตัวแปร Global)
 
-## ขั้นตอนที่ 15: Global Variables (ตัวแปร Global)
-
-### ตัวแปรที่เข้าถึงได้จากทุกที่
+Global Variables เข้าถึงได้จากทุกที่ในโปรแกรม ขึ้นต้นด้วย `$` ควรใช้อย่างระมัดระวัง
 
 ```ruby
-# $ นำหน้า = global variable
-$app_name = "My Ruby App"
-$debug_mode = false
+$app_name = "Ruby Course App"
 $version = "1.0.0"
+$debug_mode = false
 
 def show_app_info
-  # เข้าถึง global variable ได้จากทุกที่
-  puts "App: #{$app_name} v#{$version}"
-  puts "Debug mode: #{$debug_mode}"
+  puts "Application: #{$app_name}"
+  puts "Version: #{$version}"
+  puts "Debug: #{$debug_mode}"
+end
+
+def enable_debug
+  $debug_mode = true
 end
 
 show_app_info
+# => Application: Ruby Course App
+# => Version: 1.0.0
+# => Debug: false
 
-# Global variables ที่ Ruby กำหนดมาให้
-puts $0       # ชื่อไฟล์ที่กำลังรัน
-puts $$       # Process ID ปัจจุบัน
-puts $:.first # ตำแหน่งแรกใน LOAD_PATH
+enable_debug
+show_app_info
+# => Application: Ruby Course App
+# => Version: 1.0.0
+# => Debug: true
+```
+
+```ruby
+# Ruby มี Global Variables ที่กำหนดไว้ล่วงหน้า (Predefined Global Variables)
+puts $0      # ชื่อไฟล์ที่กำลังรัน
 puts $PROGRAM_NAME  # เหมือน $0
+puts $$      # Process ID
+puts $stdout.class  # => IO
+puts $stderr.class  # => IO
+puts $stdin.class   # => IO
 
-# Global variables ที่เกี่ยวกับ I/O
-# $stdin   - Standard Input
-# $stdout  - Standard Output
-# $stderr  - Standard Error
-
-$stdout.puts "ออกทาง stdout"
-$stderr.puts "ออกทาง stderr (error)"
-
-# Global variables เกี่ยวกับ Regular Expression
-"hello world" =~ /(\w+)\s(\w+)/
-puts $~.inspect   # MatchData ทั้งหมด
-puts $1           # => "hello" (group 1)
-puts $2           # => "world" (group 2)
-puts $&           # => "hello world" (match ทั้งหมด)
-puts $`           # String ก่อน match
-puts $'           # String หลัง match
-
-# คำเตือน: ควรหลีกเลี่ยง Global Variables ในโปรแกรมจริง
-# เพราะทำให้โค้ดยากต่อการ debug และ test
-# ใช้ class variables, configuration objects, หรือ dependency injection แทน
+# $_ เก็บค่าล่าสุดที่อ่านจาก gets
+# $! เก็บ Exception ล่าสุด
+# $@ เก็บ Backtrace ของ Exception ล่าสุด
 ```
 
 ---
 
-## ขั้นตอนที่ 16: Constants (ค่าคงที่)
+## Step 12: การตั้งชื่อ Variable (Naming Conventions)
 
-### การใช้งาน Constants
+Ruby มี Convention การตั้งชื่อที่ชัดเจน การทำตาม Convention จะทำให้โค้ดอ่านได้ง่ายขึ้น
+
+### 2.1 Snake_case สำหรับ Variables และ Methods
 
 ```ruby
-# Constant ขึ้นต้นด้วยตัวพิมพ์ใหญ่
-MAX_RETRY = 3
-PI = 3.14159265358979
-APP_VERSION = "2.0.0"
+# ถูกต้อง - snake_case
+student_name = "สมชาย"
+total_price = 1500.0
+is_logged_in = true
+max_retry_count = 3
+
+# ผิด Convention (แม้จะทำงานได้)
+studentName = "สมชาย"    # camelCase - ไม่ใช้ใน Ruby
+StudentName = "สมชาย"    # PascalCase - ใช้สำหรับ Class/Module เท่านั้น
+```
+
+```ruby
+# ชื่อ Method ก็ใช้ snake_case
+def calculate_total_price(price, quantity, discount_rate)
+  subtotal = price * quantity
+  discount = subtotal * discount_rate
+  subtotal - discount
+end
+
+result = calculate_total_price(100.0, 5, 0.1)
+puts result  # => 450.0
+```
+
+### 2.2 PascalCase สำหรับ Classes และ Modules
+
+```ruby
+# Classes
+class ShoppingCart
+end
+
+class UserAuthentication
+end
+
+class DatabaseConnection
+end
+
+# Modules
+module PaymentProcessor
+end
+
+module UserNotification
+end
+```
+
+### 2.3 SCREAMING_SNAKE_CASE สำหรับ Constants
+
+```ruby
+MAX_CONNECTIONS = 100
+DEFAULT_TIMEOUT = 30
+PI = 3.14159
 DATABASE_URL = "postgresql://localhost/mydb"
+APP_VERSION = "2.0.0"
 
-# Ruby จะเตือนเมื่อแก้ค่า Constant (แต่ยังทำได้)
-MAX_RETRY = 5  # Warning: already initialized constant MAX_RETRY
+puts MAX_CONNECTIONS   # => 100
+puts PI                # => 3.14159
+```
 
-# Constants ใน Class/Module (แนะนำ)
-class Configuration
-  MAX_CONNECTIONS = 10
-  DEFAULT_TIMEOUT = 30
-  SUPPORTED_FORMATS = [:json, :xml, :csv].freeze
+### 2.4 กฎพิเศษของ Ruby
 
-  def self.max_connections
-    MAX_CONNECTIONS
-  end
-end
+```ruby
+# ชื่อที่ลงท้ายด้วย ? หมายถึง predicate methods (คืนค่า boolean)
+name = "สมชาย"
+puts name.empty?    # => false
+puts name.include?("สม")  # => true
 
-puts Configuration::MAX_CONNECTIONS     # => 10
-puts Configuration::DEFAULT_TIMEOUT    # => 30
-puts Configuration::SUPPORTED_FORMATS  # => [:json, :xml, :csv]
+number = 5
+puts number.odd?    # => true
+puts number.even?   # => false
+puts number.zero?   # => false
 
-# Module Constants
-module HttpStatus
-  OK          = 200
-  CREATED     = 201
-  NO_CONTENT  = 204
-  BAD_REQUEST = 400
-  NOT_FOUND   = 404
-  SERVER_ERROR = 500
+# ชื่อที่ลงท้ายด้วย ! หมายถึงเปลี่ยนแปลง object ต้นฉบับ (bang methods)
+words = ["banana", "apple", "cherry"]
+words.sort!   # เรียงและเปลี่ยน array ต้นฉบับ
+puts words.inspect  # => ["apple", "banana", "cherry"]
 
-  ALL = {
-    OK          => "OK",
-    CREATED     => "Created",
-    NO_CONTENT  => "No Content",
-    BAD_REQUEST => "Bad Request",
-    NOT_FOUND   => "Not Found",
-    SERVER_ERROR => "Internal Server Error"
-  }.freeze
-
-  def self.message_for(code)
-    ALL[code] || "Unknown Status"
-  end
-end
-
-puts HttpStatus::NOT_FOUND            # => 404
-puts HttpStatus.message_for(200)      # => "OK"
-puts HttpStatus.message_for(999)      # => "Unknown Status"
-
-# Freeze สำหรับ Immutable Constants
-COLORS = ["red", "green", "blue"].freeze
-# COLORS << "purple"  # FrozenError!
-
-# ดู Constants ทั้งหมดใน Module/Class
-puts Configuration.constants.inspect
-# => [:MAX_CONNECTIONS, :DEFAULT_TIMEOUT, :SUPPORTED_FORMATS]
+text = "  hello world  "
+text.strip!   # ลบช่องว่างหัวท้ายและเปลี่ยนต้นฉบับ
+puts text     # => "hello world"
 ```
 
 ---
 
-## ขั้นตอนที่ 17: Integer - จำนวนเต็ม
+## Step 13: Integer - ตัวเลขจำนวนเต็ม
+
+Integer คือตัวเลขจำนวนเต็มไม่มีทศนิยม ใน Ruby ไม่มีขีดจำกัดขนาด
+
+### 3.1 การสร้าง Integer
 
 ```ruby
-# การสร้าง Integer
+# Integer ธรรมดา
 age = 25
-population = 7_900_000_000  # underscore ช่วยอ่านง่าย
+population = 1_000_000   # ใช้ underscore แทนเครื่องหมายจุลภาคเพื่อให้อ่านง่าย
 negative = -42
 
-# Arithmetic operations
-puts 10 + 3    # => 13
-puts 10 - 3    # => 7
-puts 10 * 3    # => 30
-puts 10 / 3    # => 3 (Integer division!)
-puts 10 % 3    # => 1 (modulo)
-puts 10 ** 3   # => 1000 (power)
+# Integer ขนาดใหญ่มาก (Ruby รองรับ Bignum)
+big_number = 9_999_999_999_999_999
+factorial_100 = 93326215443944152681699238856266700490715968264381621468592963895217599993229915608941463976156518286253697920827223758251185210916864000000000000000000000000
 
-# Integer division vs Float division
-puts 10 / 3      # => 3   (Integer / Integer = Integer)
-puts 10.0 / 3    # => 3.3333... (Float / Integer = Float)
-puts 10 / 3.0    # => 3.3333...
-puts 10.to_f / 3 # => 3.3333...
+puts age         # => 25
+puts population  # => 1000000
+puts big_number  # => 9999999999999999
+```
 
-# Integer methods
-n = 42
-puts n.even?      # => true
-puts n.odd?       # => false
-puts n.zero?      # => false
-puts n.positive?  # => true
-puts n.negative?  # => false
-puts n.abs        # => 42
-puts (-42).abs    # => 42
+```ruby
+# Integer ในฐานต่างๆ
+binary_num = 0b1010    # เลขฐาน 2 = 10
+octal_num  = 0o17      # เลขฐาน 8 = 15
+hex_num    = 0xFF      # เลขฐาน 16 = 255
 
-# Iteration methods
-5.times { |i| print "#{i} " }
-# 0 1 2 3 4
+puts binary_num   # => 10
+puts octal_num    # => 15
+puts hex_num      # => 255
 
-1.upto(5)   { |i| print "#{i} " }  # 1 2 3 4 5
-5.downto(1) { |i| print "#{i} " }  # 5 4 3 2 1
+# แปลงเป็นฐานต่างๆ
+num = 255
+puts num.to_s(2)   # => "11111111" (binary)
+puts num.to_s(8)   # => "377" (octal)
+puts num.to_s(16)  # => "ff" (hexadecimal)
+```
 
-1.step(10, 2) { |i| print "#{i} " }  # 1 3 5 7 9
+### 3.2 Integer Methods
 
-# Conversion
-puts 42.to_f    # => 42.0
-puts 42.to_s    # => "42"
-puts 42.to_r    # => 42/1 (Rational)
-puts 42.to_c    # => (42+0i) (Complex)
+```ruby
+num = -42
 
-# Digit methods
-puts 42.digits      # => [2, 4] (หลักจากขวาไปซ้าย)
-puts 42.digits.reverse  # => [4, 2]
-puts 1234.digits    # => [4, 3, 2, 1]
+# คณิตศาสตร์พื้นฐาน
+puts num.abs        # => 42 (ค่าสัมบูรณ์)
+puts num.abs2       # => 1764 (กำลังสอง)
 
-# Base conversion
-puts 255.to_s(2)   # => "11111111" (binary)
-puts 255.to_s(8)   # => "377" (octal)
-puts 255.to_s(16)  # => "ff" (hex)
+# การตรวจสอบ
+puts 5.odd?         # => true (เลขคี่)
+puts 4.even?        # => true (เลขคู่)
+puts 0.zero?        # => true (เป็นศูนย์)
+puts 5.positive?    # => true (เป็นบวก)
+puts (-3).negative? # => true (เป็นลบ)
 
-# Integer limits (Ruby รองรับ BigInteger!)
-puts (2 ** 100)  # => 1267650600228229401496703205376 (ใหญ่แค่ไหนก็ได้!)
+# การหาค่า
+puts 15.gcd(10)     # => 5 (ห.ร.ม.)
+puts 4.lcm(6)       # => 12 (ค.ร.น.)
+
+# Integer Division
+puts 17.divmod(5)   # => [3, 2] (몫 และ เศษ)
+puts 17.div(5)      # => 3 (ผลหาร)
+puts 17.modulo(5)   # => 2 (เศษ)
+puts 17.remainder(5) # => 2 (เศษ)
+```
+
+```ruby
+# การวนซ้ำด้วย Integer
+5.times do |i|
+  print "#{i} "
+end
+puts  # => 0 1 2 3 4
+
+1.upto(5) do |i|
+  print "#{i} "
+end
+puts  # => 1 2 3 4 5
+
+5.downto(1) do |i|
+  print "#{i} "
+end
+puts  # => 5 4 3 2 1
+
+1.step(10, 2) do |i|
+  print "#{i} "
+end
+puts  # => 1 3 5 7 9
+```
+
+```ruby
+# Integer Arithmetic
+a = 17
+b = 5
+
+puts a + b   # => 22
+puts a - b   # => 12
+puts a * b   # => 85
+puts a / b   # => 3 (Integer division!)
+puts a % b   # => 2 (modulo)
+puts a ** b  # => 1419857 (exponentiation)
+
+# การแปลง
+puts 42.to_f   # => 42.0
+puts 42.to_r   # => 42/1 (Rational)
+puts 42.to_c   # => 42+0i (Complex)
+puts 42.to_s   # => "42"
 ```
 
 ---
 
-## ขั้นตอนที่ 18: Float - จำนวนทศนิยม
+## Step 14: Float - ตัวเลขทศนิยม
+
+Float คือตัวเลขที่มีทศนิยม ใช้สำหรับการคำนวณที่ต้องการความแม่นยำ
+
+### 4.1 การสร้าง Float
 
 ```ruby
-# การสร้าง Float
-price = 99.99
+price = 29.99
+temperature = -5.5
+pi = 3.14159265358979
+scientific = 1.5e10    # 1.5 × 10^10
+
+puts price        # => 29.99
+puts temperature  # => -5.5
+puts scientific   # => 15000000000.0
+```
+
+### 4.2 Float Methods
+
+```ruby
+num = 3.7
+
+puts num.ceil      # => 4 (ปัดขึ้น)
+puts num.floor     # => 3 (ปัดลง)
+puts num.round     # => 4 (ปัดใกล้สุด)
+puts num.truncate  # => 3 (ตัดทศนิยมทิ้ง)
+puts num.abs       # => 3.7 (ค่าสัมบูรณ์)
+
+# การปัดเศษหลายตำแหน่ง
 pi = 3.14159
-negative_float = -0.5
-scientific = 1.5e3  # 1500.0
-small = 1.5e-3      # 0.0015
+puts pi.round(2)  # => 3.14
+puts pi.round(4)  # => 3.1416
 
-# Float methods
-puts 3.7.ceil    # => 4 (ปัดขึ้น)
-puts 3.2.floor   # => 3 (ปัดลง)
-puts 3.5.round   # => 4 (ปัดทั่วไป)
-puts 3.7.round   # => 4
-puts 3.14159.round(2)  # => 3.14
+# Float พิเศษ
+infinity = Float::INFINITY
+negative_inf = -Float::INFINITY
+not_a_number = Float::NAN
 
-puts 3.7.truncate  # => 3 (ตัดทศนิยมทิ้ง)
+puts infinity.infinite?      # => 1
+puts negative_inf.infinite?  # => -1
+puts pi.infinite?            # => nil
+puts not_a_number.nan?       # => true
+puts pi.nan?                 # => false
+puts pi.finite?              # => true
+```
 
-# Float constants
-puts Float::INFINITY    # => Infinity
-puts -Float::INFINITY   # => -Infinity
-puts Float::NAN         # => NaN
+```ruby
+# ระวัง Floating Point Precision
+puts 0.1 + 0.2          # => 0.30000000000000004
+puts (0.1 + 0.2).round(1)  # => 0.3
 
-# ตรวจสอบค่าพิเศษ
-puts (1.0 / 0).infinite?   # => 1
-puts (-1.0 / 0).infinite?  # => -1
-puts (0.0 / 0).nan?        # => true
-
-# Float precision problem!
-puts 0.1 + 0.2             # => 0.30000000000000004 (ไม่ใช่ 0.3!)
-puts (0.1 + 0.2) == 0.3    # => false!
-
-# วิธีแก้: ใช้ round หรือ BigDecimal
-puts (0.1 + 0.2).round(1) == 0.3  # => true
-
-# BigDecimal สำหรับการเงิน
+# ใช้ BigDecimal สำหรับการคำนวณที่ต้องการความแม่นยำสูง
 require 'bigdecimal'
-
-price1 = BigDecimal("0.1")
-price2 = BigDecimal("0.2")
-total = price1 + price2
-puts total          # => 0.3e0
-puts total.to_s     # => "0.3e0"
-puts total.to_f     # => 0.3
+a = BigDecimal("0.1")
+b = BigDecimal("0.2")
+puts (a + b).to_s   # => "0.3"
 ```
 
 ---
 
-## ขั้นตอนที่ 19: String - ข้อความ
+## Step 15: String - ข้อความ
+
+String คือลำดับของตัวอักษร สร้างได้หลายแบบ
+
+### 5.1 การสร้าง String
 
 ```ruby
-# การสร้าง String
-name = "Alice"         # Double quotes
-greeting = 'Hello'     # Single quotes
+# Single quotes - ไม่แปลง escape sequences (ยกเว้น \\ และ \')
+single = 'Hello, World!'
+single_escape = 'It\'s a beautiful day'
+no_interpolation = 'ราคา: #{price}'   # #{} จะไม่ถูกแปลง
 
-# ความแตกต่างระหว่าง ' และ "
-puts "Line 1\nLine 2"   # \n = newline (double quote ทำได้)
-puts 'Line 1\nLine 2'   # \n = literal (single quote ไม่แปล escape)
+# Double quotes - แปลง escape sequences และ interpolation
+double = "Hello, World!"
+with_tab = "ชื่อ:\tสมชาย"
+with_newline = "บรรทัดที่ 1\nบรรทัดที่ 2"
+with_interpolation = "ราคา: #{29.99}"
 
-x = 10
-puts "Value: #{x}"      # interpolation (double quote ทำได้)
-puts 'Value: #{x}'      # ไม่ทำ interpolation (แสดงตรงๆ)
+puts single              # => Hello, World!
+puts no_interpolation    # => ราคา: #{price}
+puts with_interpolation  # => ราคา: 29.99
+```
 
-# String methods พื้นฐาน
-str = "Hello, Ruby World!"
+```ruby
+# Escape Sequences
+puts "Tab:\tHello"          # Tab
+puts "Newline:\nWorld"      # Newline
+puts "Backslash: \\"        # Backslash
+puts "Quote: \""            # Double quote
+puts "Null: \0End"          # Null character
+puts "Bell: \a"             # Bell (ASCII 7)
+```
 
-puts str.length         # => 18
-puts str.size           # => 18 (เหมือนกัน)
-puts str.upcase         # => HELLO, RUBY WORLD!
-puts str.downcase       # => hello, ruby world!
-puts str.capitalize     # => Hello, ruby world!
-puts str.reverse        # => !dlroW ybuR ,olleH
-puts str.strip          # ลบ whitespace หัวท้าย
-puts "  hello  ".strip  # => "hello"
-puts str.chomp          # ลบ newline ท้าย
+### 5.2 String Methods พื้นฐาน
 
-# String inspection
-puts str.include?("Ruby")  # => true
-puts str.start_with?("Hello")  # => true
-puts str.end_with?("!")    # => true
-puts str.empty?            # => false
-puts "".empty?             # => true
+```ruby
+text = "  Hello, Ruby World!  "
 
-# String encoding
-puts str.encoding      # => UTF-8
-puts "สวัสดี".length   # => 6 (characters)
-puts "สวัสดี".bytesize # => 18 (bytes in UTF-8)
-
-# Type conversion
-puts "42".to_i    # => 42
-puts "3.14".to_f  # => 3.14
-puts "42abc".to_i # => 42 (หยุดที่ตัวแรกที่ไม่ใช่ตัวเลข)
-puts "abc".to_i   # => 0
-puts 42.to_s      # => "42"
+puts text.length      # => 22
+puts text.size        # => 22 (เหมือน length)
+puts text.upcase      # => "  HELLO, RUBY WORLD!  "
+puts text.downcase    # => "  hello, ruby world!  "
+puts text.capitalize  # => "  hello, ruby world!  " (ตัวแรกพิมพ์ใหญ่)
+puts text.strip       # => "Hello, Ruby World!"
+puts text.lstrip      # => "Hello, Ruby World!  "
+puts text.rstrip      # => "  Hello, Ruby World!"
+puts text.reverse     # => "  !dlroW ybuR ,olleH  "
 ```
 
 ---
 
-## ขั้นตอนที่ 20: Boolean, Nil, และ Symbol
+## Step 16: Boolean - true/false
 
-### Boolean
+Boolean มีเพียงสองค่า: `true` และ `false`
 
-```ruby
-# Boolean values
-is_active = true
-is_deleted = false
-
-# Truthy และ Falsy ใน Ruby
-# FALSY: false, nil (แค่สองค่านี้เท่านั้น!)
-# TRUTHY: ทุกอย่างอื่น รวมถึง 0, "", []
-
-puts "0 is truthy: #{0 ? 'yes' : 'no'}"     # => yes
-puts "'' is truthy: #{'' ? 'yes' : 'no'}"   # => yes
-puts "[] is truthy: #{[] ? 'yes' : 'no'}"   # => yes
-puts "false is falsy: #{false ? 'yes' : 'no'}"  # => no
-puts "nil is falsy: #{nil ? 'yes' : 'no'}"      # => no
-
-# Boolean methods
-puts true.class   # => TrueClass
-puts false.class  # => FalseClass
-
-puts true & false   # => false (AND)
-puts true | false   # => true  (OR)
-puts !true          # => false (NOT)
-puts true ^ false   # => true  (XOR)
-```
-
-### Nil
+### 6.1 การใช้ Boolean
 
 ```ruby
-# nil คือ absence of value
-nothing = nil
-puts nothing.class    # => NilClass
-puts nothing.nil?     # => true
-puts nothing.inspect  # => "nil"
-puts nothing.to_i     # => 0
-puts nothing.to_s     # => ""
-puts nothing.to_a     # => []
+is_student = true
+is_graduated = false
+has_job = true
 
-# nil check patterns
-user = nil
+puts is_student     # => true
+puts is_graduated   # => false
+puts is_student.class  # => TrueClass
+puts is_graduated.class # => FalseClass
 
-# แบบที่ 1: ตรวจสอบตรงๆ
-if user.nil?
-  puts "ไม่มี user"
+# Logical Operations
+puts true && true    # => true
+puts true && false   # => false
+puts false || true   # => true
+puts false || false  # => false
+puts !true           # => false
+puts !false          # => true
+
+# Truthiness ใน Ruby
+# เฉพาะ false และ nil เท่านั้นที่เป็น falsy
+# ทุกอย่างอื่นเป็น truthy (รวมถึง 0 และ "")
+if 0
+  puts "0 เป็น truthy ใน Ruby!"  # จะแสดงข้อความนี้
 end
 
-# แบบที่ 2: Conditional assignment
-user ||= "Guest"  # กำหนดค่าถ้าเป็น nil หรือ false
-puts user  # => "Guest"
-
-# Safe navigation operator (&.)
-puts user&.upcase    # => "GUEST" (ไม่ error ถ้า nil)
-puts nil&.upcase     # => nil (ไม่ error!)
-# nil.upcase         # => NoMethodError!
+if ""
+  puts "String ว่างเป็น truthy ใน Ruby!"  # จะแสดงข้อความนี้
+end
 ```
 
-### Symbol
-
 ```ruby
-# Symbol คือ immutable string-like objects
-status = :active
-puts status         # => active
-puts status.class   # => Symbol
-puts status.to_s    # => "active"
-puts "active".to_sym == :active  # => true
+# Boolean ในการเปรียบเทียบ
+a = 10
+b = 20
 
-# Symbol ใช้ memory น้อยกว่า String
-# String ทุกตัวเป็น object ใหม่
-puts "hello".object_id == "hello".object_id  # => false (ต่างกัน!)
-# Symbol ใช้ object เดิม
-puts :hello.object_id == :hello.object_id    # => true (เหมือนกัน!)
+puts a == b    # => false
+puts a != b    # => true
+puts a < b     # => true
+puts a > b     # => false
+puts a <= b    # => true
+puts a >= b    # => false
 
-# Symbol ใช้บ่อยใน Hash keys
-person = {
-  name: "Alice",     # :name เป็น key (syntax ใหม่)
-  age: 25,
-  role: :admin
-}
-
-puts person[:name]   # => "Alice"
-puts person[:role]   # => admin
-
-# Symbol methods
-sym = :hello_world
-puts sym.upcase    # => :HELLO_WORLD
-puts sym.length    # => 11
-puts sym.to_s      # => "hello_world"
-
-# Symbols เป็น immutable
-# :hello << "!"  # NoMethodError!
+# Spaceship operator
+puts a <=> b   # => -1 (a น้อยกว่า b)
+puts b <=> a   # => 1  (b มากกว่า a)
+puts a <=> a   # => 0  (เท่ากัน)
 ```
 
 ---
 
-## ขั้นตอนที่ 21: Type Conversion Methods
+## Step 17: Nil - ค่าว่าง
 
-### การแปลงชนิดข้อมูล
+Nil คือค่าว่าง ไม่มีค่า ใช้แทนการไม่มีอยู่ของข้อมูล
+
+### 7.1 การใช้ Nil
+
+```ruby
+no_value = nil
+empty_name = nil
+
+puts no_value         # => (ไม่แสดงอะไร)
+puts no_value.inspect # => nil
+puts no_value.class   # => NilClass
+puts no_value.nil?    # => true
+
+# nil เป็น falsy
+if no_value
+  puts "มีค่า"
+else
+  puts "ไม่มีค่า"  # จะแสดงข้อความนี้
+end
+
+# Safe Navigation Operator (&.) - ป้องกัน NoMethodError
+name = nil
+puts name&.upcase   # => nil (ไม่เกิด error)
+puts name&.length   # => nil
+
+name = "สมชาย"
+puts name&.upcase   # => สมชาย
+```
+
+```ruby
+# nil? vs false?
+puts nil.nil?    # => true
+puts false.nil?  # => false
+puts 0.nil?      # => false
+puts "".nil?     # => false
+
+# Nil Coalescing ด้วย ||
+user_name = nil
+display_name = user_name || "ผู้ใช้ไม่ระบุชื่อ"
+puts display_name   # => ผู้ใช้ไม่ระบุชื่อ
+
+user_name = "สมชาย"
+display_name = user_name || "ผู้ใช้ไม่ระบุชื่อ"
+puts display_name   # => สมชาย
+
+# ||= (assign ถ้าค่าเป็น nil หรือ false)
+score = nil
+score ||= 0
+puts score  # => 0
+
+score ||= 100
+puts score  # => 0 (ไม่เปลี่ยน เพราะ score ไม่ใช่ nil แล้ว)
+```
+
+---
+
+## Step 18: Symbol - :symbols
+
+Symbol คือ identifier ที่ immutable (เปลี่ยนค่าไม่ได้) มักใช้เป็น key ใน Hash
+
+### 8.1 การสร้างและใช้ Symbol
+
+```ruby
+# การสร้าง Symbol
+status = :active
+role = :admin
+color = :red
+
+puts status       # => active
+puts status.class # => Symbol
+puts :hello == :hello   # => true (Symbol เดียวกันคือ object เดียวกัน)
+
+# Symbol กับ String
+puts :hello.to_s         # => "hello"
+puts "hello".to_sym      # => :hello
+puts :hello == "hello"   # => false (คนละ class)
+puts :hello.equal?(:hello)  # => true (object เดียวกัน!)
+puts "hello".equal?("hello")  # => false (object ต่างกัน)
+```
+
+```ruby
+# Symbol ใน Hash (ใช้บ่อยมาก)
+user = {
+  name: "สมชาย",      # :name => "สมชาย"
+  age: 25,             # :age => 25
+  role: :admin         # :role => :admin
+}
+
+puts user[:name]   # => สมชาย
+puts user[:age]    # => 25
+puts user[:role]   # => admin
+
+# Symbol Methods
+sym = :hello_world
+puts sym.to_s          # => "hello_world"
+puts sym.upcase        # => :HELLO_WORLD
+puts sym.length        # => 11
+puts sym.to_proc.call("test")  # => "test" (แปลง method call)
+```
+
+```ruby
+# Symbol Array (%i)
+colors = %i[red green blue yellow]
+puts colors.inspect  # => [:red, :green, :blue, :yellow]
+puts colors.class    # => Array
+puts colors[0]       # => red
+puts colors[0].class # => Symbol
+
+# All Symbols ใน program
+# Symbol.all_symbols.first(5).each { |s| puts s }
+```
+
+---
+
+## Step 19: Type Conversion (การแปลงประเภทข้อมูล)
+
+Ruby มี Method สำหรับแปลงประเภทข้อมูลหลายรูปแบบ
+
+### 9.1 Explicit Conversion Methods
 
 ```ruby
 # to_i - แปลงเป็น Integer
-puts "42".to_i       # => 42
-puts "42.7".to_i     # => 42 (ตัดทศนิยม)
-puts "42abc".to_i    # => 42
-puts "abc".to_i      # => 0
-puts nil.to_i        # => 0
-puts true.to_i       # Error! (TrueClass ไม่มี to_i)
-puts 3.7.to_i        # => 3
+puts "42".to_i         # => 42
+puts "3.14".to_i       # => 3 (ตัดทศนิยม)
+puts "42abc".to_i      # => 42 (หยุดที่อักษร)
+puts "abc".to_i        # => 0 (ไม่ใช่ตัวเลข)
+puts 3.7.to_i          # => 3 (ตัดทศนิยม)
+puts nil.to_i          # => 0
+puts true.to_i rescue puts "ไม่สามารถแปลงได้"  # => error
+```
 
-# Integer() - strict conversion
-puts Integer("42")   # => 42
-# Integer("42abc")   # ArgumentError!
-# Integer(nil)       # TypeError!
-
+```ruby
 # to_f - แปลงเป็น Float
 puts "3.14".to_f     # => 3.14
+puts "42".to_f       # => 42.0
 puts "3.14abc".to_f  # => 3.14
 puts "abc".to_f      # => 0.0
 puts 42.to_f         # => 42.0
 puts nil.to_f        # => 0.0
+```
 
+```ruby
 # to_s - แปลงเป็น String
 puts 42.to_s         # => "42"
 puts 3.14.to_s       # => "3.14"
 puts true.to_s       # => "true"
 puts false.to_s      # => "false"
-puts nil.to_s        # => "" (empty string)
-puts :symbol.to_s    # => "symbol"
+puts nil.to_s        # => ""
+puts nil.to_s.empty? # => true
+puts :hello.to_s     # => "hello"
 puts [1,2,3].to_s    # => "[1, 2, 3]"
+```
 
+```ruby
 # to_a - แปลงเป็น Array
-puts nil.to_a.inspect        # => []
-puts (1..5).to_a.inspect     # => [1, 2, 3, 4, 5]
+puts nil.to_a.inspect         # => []
 puts {a: 1, b: 2}.to_a.inspect  # => [[:a, 1], [:b, 2]]
+puts (1..5).to_a.inspect      # => [1, 2, 3, 4, 5]
+puts "hello".chars.inspect    # => ["h", "e", "l", "l", "o"]
+```
 
-# to_sym - แปลงเป็น Symbol
-puts "hello".to_sym    # => :hello
-puts "my method".to_sym  # => :"my method"
+```ruby
+# to_h - แปลงเป็น Hash
+pairs = [[:name, "สมชาย"], [:age, 25]]
+puts pairs.to_h.inspect  # => {:name=>"สมชาย", :age=>25}
 
-# to_r - แปลงเป็น Rational
-puts 0.5.to_r          # => 1/2
-puts "1/3".to_r        # => 1/3
+# Integer() Float() String() - Strict Conversion (raise Error ถ้าแปลงไม่ได้)
+puts Integer("42")     # => 42
+puts Float("3.14")     # => 3.14
 
-# Implicit vs Explicit conversion
-class Temperature
-  def initialize(celsius)
-    @celsius = celsius
-  end
-
-  # Explicit conversion (to_s)
-  def to_s
-    "#{@celsius}°C"
-  end
-
-  # Implicit conversion (to_str - Ruby ใช้อัตโนมัติ)
-  def to_str
-    "#{@celsius}°C"
-  end
-
-  # Explicit to number
-  def to_f
-    @celsius.to_f
-  end
-
-  def to_i
-    @celsius.to_i
-  end
+begin
+  Integer("abc")
+rescue ArgumentError => e
+  puts "Error: #{e.message}"  # => Error: invalid value for Integer()
 end
-
-temp = Temperature.new(25)
-puts temp           # => 25°C (ใช้ to_s)
-puts "Temp: " + temp  # => "Temp: 25°C" (ใช้ to_str)
-puts temp.to_f      # => 25.0
 ```
 
 ---
 
-## ขั้นตอนที่ 22: Checking Variable Types
+## Step 20: Checking Types (การตรวจสอบประเภทข้อมูล)
 
-### การตรวจสอบชนิดข้อมูล
+### 10.1 การตรวจสอบประเภท
 
 ```ruby
-# class method
-puts 42.class           # => Integer
-puts 3.14.class         # => Float
-puts "hello".class      # => String
-puts true.class         # => TrueClass
-puts false.class        # => FalseClass
-puts nil.class          # => NilClass
-puts :symbol.class      # => Symbol
-puts [1,2,3].class      # => Array
-puts({a: 1}.class)      # => Hash
-puts (1..5).class       # => Range
+# .class - ดู class ของ object
+puts 42.class         # => Integer
+puts 3.14.class       # => Float
+puts "hello".class    # => String
+puts true.class       # => TrueClass
+puts false.class      # => FalseClass
+puts nil.class        # => NilClass
+puts :symbol.class    # => Symbol
+puts [1,2].class      # => Array
+puts({a: 1}.class)    # => Hash
+```
 
-# is_a? / kind_of? - ตรวจสอบว่าเป็น class นั้นหรือ subclass
+```ruby
+# is_a? / kind_of? - ตรวจสอบว่าเป็น class หรือไม่
 puts 42.is_a?(Integer)   # => true
 puts 42.is_a?(Numeric)   # => true (Integer เป็น subclass ของ Numeric)
 puts 42.is_a?(Float)     # => false
 puts 42.is_a?(Object)    # => true (ทุกอย่างเป็น Object)
 
-puts 42.kind_of?(Integer)  # => true (เหมือน is_a?)
+puts "hello".kind_of?(String)  # => true
+puts "hello".kind_of?(Object)  # => true
 
-# instance_of? - ตรวจสอบว่าเป็น class นั้นเท่านั้น (ไม่รวม subclass)
+# instance_of? - ตรวจสอบว่าเป็น class นั้นๆ ตรงๆ (ไม่รวม subclass)
 puts 42.instance_of?(Integer)  # => true
-puts 42.instance_of?(Numeric)  # => false! (Integer ไม่ใช่ Numeric โดยตรง)
+puts 42.instance_of?(Numeric)  # => false!
+```
 
+```ruby
 # respond_to? - ตรวจสอบว่า object มี method นั้นหรือไม่
 puts "hello".respond_to?(:upcase)   # => true
-puts "hello".respond_to?(:nonexistent)  # => false
+puts "hello".respond_to?(:times)    # => false
 puts 42.respond_to?(:times)         # => true
 puts 42.respond_to?(:upcase)        # => false
+puts nil.respond_to?(:nil?)         # => true
+puts nil.respond_to?(:nonexistent)  # => false
 
-# Duck typing - ตรวจสอบว่าทำ operation ได้ไหม
-def process(obj)
-  if obj.respond_to?(:each)
-    obj.each { |item| puts item }
-  elsif obj.respond_to?(:to_s)
-    puts obj.to_s
+# ใช้ respond_to? เพื่อเขียนโค้ดที่ยืดหยุ่น
+def process(value)
+  if value.respond_to?(:each)
+    value.each { |v| puts "Item: #{v}" }
+  else
+    puts "Value: #{value}"
   end
 end
 
-process([1, 2, 3])   # รัน each
-process("hello")     # รัน to_s
+process([1, 2, 3])     # => Item: 1, Item: 2, Item: 3
+process("hello")        # => Value: hello
+process(42)             # => Value: 42
+```
 
-# Comparable types
-puts Integer.ancestors.inspect
-# => [Integer, Numeric, Comparable, Object, Kernel, BasicObject]
-
-# ตรวจสอบ nil
-puts nil.nil?     # => true
-puts 0.nil?       # => false
-puts false.nil?   # => false
-puts "".nil?      # => false
-
-# ตรวจสอบ blank/present? (Rails methods)
-# puts nil.blank?    # => true (เฉพาะ Rails)
-# puts "".blank?     # => true (เฉพาะ Rails)
-# puts [].blank?     # => true (เฉพาะ Rails)
-# puts 0.blank?      # => false (เฉพาะ Rails)
+```ruby
+# Comparable Methods
+puts 5.between?(1, 10)    # => true
+puts 15.between?(1, 10)   # => false
+puts 5.clamp(1, 10)       # => 5
+puts 0.clamp(1, 10)       # => 1
+puts 15.clamp(1, 10)      # => 10
 ```
 
 ---
 
-## ขั้นตอนที่ 23: Frozen Objects
+## Step 21: Frozen Objects
 
-### Object ที่ไม่สามารถเปลี่ยนค่าได้
+Ruby 3+ ทำให้ String literals เป็น Frozen โดยอัตโนมัติ แต่เราสามารถ freeze object ได้เอง
+
+### 11.1 freeze และ frozen?
 
 ```ruby
-# freeze ทำให้ object ไม่สามารถแก้ไขได้
-str = "hello"
+# Freeze object
+str = "Hello"
 str.freeze
 
 puts str.frozen?  # => true
-# str << "!"      # FrozenError!
-# str.upcase!     # FrozenError!
-
-str_copy = str.dup  # dup สร้าง copy ที่ไม่ frozen
-str_copy << "!"
-puts str_copy  # => "hello!"
-
-# Symbol และ Integer ถูก freeze อยู่แล้ว
-puts :hello.frozen?  # => true
-puts 42.frozen?      # => true
-
-# Frozen Array
-arr = [1, 2, 3].freeze
-# arr << 4        # FrozenError!
-# arr.push(4)     # FrozenError!
-arr_copy = arr.dup  # copy ที่ไม่ frozen
-
-# Frozen Hash
-config = {
-  host: "localhost",
-  port: 5432
-}.freeze
-# config[:host] = "remote"  # FrozenError!
-
-# String Literals - frozen_string_literal magic comment
-# # frozen_string_literal: true
-# ใส่ที่บรรทัดแรกของไฟล์ทำให้ string ทุกตัวถูก freeze
-
-# ตัวอย่าง immutable value object
-class Point
-  attr_reader :x, :y
-
-  def initialize(x, y)
-    @x = x
-    @y = y
-    freeze  # freeze ตัวเอง
-  end
-
-  def +(other)
-    Point.new(@x + other.x, @y + other.y)
-  end
-
-  def to_s
-    "(#{@x}, #{@y})"
-  end
-end
-
-p1 = Point.new(1, 2)
-p2 = Point.new(3, 4)
-p3 = p1 + p2
-
-puts p1  # => (1, 2)
-puts p2  # => (3, 4)
-puts p3  # => (4, 6)
-puts p1.frozen?  # => true
-```
-
----
-
-## ขั้นตอนที่ 24: Multiple Assignment และ Swap
-
-### Multiple Assignment
-
-```ruby
-# กำหนดหลายตัวแปรพร้อมกัน
-a, b, c = 1, 2, 3
-puts "#{a}, #{b}, #{c}"  # => 1, 2, 3
-
-# Splat operator (*)
-first, *rest = [1, 2, 3, 4, 5]
-puts first        # => 1
-puts rest.inspect # => [2, 3, 4, 5]
-
-*beginning, last = [1, 2, 3, 4, 5]
-puts beginning.inspect  # => [1, 2, 3, 4]
-puts last               # => 5
-
-head, *middle, tail = [1, 2, 3, 4, 5]
-puts head           # => 1
-puts middle.inspect # => [2, 3, 4]
-puts tail           # => 5
-
-# Nested assignment
-a, (b, c) = 1, [2, 3]
-puts "#{a}, #{b}, #{c}"  # => 1, 2, 3
-
-# Swap variables
-x = 10
-y = 20
-x, y = y, x  # Swap ด้วย Ruby idiom!
-puts "x=#{x}, y=#{y}"  # => x=20, y=10
-
-# แบบเดิม (ต้องใช้ temp variable)
-# temp = x
-# x = y
-# y = temp
-
-# Swap หลายค่า
-a, b, c = 1, 2, 3
-a, b, c = c, a, b  # rotate!
-puts "#{a}, #{b}, #{c}"  # => 3, 1, 2
-
-# จาก Method return หลายค่า
-def min_max(arr)
-  [arr.min, arr.max]
-end
-
-min, max = min_max([3, 1, 4, 1, 5, 9, 2, 6])
-puts "min=#{min}, max=#{max}"  # => min=1, max=9
-
-# Ignore บางค่า ด้วย _
-_, second, _ = [1, 2, 3]
-puts second  # => 2
-
-first, _, _, fourth = [10, 20, 30, 40]
-puts "#{first}, #{fourth}"  # => 10, 40
-```
-
----
-
-## ขั้นตอนที่ 25: String Interpolation และแบบฝึกหัด
-
-### String Interpolation ขั้นสูง
-
-```ruby
-name = "Alice"
-age = 25
-score = 98.765
-
-# Basic interpolation
-puts "ชื่อ: #{name}"
-puts "อายุ: #{age} ปี"
-puts "คะแนน: #{score}"
-
-# Expression ใน interpolation
-puts "ปีเกิด: #{2024 - age}"
-puts "คะแนนเต็ม: #{score.round(1)}%"
-
-# Method call ใน interpolation
-puts "ชื่อใหญ่: #{name.upcase}"
-puts "ชื่อกลับ: #{name.reverse}"
-
-# Conditional ใน interpolation
-grade = score >= 90 ? "A" : "B"
-puts "เกรด: #{grade}"
-
-# Complex expression
-items = [1, 2, 3, 4, 5]
-puts "รวม: #{items.sum}, เฉลี่ย: #{items.sum.to_f / items.length}"
-
-# Multi-line string
-message = "
-  สวัสดี #{name}!
-  คุณอายุ #{age} ปี
-  คะแนน: #{score.round(2)}%
-  เกรด: #{grade}
-".strip
-
-puts message
-
-# Heredoc
-report = <<~HEREDOC
-  === รายงานผล ===
-  นักเรียน: #{name}
-  อายุ: #{age}
-  คะแนน: #{score.round(2)}
-  เกรด: #{grade}
-  วันที่: #{Time.now.strftime("%d/%m/%Y")}
-HEREDOC
-
-puts report
-
-# Format String
-printf("%-10s %5d %8.2f\n", name, age, score)
-# Alice         25    98.77
-
-formatted = format("ชื่อ: %-10s | คะแนน: %6.2f%%", name, score)
-puts formatted
-
-# % operator (sprintf shorthand)
-puts "Hello, %s! You are %d years old." % [name, age]
-```
-
----
-
-## แบบฝึกหัด 15 ข้อ
-
-### แบบฝึกหัดที่ 1: ตัวแปรและการแสดงผล
-
-```ruby
-# เขียนโปรแกรมเก็บข้อมูลนักเรียนและแสดงผล
-student_name = "สมชาย"
-student_id = "STD001"
-grade_level = 10
-gpa = 3.75
-is_honor_roll = gpa >= 3.5
-
-puts "=== ข้อมูลนักเรียน ==="
-puts "ชื่อ: #{student_name}"
-puts "รหัส: #{student_id}"
-puts "ชั้น: #{grade_level}"
-puts "GPA: #{gpa}"
-puts "เกียรตินิยม: #{is_honor_roll ? 'ใช่' : 'ไม่ใช่'}"
-```
-
-### แบบฝึกหัดที่ 2: Type Checking
-
-```ruby
-# เขียน method ที่ตรวจสอบชนิดและแสดงข้อมูล
-def describe(value)
-  puts "ค่า: #{value.inspect}"
-  puts "ชนิด: #{value.class}"
-  puts "Frozen: #{value.frozen?}"
-
-  case value
-  when Integer then puts "ลักษณะ: จำนวนเต็ม #{value.even? ? 'คู่' : 'คี่'}"
-  when Float   then puts "ลักษณะ: ทศนิยม #{value > 0 ? 'บวก' : 'ลบ'}"
-  when String  then puts "ลักษณะ: ข้อความ ยาว #{value.length} ตัวอักษร"
-  when Array   then puts "ลักษณะ: Array มี #{value.length} สมาชิก"
-  when NilClass then puts "ลักษณะ: ไม่มีค่า"
-  when TrueClass, FalseClass then puts "ลักษณะ: Boolean"
-  end
-  puts "-" * 30
-end
-
-describe(42)
-describe(3.14)
-describe("Hello")
-describe([1, 2, 3])
-describe(nil)
-describe(true)
-```
-
-### แบบฝึกหัดที่ 3: Constants ในโปรแกรม
-
-```ruby
-module ShippingRates
-  STANDARD_RATE = 50
-  EXPRESS_RATE = 150
-  OVERNIGHT_RATE = 300
-  FREE_SHIPPING_MINIMUM = 500
-
-  def self.calculate(total, method)
-    return 0 if total >= FREE_SHIPPING_MINIMUM
-
-    case method
-    when :standard  then STANDARD_RATE
-    when :express   then EXPRESS_RATE
-    when :overnight then OVERNIGHT_RATE
-    else raise "Unknown shipping method: #{method}"
-    end
-  end
-end
-
-orders = [
-  { items: 200, method: :standard },
-  { items: 600, method: :express },
-  { items: 150, method: :overnight }
-]
-
-orders.each do |order|
-  shipping = ShippingRates.calculate(order[:items], order[:method])
-  total = order[:items] + shipping
-  puts "สินค้า: #{order[:items]} บาท | ค่าส่ง: #{shipping} บาท | รวม: #{total} บาท"
-end
-```
-
-### แบบฝึกหัดที่ 4: Multiple Assignment
-
-```ruby
-# ใช้ multiple assignment แก้ปัญหา
-def stats(numbers)
-  sorted = numbers.sort
-  [sorted.first, sorted.last, numbers.sum, numbers.sum.to_f / numbers.size]
-end
-
-data = [23, 45, 12, 67, 34, 89, 11, 56]
-min, max, total, average = stats(data)
-
-puts "ข้อมูล: #{data.join(', ')}"
-puts "ต่ำสุด: #{min}"
-puts "สูงสุด: #{max}"
-puts "ผลรวม: #{total}"
-puts "ค่าเฉลี่ย: #{average.round(2)}"
-```
-
-### แบบฝึกหัดที่ 5: Global vs Local Scope
-
-```ruby
-$application_name = "Ruby Course App"
-$request_count = 0
-
-def handle_request(path)
-  $request_count += 1
-  local_response = "Response for #{path}"
-
-  puts "Request ##{$request_count}: #{path}"
-  puts "App: #{$application_name}"
-
-  local_response  # return
-end
-
-["/" , "/about", "/contact"].each do |path|
-  response = handle_request(path)
-  puts "Got: #{response}"
-  puts "-" * 40
-end
-
-puts "Total requests: #{$request_count}"
-```
-
-### แบบฝึกหัดที่ 6: Symbol vs String
-
-```ruby
-# เปรียบเทียบ performance และการใช้งาน
-require 'benchmark'
-
-n = 1_000_000
-
-time_string = Benchmark.realtime do
-  n.times { "hello" == "hello" }
-end
-
-time_symbol = Benchmark.realtime do
-  n.times { :hello == :hello }
-end
-
-puts "String comparison: #{time_string.round(4)} seconds"
-puts "Symbol comparison: #{time_symbol.round(4)} seconds"
-puts "Symbol เร็วกว่า #{(time_string / time_symbol).round(2)}x"
-
-# การใช้งาน Symbol เป็น Hash key
-config = {
-  database: "mydb",
-  host: "localhost",
-  port: 5432,
-  pool: 5
-}
-
-puts "\nConfiguration:"
-config.each do |key, value|
-  puts "  #{key}: #{value}"
-end
-```
-
-### แบบฝึกหัดที่ 7: Type Conversion Chain
-
-```ruby
-# แปลงชนิดข้อมูลในหลายขั้นตอน
-user_input = "  42.5  "
-
-# แปลงทีละขั้น
-step1 = user_input.strip      # ลบ whitespace
-step2 = step1.to_f            # แปลงเป็น Float
-step3 = step2.round           # ปัดเป็น Integer
-step4 = step3.to_s            # กลับเป็น String
-step5 = step4 + " items"      # ต่อ String
-
-puts "ต้นฉบับ: #{user_input.inspect}"
-puts "หลัง strip: #{step1.inspect}"
-puts "หลัง to_f: #{step2}"
-puts "หลัง round: #{step3}"
-puts "หลัง to_s: #{step4.inspect}"
-puts "ผลลัพธ์: #{step5}"
-
-# Method chain
-result = "  42.5  ".strip.to_f.round.to_s + " items"
-puts "Method chain: #{result}"
-```
-
-### แบบฝึกหัดที่ 8: Immutable Configuration
-
-```ruby
-# สร้าง configuration ที่ไม่สามารถเปลี่ยนแปลงได้
-module AppConfig
-  DATABASE = {
-    host: "localhost",
-    port: 5432,
-    name: "production_db",
-    pool: 5
-  }.freeze
-
-  CACHE = {
-    provider: :redis,
-    host: "localhost",
-    port: 6379,
-    ttl: 3600
-  }.freeze
-
-  ALLOWED_ORIGINS = [
-    "https://example.com",
-    "https://api.example.com"
-  ].freeze
-
-  def self.database_url
-    "postgresql://#{DATABASE[:host]}:#{DATABASE[:port]}/#{DATABASE[:name]}"
-  end
-end
-
-puts "Database URL: #{AppConfig.database_url}"
-puts "Cache TTL: #{AppConfig::CACHE[:ttl]} seconds"
-puts "Allowed origins: #{AppConfig::ALLOWED_ORIGINS.join(', ')}"
 
 begin
-  AppConfig::DATABASE[:host] = "remote"
-rescue => e
-  puts "Error: #{e.class}: #{e.message}"
+  str << " World"  # พยายามเปลี่ยน frozen string
+rescue FrozenError => e
+  puts "Error: #{e.message}"  # => Error: can't modify frozen String
+end
+
+# Numbers และ Symbol เป็น frozen โดยอัตโนมัติ
+puts 42.frozen?       # => true
+puts :symbol.frozen?  # => true
+puts true.frozen?     # => true
+puts nil.frozen?      # => true
+```
+
+```ruby
+# Frozen String Literal Comment
+# เพิ่มที่ต้นไฟล์: # frozen_string_literal: true
+# ทำให้ทุก String literal เป็น frozen
+
+# ตัวอย่างการใช้ freeze เพื่อประหยัด memory
+COLORS = ["red", "green", "blue"].freeze
+STATUSES = { active: "Active", inactive: "Inactive" }.freeze
+
+begin
+  COLORS.push("yellow")
+rescue FrozenError => e
+  puts "ไม่สามารถเพิ่ม element ใน frozen array: #{e.message}"
+end
+
+# แต่สามารถอ่านได้
+puts COLORS.inspect   # => ["red", "green", "blue"]
+puts STATUSES[:active]  # => Active
+```
+
+```ruby
+# dup vs clone - ความแตกต่างเมื่อ copy frozen object
+frozen_str = "hello".freeze
+
+duped  = frozen_str.dup    # copy แต่ไม่ frozen
+cloned = frozen_str.clone  # copy และยัง frozen
+
+puts duped.frozen?   # => false
+puts cloned.frozen?  # => true
+
+duped << " world"    # OK
+puts duped           # => hello world
+
+begin
+  cloned << " world"
+rescue FrozenError
+  puts "ไม่สามารถเปลี่ยน cloned frozen string"
 end
 ```
 
-### แบบฝึกหัดที่ 9: Nil Safety
+---
+
+## Step 22: Multiple Assignment (การกำหนดค่าหลายตัวแปร)
+
+### 12.1 Parallel Assignment
 
 ```ruby
-# เขียนโค้ดที่ปลอดภัยจาก nil
-class UserProfile
-  attr_reader :name, :email, :address
+# กำหนดค่าหลายตัวแปรพร้อมกัน
+a, b, c = 1, 2, 3
+puts "#{a}, #{b}, #{c}"  # => 1, 2, 3
 
-  def initialize(name, email, address = nil)
-    @name = name
-    @email = email
-    @address = address
-  end
+# ถ้าค่าน้อยกว่าตัวแปร ที่เหลือจะเป็น nil
+x, y, z = 10, 20
+puts "#{x}, #{y}, #{z}"  # => 10, 20,
 
-  def city
-    @address&.[](:city)  # safe navigation
-  end
-
-  def display_location
-    city || "ไม่ระบุเมือง"
-  end
-
-  def full_info
-    [
-      "ชื่อ: #{@name}",
-      "Email: #{@email}",
-      "เมือง: #{display_location}"
-    ].join("\n")
-  end
-end
-
-user1 = UserProfile.new("Alice", "alice@example.com", { city: "Bangkok" })
-user2 = UserProfile.new("Bob", "bob@example.com")
-
-[user1, user2].each do |user|
-  puts user.full_info
-  puts "-" * 30
-end
+# ถ้าค่ามากกว่าตัวแปร ค่าที่เกินจะถูกละทิ้ง
+p, q = 1, 2, 3, 4
+puts "#{p}, #{q}"  # => 1, 2
 ```
 
-### แบบฝึกหัดที่ 10: Class Variable Counter
+```ruby
+# Splat operator (*) - เก็บค่าที่เหลือ
+first, *rest = [1, 2, 3, 4, 5]
+puts "first: #{first}"        # => first: 1
+puts "rest: #{rest.inspect}"  # => rest: [2, 3, 4, 5]
+
+*beginning, last = [1, 2, 3, 4, 5]
+puts "beginning: #{beginning.inspect}"  # => beginning: [1, 2, 3, 4]
+puts "last: #{last}"                    # => last: 5
+
+first, *middle, last = [1, 2, 3, 4, 5]
+puts "first: #{first}"          # => first: 1
+puts "middle: #{middle.inspect}" # => middle: [2, 3, 4]
+puts "last: #{last}"            # => last: 5
+```
+
+### 12.2 Swap ตัวแปร
 
 ```ruby
+# การสลับค่าระหว่างตัวแปร
+a = 10
+b = 20
+
+puts "ก่อน: a=#{a}, b=#{b}"  # => ก่อน: a=10, b=20
+
+# Swap แบบ Ruby
+a, b = b, a
+
+puts "หลัง: a=#{a}, b=#{b}"  # => หลัง: a=20, b=10
+
+# Swap 3 ตัวแปร
+x = 1
+y = 2
+z = 3
+
+x, y, z = z, x, y
+puts "x=#{x}, y=#{y}, z=#{z}"  # => x=3, y=1, z=2
+```
+
+```ruby
+# Destructuring จาก Array
+point = [10, 20]
+x, y = point
+puts "x=#{x}, y=#{y}"  # => x=10, y=20
+
+# Destructuring จาก Method ที่คืน Array
+def min_max(array)
+  [array.min, array.max]
+end
+
+min, max = min_max([5, 3, 8, 1, 9])
+puts "min=#{min}, max=#{max}"  # => min=1, max=9
+
+# Nested destructuring
+first, (second_a, second_b), third = [1, [2, 3], 4]
+puts "#{first}, #{second_a}, #{second_b}, #{third}"  # => 1, 2, 3, 4
+```
+
+---
+
+## Step 23: Constants (ค่าคงที่)
+
+### 13.1 การใช้ Constants
+
+```ruby
+# Constants ต้องขึ้นต้นด้วยตัวพิมพ์ใหญ่
+MAX_SIZE = 100
+PI = 3.14159265358979
+SITE_NAME = "Ruby Course"
+SUPPORTED_FORMATS = ["jpg", "png", "gif"].freeze
+
+puts MAX_SIZE      # => 100
+puts PI            # => 3.14159265358979
+puts SITE_NAME     # => Ruby Course
+
+# Constants ใน Class
+class Circle
+  PI = 3.14159265358979
+  
+  def initialize(radius)
+    @radius = radius
+  end
+  
+  def area
+    PI * @radius ** 2
+  end
+  
+  def circumference
+    2 * PI * @radius
+  end
+end
+
+circle = Circle.new(5)
+puts circle.area.round(2)          # => 78.54
+puts circle.circumference.round(2) # => 31.42
+puts Circle::PI                    # => 3.14159265358979
+```
+
+```ruby
+# Ruby จะเตือนถ้าพยายามเปลี่ยนค่า Constant
+MAX_SIZE = 100
+# MAX_SIZE = 200  # => warning: already initialized constant MAX_SIZE
+
+# ป้องกัน Constants Array/Hash ด้วย freeze
+VALID_COLORS = %w[red green blue yellow].freeze
+CONFIG = { max_connections: 100, timeout: 30 }.freeze
+
+puts VALID_COLORS.inspect
+puts CONFIG.inspect
+```
+
+---
+
+## Step 24: การใช้งานขั้นสูง
+
+### 14.1 Object ID และ Object Identity
+
+```ruby
+# object_id - ID ที่ unique ของ object
+puts 1.object_id    # => 3 (fixed: 2*n+1 สำหรับ Integer)
+puts 2.object_id    # => 5
+puts true.object_id  # => 2 (fixed)
+puts false.object_id # => 0 (fixed)
+puts nil.object_id   # => 8 (fixed)
+
+# Symbol ใช้ object เดียวกัน
+puts :hello.object_id == :hello.object_id  # => true
+
+# String ใช้ object ต่างกัน
+str1 = "hello"
+str2 = "hello"
+puts str1.object_id == str2.object_id  # => false
+puts str1 == str2                       # => true (ค่าเท่ากัน)
+
+# equal? - ตรวจสอบว่าเป็น object เดียวกัน (ตรวจ object_id)
+puts str1.equal?(str2)  # => false
+puts :hello.equal?(:hello)  # => true
+```
+
+```ruby
+# Frozen String Interning (String.intern)
+str1 = "hello".freeze
+str2 = "hello".freeze
+
+# ใน Ruby บางกรณี frozen string อาจเป็น object เดียวกัน
+puts str1.frozen?  # => true
+puts str2.frozen?  # => true
+```
+
+### 14.2 Encoding
+
+```ruby
+# String encoding
+str = "สวัสดีครับ"
+puts str.encoding          # => UTF-8
+
+# ตรวจสอบ valid encoding
+puts str.valid_encoding?   # => true
+puts str.length            # => 10 (จำนวนตัวอักษร)
+puts str.bytesize          # => 30 (จำนวน bytes ใน UTF-8)
+```
+
+---
+
+## Step 25: แบบฝึกหัด
+
+### แบบฝึกหัดที่ 1
+สร้าง Local Variables สำหรับข้อมูลนักเรียน แล้วแสดงผล
+
+```ruby
+# เฉลย
+student_id = "ST001"
+student_name = "นางสาวมาลี"
+student_grade = "A"
+student_gpa = 3.85
+is_honor_student = true
+
+puts "รหัส: #{student_id}"
+puts "ชื่อ: #{student_name}"
+puts "เกรด: #{student_grade}"
+puts "GPA: #{student_gpa}"
+puts "เกียรตินิยม: #{is_honor_student ? 'ใช่' : 'ไม่ใช่'}"
+```
+
+### แบบฝึกหัดที่ 2
+สร้าง Class สินค้า พร้อม Class Variable นับจำนวน
+
+```ruby
+# เฉลย
 class Product
-  @@total_products = 0
-  @@total_value = 0
-
-  attr_reader :name, :price, :quantity
-
-  def initialize(name, price, quantity)
+  @@count = 0
+  
+  attr_reader :name, :price
+  
+  def initialize(name, price)
     @name = name
     @price = price
-    @quantity = quantity
-    @@total_products += 1
-    @@total_value += price * quantity
+    @@count += 1
   end
-
-  def total_value
-    @price * @quantity
+  
+  def self.count
+    @@count
   end
+end
 
-  def self.total_products
-    @@total_products
+Product.new("แอปเปิ้ล", 50)
+Product.new("กล้วย", 20)
+Product.new("มะม่วง", 80)
+
+puts "สินค้าทั้งหมด: #{Product.count} รายการ"  # => 3
+```
+
+### แบบฝึกหัดที่ 3
+ทดสอบการแปลงประเภทข้อมูล
+
+```ruby
+# เฉลย
+values = ["42", "3.14", "hello", nil, true, false, :symbol]
+
+values.each do |val|
+  puts "#{val.inspect} => to_s: #{val.to_s.inspect}, class: #{val.class}"
+end
+```
+
+### แบบฝึกหัดที่ 4
+ใช้ Multiple Assignment เรียงลำดับตัวเลข
+
+```ruby
+# เฉลย
+a = 30
+b = 10
+c = 20
+
+# เรียงจากน้อยไปมาก
+a, b, c = [a, b, c].sort
+puts "#{a}, #{b}, #{c}"  # => 10, 20, 30
+```
+
+### แบบฝึกหัดที่ 5
+ตรวจสอบประเภทข้อมูลและบอก type
+
+```ruby
+# เฉลย
+def describe_type(value)
+  case value
+  when Integer then "จำนวนเต็ม"
+  when Float   then "ทศนิยม"
+  when String  then "ข้อความ"
+  when TrueClass, FalseClass then "บูลีน"
+  when NilClass  then "ค่าว่าง"
+  when Symbol    then "สัญลักษณ์"
+  when Array     then "อาร์เรย์"
+  when Hash      then "แฮช"
+  else "ไม่รู้จัก"
   end
+end
 
+puts describe_type(42)        # => จำนวนเต็ม
+puts describe_type(3.14)      # => ทศนิยม
+puts describe_type("hello")   # => ข้อความ
+puts describe_type(true)      # => บูลีน
+puts describe_type(nil)       # => ค่าว่าง
+puts describe_type(:foo)      # => สัญลักษณ์
+puts describe_type([])        # => อาร์เรย์
+puts describe_type({})        # => แฮช
+```
+
+### แบบฝึกหัดที่ 6
+สร้าง Frozen Configuration
+
+```ruby
+# เฉลย
+DATABASE_CONFIG = {
+  host: "localhost",
+  port: 5432,
+  name: "myapp_production",
+  pool: 5
+}.freeze
+
+puts "Host: #{DATABASE_CONFIG[:host]}"
+puts "Port: #{DATABASE_CONFIG[:port]}"
+
+begin
+  DATABASE_CONFIG[:host] = "remote.server.com"
+rescue FrozenError => e
+  puts "ไม่สามารถเปลี่ยนค่าได้: #{e.message}"
+end
+```
+
+### แบบฝึกหัดที่ 7
+ใช้ Symbol แทน String ใน Hash
+
+```ruby
+# เฉลย
+# ไม่ดี (ใช้ String)
+user_string = {
+  "name" => "สมชาย",
+  "age" => 25,
+  "email" => "somchai@example.com"
+}
+
+# ดี (ใช้ Symbol)
+user_symbol = {
+  name: "สมชาย",
+  age: 25,
+  email: "somchai@example.com"
+}
+
+puts user_symbol[:name]
+puts user_symbol[:age]
+
+# Symbol ประหยัด memory มากกว่า String
+str_a = "status"
+str_b = "status"
+sym_a = :status
+sym_b = :status
+
+puts "String same object? #{str_a.equal?(str_b)}"  # => false
+puts "Symbol same object? #{sym_a.equal?(sym_b)}"  # => true
+```
+
+### แบบฝึกหัดที่ 8
+ใช้ respond_to? เขียน flexible method
+
+```ruby
+# เฉลย
+def smart_display(value)
+  if value.respond_to?(:join)
+    puts "Array: #{value.join(', ')}"
+  elsif value.respond_to?(:keys)
+    puts "Hash keys: #{value.keys.join(', ')}"
+  elsif value.respond_to?(:to_str)
+    puts "String: #{value}"
+  else
+    puts "Other (#{value.class}): #{value}"
+  end
+end
+
+smart_display([1, 2, 3])                # => Array: 1, 2, 3
+smart_display({a: 1, b: 2})            # => Hash keys: a, b
+smart_display("Hello Ruby")             # => String: Hello Ruby
+smart_display(42)                       # => Other (Integer): 42
+```
+
+### แบบฝึกหัดที่ 9
+Destructuring Complex Data
+
+```ruby
+# เฉลย
+students = [
+  ["ST001", "สมชาย", [90, 85, 92]],
+  ["ST002", "สมหญิง", [88, 95, 80]],
+  ["ST003", "สมศรี", [75, 82, 88]]
+]
+
+students.each do |id, name, scores|
+  avg = scores.sum.to_f / scores.length
+  puts "#{id}: #{name} - เฉลี่ย #{avg.round(1)}"
+end
+# ST001: สมชาย - เฉลี่ย 89.0
+# ST002: สมหญิง - เฉลี่ย 87.7
+# ST003: สมศรี - เฉลี่ย 81.7
+```
+
+### แบบฝึกหัดที่ 10
+Type Checking and Safe Operations
+
+```ruby
+# เฉลย
+def safe_divide(a, b)
+  unless a.is_a?(Numeric) && b.is_a?(Numeric)
+    return "Error: ต้องการตัวเลข"
+  end
+  
+  return "Error: ไม่สามารถหารด้วยศูนย์" if b.zero?
+  
+  result = a.to_f / b
+  result.round(4)
+end
+
+puts safe_divide(10, 3)      # => 3.3333
+puts safe_divide(10, 0)      # => Error: ไม่สามารถหารด้วยศูนย์
+puts safe_divide("10", 3)    # => Error: ต้องการตัวเลข
+puts safe_divide(10, "abc")  # => Error: ต้องการตัวเลข
+```
+
+### แบบฝึกหัดที่ 11
+Instance Variables และ Getter/Setter
+
+```ruby
+# เฉลย
+class Temperature
+  def initialize(celsius)
+    @celsius = celsius.to_f
+  end
+  
+  def celsius
+    @celsius
+  end
+  
+  def celsius=(value)
+    @celsius = value.to_f
+  end
+  
+  def fahrenheit
+    (@celsius * 9.0 / 5.0) + 32
+  end
+  
+  def kelvin
+    @celsius + 273.15
+  end
+  
+  def to_s
+    "#{@celsius}°C = #{fahrenheit}°F = #{kelvin}K"
+  end
+end
+
+temp = Temperature.new(100)
+puts temp           # => 100.0°C = 212.0°F = 373.15K
+
+temp.celsius = 0
+puts temp           # => 0.0°C = 32.0°F = 273.15K
+
+temp.celsius = -40
+puts temp           # => -40.0°C = -40.0°F = 233.15K
+```
+
+### แบบฝึกหัดที่ 12
+Global Variables สำหรับ Application Config
+
+```ruby
+# เฉลย
+$log_level = :info
+$app_env = :development
+
+def log(message, level = :info)
+  levels = { debug: 0, info: 1, warn: 2, error: 3 }
+  return if levels[level] < levels[$log_level]
+  
+  timestamp = Time.now.strftime("%H:%M:%S")
+  puts "[#{timestamp}] [#{level.to_s.upcase}] #{message}"
+end
+
+$log_level = :warn
+
+log("ข้อความ debug", :debug)  # ไม่แสดง
+log("ข้อความ info", :info)    # ไม่แสดง
+log("ข้อความ warn", :warn)    # => [xx:xx:xx] [WARN] ข้อความ warn
+log("ข้อความ error", :error)  # => [xx:xx:xx] [ERROR] ข้อความ error
+```
+
+### แบบฝึกหัดที่ 13
+Nil Safety Pattern
+
+```ruby
+# เฉลย
+class UserProfile
+  def initialize(data)
+    @data = data
+  end
+  
+  def display_name
+    @data[:first_name]&.capitalize.to_s +
+    " " +
+    @data[:last_name]&.capitalize.to_s
+  end
+  
+  def email
+    @data[:email] || "ไม่ได้ระบุ email"
+  end
+  
+  def age
+    @data[:age]&.to_i || 0
+  end
+end
+
+user1 = UserProfile.new({ first_name: "john", last_name: "doe", email: "john@example.com", age: "25" })
+user2 = UserProfile.new({ first_name: "Jane" })
+
+puts user1.display_name  # => John Doe
+puts user1.email         # => john@example.com
+puts user1.age           # => 25
+
+puts user2.display_name  # => Jane 
+puts user2.email         # => ไม่ได้ระบุ email
+puts user2.age           # => 0
+```
+
+### แบบฝึกหัดที่ 14
+Constants ใน Module
+
+```ruby
+# เฉลย
+module MathConstants
+  PI = Math::PI
+  E = Math::E
+  GOLDEN_RATIO = 1.6180339887
+  
+  def self.circle_area(r)
+    PI * r ** 2
+  end
+  
+  def self.sphere_volume(r)
+    (4.0/3.0) * PI * r ** 3
+  end
+end
+
+puts MathConstants::PI.round(5)           # => 3.14159
+puts MathConstants::GOLDEN_RATIO          # => 1.6180339887
+puts MathConstants.circle_area(5).round(2)  # => 78.54
+puts MathConstants.sphere_volume(3).round(2) # => 113.1
+```
+
+### แบบฝึกหัดที่ 15
+สร้าง Complex Data Manipulation
+
+```ruby
+# เฉลย
+# ระบบคลังสินค้า
+class Inventory
+  @@items = {}
+  
+  def self.add_item(name, quantity, price)
+    if @@items.key?(name)
+      @@items[name][:quantity] += quantity
+    else
+      @@items[name] = {
+        quantity: quantity,
+        price: price,
+        added_at: Time.now
+      }
+    end
+  end
+  
+  def self.remove_item(name, quantity)
+    return "ไม่พบสินค้า #{name}" unless @@items.key?(name)
+    
+    if @@items[name][:quantity] < quantity
+      return "สินค้าไม่เพียงพอ"
+    end
+    
+    @@items[name][:quantity] -= quantity
+    @@items.delete(name) if @@items[name][:quantity].zero?
+    "ลบสินค้า #{name} จำนวน #{quantity} ชิ้น"
+  end
+  
   def self.total_value
-    @@total_value
+    @@items.sum { |_, v| v[:quantity] * v[:price] }
   end
-
-  def self.summary
-    puts "=== สรุปสินค้า ==="
-    puts "จำนวนรายการ: #{@@total_products}"
-    puts "มูลค่ารวม: #{@@total_value.to_s.gsub(/\B(?=(\d{3})+(?!\d))/, ',')} บาท"
-  end
-end
-
-products = [
-  Product.new("Laptop", 35000, 10),
-  Product.new("Mouse", 500, 50),
-  Product.new("Keyboard", 1500, 30),
-  Product.new("Monitor", 8000, 15)
-]
-
-products.each do |p|
-  puts "#{p.name}: #{p.quantity} ชิ้น × #{p.price} = #{p.total_value.to_s.gsub(/\B(?=(\d{3})+(?!\d))/, ',')} บาท"
-end
-
-Product.summary
-```
-
-### แบบฝึกหัดที่ 11: Swap Array Elements
-
-```ruby
-def sort_without_sort(arr)
-  n = arr.length
-  n.times do |i|
-    (n - i - 1).times do |j|
-      arr[j], arr[j+1] = arr[j+1], arr[j] if arr[j] > arr[j+1]
+  
+  def self.report
+    puts "=== รายงานคลังสินค้า ==="
+    @@items.each do |name, data|
+      puts "#{name}: #{data[:quantity]} ชิ้น @ #{data[:price]} บาท"
     end
-  end
-  arr
-end
-
-numbers = [64, 34, 25, 12, 22, 11, 90]
-puts "ก่อน: #{numbers.inspect}"
-sorted = sort_without_sort(numbers.dup)
-puts "หลัง: #{sorted.inspect}"
-```
-
-### แบบฝึกหัดที่ 12: Instance Variable ใน Class
-
-```ruby
-class ShoppingCart
-  def initialize
-    @items = []
-    @discount = 0
-  end
-
-  def add_item(name, price, quantity = 1)
-    @items << { name: name, price: price, quantity: quantity }
-    puts "เพิ่ม #{name} (#{quantity} ชิ้น) แล้ว"
-  end
-
-  def apply_discount(percent)
-    @discount = percent
-    puts "ใช้ส่วนลด #{percent}%"
-  end
-
-  def subtotal
-    @items.sum { |item| item[:price] * item[:quantity] }
-  end
-
-  def discount_amount
-    subtotal * @discount / 100.0
-  end
-
-  def total
-    subtotal - discount_amount
-  end
-
-  def receipt
-    puts "\n=== ใบเสร็จ ==="
-    @items.each do |item|
-      printf("%-20s %3d × %8.2f = %10.2f\n",
-             item[:name], item[:quantity], item[:price],
-             item[:price] * item[:quantity])
-    end
-    puts "-" * 50
-    printf("%-30s %16.2f\n", "ราคารวม:", subtotal)
-    printf("%-30s %16.2f\n", "ส่วนลด #{@discount}%:", -discount_amount) if @discount > 0
-    printf("%-30s %16.2f\n", "ยอดสุทธิ:", total)
+    puts "มูลค่ารวม: #{total_value} บาท"
   end
 end
 
-cart = ShoppingCart.new
-cart.add_item("แล็ปท็อป", 35000)
-cart.add_item("เมาส์", 500, 2)
-cart.add_item("คีย์บอร์ด", 1500)
-cart.apply_discount(10)
-cart.receipt
-```
+Inventory.add_item("แอปเปิ้ล", 100, 50)
+Inventory.add_item("กล้วย", 200, 20)
+Inventory.add_item("มะม่วง", 50, 80)
+Inventory.add_item("แอปเปิ้ล", 50, 50)
 
-### แบบฝึกหัดที่ 13: String Interpolation สร้าง Report
+Inventory.report
 
-```ruby
-class SalesReport
-  def initialize(month, year)
-    @month = month
-    @year = year
-    @sales = []
-  end
+puts Inventory.remove_item("กล้วย", 30)  # => ลบสินค้า กล้วย จำนวน 30 ชิ้น
+puts Inventory.remove_item("ทุเรียน", 5)  # => ไม่พบสินค้า ทุเรียน
 
-  def add_sale(product, amount, units)
-    @sales << { product: product, amount: amount, units: units }
-  end
-
-  def generate
-    total_revenue = @sales.sum { |s| s[:amount] * s[:units] }
-    total_units = @sales.sum { |s| s[:units] }
-    best_seller = @sales.max_by { |s| s[:units] }
-
-    <<~REPORT
-      ╔═══════════════════════════════════════╗
-      ║        รายงานยอดขาย #{@month}/#{@year}            ║
-      ╚═══════════════════════════════════════╝
-
-      รายละเอียด:
-      #{@sales.map { |s| "  • #{s[:product]}: #{s[:units]} ชิ้น = #{(s[:amount] * s[:units]).to_s.reverse.gsub(/(\d{3})(?=\d)/, '\\1,').reverse} บาท" }.join("\n")}
-
-      สรุป:
-        รวมสินค้า: #{total_units} ชิ้น
-        รวมรายได้: #{total_revenue.to_s.reverse.gsub(/(\d{3})(?=\d)/, '\\1,').reverse} บาท
-        ขายดีสุด: #{best_seller[:product]} (#{best_seller[:units]} ชิ้น)
-    REPORT
-  end
-end
-
-report = SalesReport.new("มกราคม", 2024)
-report.add_sale("Ruby Book", 350, 45)
-report.add_sale("Rails Course", 2500, 30)
-report.add_sale("VS Code Plugin", 199, 120)
-
-puts report.generate
-```
-
-### แบบฝึกหัดที่ 14: Frozen String และ Performance
-
-```ruby
-# frozen_string_literal: true
-
-# เปรียบเทียบ frozen vs non-frozen strings
-require 'benchmark'
-
-n = 1_000_000
-
-# สร้าง frozen string (efficient)
-frozen_greeting = "Hello, World!".freeze
-
-time1 = Benchmark.realtime do
-  n.times { frozen_greeting.dup.upcase }
-end
-
-time2 = Benchmark.realtime do
-  n.times { "Hello, World!".upcase }
-end
-
-puts "Frozen string: #{time1.round(4)}s"
-puts "New string:    #{time2.round(4)}s"
-puts "Memory comparison:"
-puts "  Frozen object_id changes: #{5.times.map { frozen_greeting.object_id }.uniq.count} unique IDs"
-```
-
-### แบบฝึกหัดที่ 15: Data Type Validation
-
-```ruby
-class DataValidator
-  def self.validate_age(value)
-    return { valid: false, error: "ต้องไม่เป็น nil" } if value.nil?
-    return { valid: false, error: "ต้องเป็นตัวเลข" } unless value.is_a?(Numeric)
-    return { valid: false, error: "ต้องเป็นจำนวนเต็ม" } unless value.is_a?(Integer)
-    return { valid: false, error: "ต้องมากกว่า 0" } unless value.positive?
-    return { valid: false, error: "ต้องน้อยกว่า 150" } unless value < 150
-
-    { valid: true, value: value }
-  end
-
-  def self.validate_email(value)
-    return { valid: false, error: "ต้องไม่เป็น nil" } if value.nil?
-    return { valid: false, error: "ต้องเป็น String" } unless value.is_a?(String)
-    return { valid: false, error: "ต้องไม่ว่างเปล่า" } if value.strip.empty?
-
-    email_regex = /\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/i
-    return { valid: false, error: "รูปแบบ email ไม่ถูกต้อง" } unless value.match?(email_regex)
-
-    { valid: true, value: value.strip.downcase }
-  end
-
-  def self.validate_name(value)
-    return { valid: false, error: "ต้องไม่เป็น nil" } if value.nil?
-    return { valid: false, error: "ต้องเป็น String" } unless value.is_a?(String)
-    stripped = value.strip
-    return { valid: false, error: "ต้องไม่ว่างเปล่า" } if stripped.empty?
-    return { valid: false, error: "ต้องมีอย่างน้อย 2 ตัวอักษร" } if stripped.length < 2
-
-    { valid: true, value: stripped }
-  end
-end
-
-test_cases = [
-  { field: "age",   value: 25 },
-  { field: "age",   value: -5 },
-  { field: "age",   value: "25" },
-  { field: "email", value: "test@example.com" },
-  { field: "email", value: "invalid-email" },
-  { field: "name",  value: "Alice" },
-  { field: "name",  value: "A" }
-]
-
-test_cases.each do |test|
-  result = case test[:field]
-           when "age"   then DataValidator.validate_age(test[:value])
-           when "email" then DataValidator.validate_email(test[:value])
-           when "name"  then DataValidator.validate_name(test[:value])
-           end
-
-  status = result[:valid] ? "✓ ผ่าน" : "✗ ไม่ผ่าน (#{result[:error]})"
-  puts "#{test[:field]} = #{test[:value].inspect} → #{status}"
-end
+Inventory.report
 ```
 
 ---
 
-## สรุปส่วนที่ 2
+## สรุป
 
-ในส่วนนี้เราได้เรียนรู้:
+ในตอนที่ 2 นี้ เราได้เรียนรู้:
 
-1. **Naming Conventions** - snake_case, PascalCase, SCREAMING_SNAKE
-2. **Local Variables** - scope, multiple assignment
-3. **Instance Variables** (@) - ของแต่ละ object
-4. **Class Variables** (@@) - แชร์กันทุก instance
-5. **Global Variables** ($) - เข้าถึงได้ทุกที่
-6. **Constants** - ค่าคงที่, freeze
-7. **Integer** - จำนวนเต็ม, methods
-8. **Float** - ทศนิยม, precision issues
-9. **String** - ข้อความ, interpolation
-10. **Boolean** - true/false, truthy/falsy
-11. **Nil** - ค่าว่าง, safe navigation
-12. **Symbol** - immutable identifiers
-13. **Type Conversion** - to_i, to_f, to_s, to_a
-14. **Type Checking** - class, is_a?, respond_to?
-15. **Frozen Objects** - immutability
+1. **ประเภทของ Variables** - Local, Instance, Class, Global, และ Constants
+2. **Naming Conventions** - snake_case, PascalCase, SCREAMING_SNAKE_CASE
+3. **Data Types พื้นฐาน** - Integer, Float, String, Boolean, Nil, Symbol
+4. **Type Conversion** - to_i, to_f, to_s, to_a, to_h
+5. **Type Checking** - class, is_a?, kind_of?, respond_to?
+6. **Frozen Objects** - freeze, frozen?
+7. **Multiple Assignment** - Parallel assignment, Splat operator
+8. **Swap Variables** - การสลับค่าแบบ Ruby
+9. **Constants** - การใช้งานและป้องกันการเปลี่ยนแปลง
 
-### สิ่งสำคัญที่ต้องจำ
-
-- ใน Ruby **nil** และ **false** เท่านั้นที่เป็น falsy
-- ทุกอย่างเป็น Object รวมถึง nil, true, false
-- Symbol ใช้ memory น้อยกว่า String เมื่อเปรียบเทียบ
-- Integer division ใน Ruby ให้ผลเป็น Integer เสมอ
-- ใช้ `&.` (safe navigation) เพื่อหลีกเลี่ยง NoMethodError กับ nil
+ในตอนต่อไปเราจะลงลึกกับ **Strings** ซึ่งเป็นหนึ่งในประเภทข้อมูลที่ใช้งานบ่อยที่สุด
 
 ---
 
-*เอกสารนี้เป็นส่วนหนึ่งของคอร์ส Ruby on Rails สำหรับผู้เริ่มต้น*
+*ตอนที่ 2 จบแล้ว - ไปต่อตอนที่ 3: Strings*

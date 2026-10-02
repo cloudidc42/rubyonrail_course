@@ -1,536 +1,951 @@
-# Part 11: Classes and Objects (OOP) - Steps 201-230
+# ตอนที่ 11: Classes และ Objects (Steps 201-230)
 
 ## บทนำ
 
-Object-Oriented Programming (OOP) เป็นแนวคิดการเขียนโปรแกรมที่จัดระเบียบโค้ดโดยการสร้าง **Objects** ที่รวม **Data** (ข้อมูล) และ **Behavior** (พฤติกรรม) เข้าด้วยกัน Ruby เป็นภาษาที่สนับสนุน OOP อย่างสมบูรณ์แบบ ทุกอย่างใน Ruby เป็น Object
+ในตอนนี้เราจะเรียนรู้เกี่ยวกับ Object-Oriented Programming (OOP) ซึ่งเป็นหัวใจสำคัญของภาษา Ruby ทุกอย่างใน Ruby คือ object และการเข้าใจ Classes จะช่วยให้คุณเขียนโค้ดที่มีโครงสร้างดี อ่านง่าย และบำรุงรักษาได้ง่ายขึ้น
 
 ---
 
 ## Step 201: Object-Oriented Programming คืออะไร?
 
+Object-Oriented Programming (OOP) คือแนวคิดการเขียนโปรแกรมที่จัดโครงสร้างโค้ดเป็น "objects" ซึ่งแต่ละ object มีทั้ง data (attributes) และ behavior (methods)
+
 ### แนวคิดหลักของ OOP
 
-OOP มีหลักการสำคัญ 4 อย่าง:
+**1. Encapsulation (การห่อหุ้มข้อมูล)**
+- ข้อมูลและฟังก์ชันที่เกี่ยวข้องถูกรวมไว้ใน object เดียวกัน
+- ซ่อนรายละเอียดภายในจากภายนอก
 
-1. **Encapsulation** - ห่อหุ้มข้อมูลและพฤติกรรมไว้ด้วยกัน
-2. **Inheritance** - การสืบทอดคุณสมบัติจาก class แม่
-3. **Polymorphism** - ความสามารถในการรับรูปร่างหลายแบบ
-4. **Abstraction** - ซ่อนรายละเอียดที่ซับซ้อน แสดงเฉพาะสิ่งที่จำเป็น
+**2. Inheritance (การสืบทอด)**
+- Class ลูกสามารถรับ properties และ methods จาก Class แม่
+
+**3. Polymorphism (ความหลากหลายรูปแบบ)**
+- Objects ต่างชนิดสามารถตอบสนองต่อ method เดียวกันในแบบที่แตกต่างกัน
+
+**4. Abstraction (การนามธรรม)**
+- ซ่อนความซับซ้อนและแสดงเฉพาะสิ่งที่จำเป็น
+
+```ruby
+# ตัวอย่างแนวคิด OOP เบื้องต้น
+# ในโลกจริง "รถยนต์" มีคุณสมบัติ (ยี่ห้อ, สี, ความเร็ว)
+# และมีพฤติกรรม (วิ่ง, หยุด, เลี้ยว)
+
+# แบบ Procedural (ไม่ใช้ OOP)
+brand = "Toyota"
+color = "Red"
+speed = 0
+
+def accelerate(speed)
+  speed + 10
+end
+
+speed = accelerate(speed)
+puts "Speed: #{speed}"
+
+# แบบ OOP
+class Car
+  def initialize(brand, color)
+    @brand = brand
+    @color = color
+    @speed = 0
+  end
+
+  def accelerate
+    @speed += 10
+    puts "#{@brand} accelerates to #{@speed} km/h"
+  end
+
+  def brake
+    @speed = [@speed - 10, 0].max
+    puts "#{@brand} slows to #{@speed} km/h"
+  end
+
+  def info
+    puts "#{@brand} (#{@color}) - Speed: #{@speed} km/h"
+  end
+end
+
+my_car = Car.new("Toyota", "Red")
+my_car.info
+my_car.accelerate
+my_car.accelerate
+my_car.brake
+my_car.info
+```
+
+**Output:**
+```
+Toyota (Red) - Speed: 0 km/h
+Toyota accelerates to 10 km/h
+Toyota accelerates to 20 km/h
+Toyota slows to 10 km/h
+Toyota (Red) - Speed: 10 km/h
+```
 
 ### ทำไมต้องใช้ OOP?
 
 ```ruby
-# แบบไม่ใช้ OOP (Procedural)
-name = "สมชาย"
-age = 25
-salary = 50000
+# โดยไม่ใช้ OOP - จัดการหลาย users ยากมาก
+user1_name = "Alice"
+user1_email = "alice@example.com"
+user1_age = 30
 
-def show_employee_info(name, age, salary)
-  puts "ชื่อ: #{name}, อายุ: #{age}, เงินเดือน: #{salary}"
-end
+user2_name = "Bob"
+user2_email = "bob@example.com"
+user2_age = 25
 
-def give_raise(salary, percent)
-  salary * (1 + percent / 100.0)
-end
-
-show_employee_info(name, age, salary)
-new_salary = give_raise(salary, 10)
-puts "เงินเดือนใหม่: #{new_salary}"
-
-# แบบใช้ OOP
-class Employee
-  def initialize(name, age, salary)
+# ด้วย OOP - จัดการง่ายและเป็นระเบียบ
+class User
+  def initialize(name, email, age)
     @name = name
+    @email = email
     @age = age
-    @salary = salary
   end
-  
-  def show_info
-    puts "ชื่อ: #{@name}, อายุ: #{@age}, เงินเดือน: #{@salary}"
+
+  def greet
+    puts "Hello, I'm #{@name} (#{@age} years old)"
   end
-  
-  def give_raise(percent)
-    @salary *= (1 + percent / 100.0)
-    puts "เงินเดือนใหม่ของ #{@name}: #{@salary}"
+
+  def contact
+    puts "Email: #{@email}"
   end
 end
 
-emp = Employee.new("สมชาย", 25, 50000)
-emp.show_info
-emp.give_raise(10)
-```
+user1 = User.new("Alice", "alice@example.com", 30)
+user2 = User.new("Bob", "bob@example.com", 25)
 
-### ทุกอย่างใน Ruby เป็น Object
-
-```ruby
-# ตัวเลขเป็น Object
-puts 42.class        # => Integer
-puts 3.14.class      # => Float
-
-# String เป็น Object
-puts "hello".class   # => String
-puts "hello".upcase  # => HELLO
-
-# Array เป็น Object
-puts [1, 2, 3].class # => Array
-puts [1, 2, 3].length # => 3
-
-# nil เป็น Object
-puts nil.class       # => NilClass
-puts nil.nil?        # => true
-
-# true/false เป็น Object
-puts true.class      # => TrueClass
-puts false.class     # => FalseClass
-
-# แม้แต่ Class ก็เป็น Object!
-puts String.class    # => Class
-puts Integer.class   # => Class
+user1.greet
+user2.greet
+user1.contact
 ```
 
 ---
 
-## Step 202: Class Definition
+## Step 202: Class Definition (class ... end)
 
-### การสร้าง Class พื้นฐาน
+### โครงสร้างพื้นฐานของ Class
 
 ```ruby
-# การสร้าง Class ใช้คีย์เวิร์ด class
+# รูปแบบพื้นฐาน
+class ClassName
+  # code here
+end
+
+# ตัวอย่าง Class ง่ายๆ
 class Dog
-  # เนื้อหาของ class
-end
-
-# สร้าง object จาก class (instantiation)
-my_dog = Dog.new
-puts my_dog.class    # => Dog
-puts my_dog.is_a?(Dog) # => true
-```
-
-### Naming Convention ของ Class
-
-```ruby
-# Class ชื่อต้องขึ้นต้นด้วยตัวพิมพ์ใหญ่ (CamelCase)
-class MyClass; end
-class UserAccount; end
-class BankTransfer; end
-class HttpRequest; end
-
-# ไม่ถูกต้อง (จะเกิด SyntaxError)
-# class myClass; end
-# class user_account; end
-```
-
-### Class ที่มี Methods
-
-```ruby
-class Greeter
-  def hello
-    puts "สวัสดี!"
+  def bark
+    puts "Woof!"
   end
-  
-  def goodbye
-    puts "ลาก่อน!"
-  end
-  
-  def greet(name)
-    puts "สวัสดี, #{name}!"
+
+  def sit
+    puts "Dog sits down"
   end
 end
 
-g = Greeter.new
-g.hello
-g.goodbye
-g.greet("สมชาย")
+# สร้าง instance (object) จาก class
+rex = Dog.new
+rex.bark   # => Woof!
+rex.sit    # => Dog sits down
+
+# สร้างหลาย instances
+buddy = Dog.new
+buddy.bark # => Woof!
+```
+
+### การตั้งชื่อ Class
+
+```ruby
+# ชื่อ class ต้องขึ้นต้นด้วยตัวพิมพ์ใหญ่ (CamelCase)
+class BankAccount   # ถูกต้อง
+end
+
+class HTTPRequest   # ถูกต้อง
+end
+
+class UserProfile   # ถูกต้อง
+end
+
+# ไม่ถูกต้อง (จะ error)
+# class bankAccount  # ผิด
+# class bank_account # ผิด
+
+# ตรวจสอบว่าสิ่งที่เราสร้างเป็น instance ของ class อะไร
+dog = Dog.new
+puts dog.class        # => Dog
+puts dog.is_a?(Dog)   # => true
+puts Dog.superclass   # => Object
+```
+
+### Class เปิด (Open Class / Monkey Patching)
+
+```ruby
+# Ruby อนุญาตให้เปิด class ที่มีอยู่แล้วและเพิ่ม methods
+class Dog
+  def name
+    "Generic Dog"
+  end
+end
+
+# เปิด class เดิมและเพิ่ม method ใหม่
+class Dog
+  def fetch(item)
+    puts "Dog fetches the #{item}!"
+  end
+end
+
+rex = Dog.new
+rex.bark    # ยังใช้ได้
+rex.fetch("ball")  # method ใหม่
+
+# แม้แต่ built-in classes ก็เปิดได้
+class String
+  def shout
+    self.upcase + "!!!"
+  end
+end
+
+puts "hello".shout  # => HELLO!!!
 ```
 
 ---
 
-## Step 203: Instance Variables (@variable)
+## Step 203: Instance Variables (@var)
 
 Instance variables คือตัวแปรที่เก็บข้อมูลของแต่ละ object โดยเฉพาะ ขึ้นต้นด้วย `@`
 
 ```ruby
 class Person
-  def set_name(name)
+  def initialize(name, age)
     @name = name  # instance variable
-  end
-  
-  def set_age(age)
     @age = age    # instance variable
   end
-  
+
   def introduce
-    puts "สวัสดี, ฉันชื่อ #{@name} อายุ #{@age} ปี"
+    puts "Hi, I'm #{@name} and I'm #{@age} years old."
+  end
+
+  def birthday
+    @age += 1
+    puts "Happy birthday #{@name}! Now #{@age} years old."
   end
 end
 
-person1 = Person.new
-person1.set_name("สมชาย")
-person1.set_age(25)
+alice = Person.new("Alice", 30)
+bob = Person.new("Bob", 25)
 
-person2 = Person.new
-person2.set_name("สมหญิง")
-person2.set_age(30)
+alice.introduce  # => Hi, I'm Alice and I'm 30 years old.
+bob.introduce    # => Hi, I'm Bob and I'm 25 years old.
 
-person1.introduce  # => สวัสดี, ฉันชื่อ สมชาย อายุ 25 ปี
-person2.introduce  # => สวัสดี, ฉันชื่อ สมหญิง อายุ 30 ปี
-
-# instance variable แต่ละ object แยกกันอิสระ
-puts person1.instance_variables  # => [:@name, :@age]
-puts person2.instance_variables  # => [:@name, :@age]
+alice.birthday   # => Happy birthday Alice! Now 31 years old.
+alice.introduce  # => Hi, I'm Alice and I'm 31 years old.
+bob.introduce    # => Hi, I'm Bob and I'm 25 years old. (ไม่เปลี่ยน)
 ```
 
-### Instance Variable ที่ยังไม่ได้กำหนดค่า
+### Instance Variables กับ nil
 
 ```ruby
-class Example
-  def show_unset
-    puts @undefined_var.inspect  # => nil (ไม่ใช่ error)
+class Cat
+  def initialize(name)
+    @name = name
+    # @color ไม่ได้ถูก initialize
   end
-  
-  def show_set
-    @value = 42
-    puts @value
+
+  def info
+    # @color จะเป็น nil ถ้าไม่ได้ set
+    puts "#{@name} - Color: #{@color.inspect}"
+  end
+
+  def set_color(color)
+    @color = color
   end
 end
 
-e = Example.new
-e.show_unset  # => nil
-e.show_set    # => 42
+kitty = Cat.new("Kitty")
+kitty.info         # => Kitty - Color: nil
+kitty.set_color("white")
+kitty.info         # => Kitty - Color: "white"
+```
+
+### ตรวจสอบ Instance Variables
+
+```ruby
+class Product
+  def initialize(name, price)
+    @name = name
+    @price = price
+  end
+end
+
+item = Product.new("Laptop", 25000)
+
+# ดู instance variables ทั้งหมด
+puts item.instance_variables.inspect
+# => [:@name, :@price]
+
+# อ่านค่า instance variable (ไม่แนะนำในการใช้งานจริง)
+puts item.instance_variable_get(:@name)   # => Laptop
+puts item.instance_variable_get(:@price)  # => 25000
+
+# เซ็ตค่า instance variable จากภายนอก (ไม่แนะนำ)
+item.instance_variable_set(:@price, 30000)
+puts item.instance_variable_get(:@price)  # => 30000
 ```
 
 ---
 
-## Step 204: Instance Methods
+## Step 204: initialize Method (Constructor)
 
-Instance methods คือ methods ที่เรียกใช้ผ่าน object
+`initialize` คือ method พิเศษที่ถูกเรียกอัตโนมัติเมื่อสร้าง object ด้วย `.new`
 
 ```ruby
-class Calculator
-  def add(a, b)
-    a + b
+class Rectangle
+  def initialize(width, height)
+    puts "Creating rectangle #{width}x#{height}"
+    @width = width
+    @height = height
   end
-  
-  def subtract(a, b)
-    a - b
+
+  def area
+    @width * @height
   end
-  
-  def multiply(a, b)
-    a * b
-  end
-  
-  def divide(a, b)
-    return "ไม่สามารถหารด้วย 0 ได้" if b == 0
-    a.to_f / b
-  end
-  
-  # Method ที่เรียก method อื่นใน class เดียวกัน
-  def power(base, exp)
-    result = 1
-    exp.times { result = multiply(result, base) }
-    result
+
+  def perimeter
+    2 * (@width + @height)
   end
 end
 
-calc = Calculator.new
-puts calc.add(5, 3)        # => 8
-puts calc.subtract(10, 4)  # => 6
-puts calc.multiply(3, 7)   # => 21
-puts calc.divide(15, 4)    # => 3.75
-puts calc.divide(10, 0)    # => ไม่สามารถหารด้วย 0 ได้
-puts calc.power(2, 8)      # => 256
+r = Rectangle.new(5, 3)
+# => Creating rectangle 5x3
+puts r.area       # => 15
+puts r.perimeter  # => 16
 ```
 
-### Method ที่ Return Object เดิม (Method Chaining)
+### initialize กับ Default Values
+
+```ruby
+class Circle
+  def initialize(radius, color = "red", filled = true)
+    @radius = radius
+    @color = color
+    @filled = filled
+  end
+
+  def describe
+    fill_status = @filled ? "filled" : "outline"
+    puts "#{@color} #{fill_status} circle with radius #{@radius}"
+  end
+
+  def area
+    Math::PI * @radius ** 2
+  end
+end
+
+c1 = Circle.new(5)
+c2 = Circle.new(3, "blue")
+c3 = Circle.new(7, "green", false)
+
+c1.describe  # => red filled circle with radius 5
+c2.describe  # => blue filled circle with radius 3
+c3.describe  # => green outline circle with radius 7
+
+printf "Area of c1: %.2f\n", c1.area  # => Area of c1: 78.54
+```
+
+### initialize กับ Keyword Arguments
+
+```ruby
+class Student
+  def initialize(name:, grade:, subject: "General")
+    @name = name
+    @grade = grade
+    @subject = subject
+  end
+
+  def report
+    puts "Student: #{@name}"
+    puts "Grade: #{@grade}"
+    puts "Subject: #{@subject}"
+    puts "---"
+  end
+end
+
+s1 = Student.new(name: "Alice", grade: "A")
+s2 = Student.new(name: "Bob", grade: "B", subject: "Math")
+s3 = Student.new(grade: "C", name: "Charlie", subject: "Science")
+
+s1.report
+s2.report
+s3.report
+```
+
+### initialize กับ Hash Options
+
+```ruby
+class Config
+  def initialize(options = {})
+    @debug = options.fetch(:debug, false)
+    @timeout = options.fetch(:timeout, 30)
+    @max_retries = options.fetch(:max_retries, 3)
+    @host = options.fetch(:host, "localhost")
+  end
+
+  def show
+    puts "Debug: #{@debug}"
+    puts "Timeout: #{@timeout}s"
+    puts "Max Retries: #{@max_retries}"
+    puts "Host: #{@host}"
+  end
+end
+
+default_config = Config.new
+custom_config = Config.new(debug: true, timeout: 60, host: "example.com")
+
+puts "=== Default Config ==="
+default_config.show
+puts "\n=== Custom Config ==="
+custom_config.show
+```
+
+---
+
+## Step 205: Instance Methods
+
+Instance methods คือ methods ที่เรียกใช้ผ่าน instance ของ class
+
+```ruby
+class BankAccount
+  def initialize(owner, initial_balance = 0)
+    @owner = owner
+    @balance = initial_balance
+    @transactions = []
+  end
+
+  def deposit(amount)
+    if amount > 0
+      @balance += amount
+      @transactions << { type: :deposit, amount: amount }
+      puts "Deposited #{amount}. New balance: #{@balance}"
+    else
+      puts "Invalid deposit amount"
+    end
+  end
+
+  def withdraw(amount)
+    if amount > 0 && amount <= @balance
+      @balance -= amount
+      @transactions << { type: :withdrawal, amount: amount }
+      puts "Withdrew #{amount}. New balance: #{@balance}"
+    elsif amount > @balance
+      puts "Insufficient funds. Balance: #{@balance}"
+    else
+      puts "Invalid withdrawal amount"
+    end
+  end
+
+  def balance
+    @balance
+  end
+
+  def statement
+    puts "=== Account Statement for #{@owner} ==="
+    @transactions.each do |t|
+      type = t[:type] == :deposit ? "Deposit" : "Withdrawal"
+      puts "#{type}: #{t[:amount]}"
+    end
+    puts "Current Balance: #{@balance}"
+    puts "=================================="
+  end
+
+  def transfer_to(other_account, amount)
+    if @balance >= amount
+      withdraw(amount)
+      other_account.deposit(amount)
+      puts "Transferred #{amount} to #{other_account.instance_variable_get(:@owner)}"
+    else
+      puts "Transfer failed: Insufficient funds"
+    end
+  end
+end
+
+alice_account = BankAccount.new("Alice", 1000)
+bob_account = BankAccount.new("Bob", 500)
+
+alice_account.deposit(500)
+alice_account.withdraw(200)
+alice_account.transfer_to(bob_account, 300)
+
+alice_account.statement
+bob_account.statement
+```
+
+### Methods ที่ Return Self (Method Chaining)
 
 ```ruby
 class StringBuilder
   def initialize
-    @content = ""
+    @parts = []
   end
-  
-  def append(text)
-    @content += text
+
+  def add(text)
+    @parts << text
     self  # return self เพื่อให้ chain ได้
   end
-  
-  def prepend(text)
-    @content = text + @content
+
+  def upcase
+    @parts = @parts.map(&:upcase)
     self
   end
-  
-  def upcase!
-    @content.upcase!
+
+  def with_newlines
+    @parts = @parts.map { |p| p + "\n" }
     self
   end
-  
-  def result
-    @content
+
+  def build
+    @parts.join
   end
 end
 
-builder = StringBuilder.new
-result = builder.append("hello").append(" ").append("world").upcase!.result
+result = StringBuilder.new
+  .add("Hello")
+  .add(" ")
+  .add("World")
+  .upcase
+  .build
+
 puts result  # => HELLO WORLD
-```
 
----
+result2 = StringBuilder.new
+  .add("line 1")
+  .add("line 2")
+  .add("line 3")
+  .with_newlines
+  .build
 
-## Step 205: initialize Method (Constructor)
-
-`initialize` เป็น method พิเศษที่ถูกเรียกอัตโนมัติเมื่อสร้าง object ใหม่
-
-```ruby
-class Car
-  def initialize(brand, model, year)
-    @brand = brand
-    @model = model
-    @year = year
-    @speed = 0
-    puts "สร้างรถ #{brand} #{model} ปี #{year} แล้ว!"
-  end
-  
-  def accelerate(amount)
-    @speed += amount
-    puts "ความเร็ว: #{@speed} km/h"
-  end
-  
-  def brake(amount)
-    @speed = [@speed - amount, 0].max
-    puts "ความเร็ว: #{@speed} km/h"
-  end
-  
-  def info
-    "#{@year} #{@brand} #{@model}"
-  end
-end
-
-car1 = Car.new("Toyota", "Camry", 2023)
-# => สร้างรถ Toyota Camry ปี 2023 แล้ว!
-
-car1.accelerate(60)  # => ความเร็ว: 60 km/h
-car1.accelerate(40)  # => ความเร็ว: 100 km/h
-car1.brake(30)       # => ความเร็ว: 70 km/h
-
-puts car1.info       # => 2023 Toyota Camry
-```
-
-### Default Parameters ใน initialize
-
-```ruby
-class UserProfile
-  def initialize(name, age = 0, email = nil, admin = false)
-    @name = name
-    @age = age
-    @email = email
-    @admin = admin
-  end
-  
-  def to_s
-    "#{@name} (#{@age}) - #{@email || 'ไม่มี email'} - Admin: #{@admin}"
-  end
-end
-
-u1 = UserProfile.new("สมชาย")
-u2 = UserProfile.new("สมหญิง", 25)
-u3 = UserProfile.new("สมศักดิ์", 30, "somsak@example.com")
-u4 = UserProfile.new("ผู้ดูแล", 35, "admin@example.com", true)
-
-puts u1  # => สมชาย (0) - ไม่มี email - Admin: false
-puts u2  # => สมหญิง (25) - ไม่มี email - Admin: false
-puts u3  # => สมศักดิ์ (30) - somsak@example.com - Admin: false
-puts u4  # => ผู้ดูแล (35) - admin@example.com - Admin: true
-```
-
-### initialize ด้วย Hash (Keyword Arguments)
-
-```ruby
-class Product
-  def initialize(name:, price:, category: "ทั่วไป", in_stock: true)
-    @name = name
-    @price = price
-    @category = category
-    @in_stock = in_stock
-  end
-  
-  def details
-    status = @in_stock ? "มีสินค้า" : "สินค้าหมด"
-    "#{@name} - ราคา: #{@price} บาท - หมวดหมู่: #{@category} - #{status}"
-  end
-end
-
-p1 = Product.new(name: "MacBook Pro", price: 59900, category: "คอมพิวเตอร์")
-p2 = Product.new(name: "iPhone 15", price: 32900, in_stock: false)
-
-puts p1.details
-# => MacBook Pro - ราคา: 59900 บาท - หมวดหมู่: คอมพิวเตอร์ - มีสินค้า
-
-puts p2.details
-# => iPhone 15 - ราคา: 32900 บาท - หมวดหมู่: ทั่วไป - สินค้าหมด
+puts result2
 ```
 
 ---
 
 ## Step 206: attr_reader, attr_writer, attr_accessor
 
-### ปัญหาโดยไม่มี Attribute Methods
+แทนที่จะเขียน getter/setter methods เอง Ruby มี shortcuts ให้
+
+### attr_reader - อ่านได้อย่างเดียว
 
 ```ruby
-class Person
-  def initialize(name, age)
-    @name = name
-    @age = age
-  end
-  
-  # ต้องเขียน getter method เอง
-  def name
-    @name
-  end
-  
-  # ต้องเขียน setter method เอง
-  def name=(new_name)
-    @name = new_name
-  end
-  
-  def age
-    @age
-  end
-  
-  def age=(new_age)
-    @age = new_age
-  end
-end
-```
+class Temperature
+  attr_reader :celsius  # สร้าง getter method: def celsius; @celsius; end
 
-### attr_reader - อ่านค่าได้อย่างเดียว
+  def initialize(celsius)
+    @celsius = celsius
+  end
 
-```ruby
-class Circle
-  attr_reader :radius, :color
-  
-  def initialize(radius, color = "red")
-    @radius = radius
-    @color = color
+  def fahrenheit
+    @celsius * 9.0 / 5 + 32
   end
-  
-  def area
-    Math::PI * @radius ** 2
-  end
-  
-  def circumference
-    2 * Math::PI * @radius
+
+  def kelvin
+    @celsius + 273.15
   end
 end
 
-c = Circle.new(5, "blue")
-puts c.radius        # => 5
-puts c.color         # => blue
-puts c.area.round(2) # => 78.54
+temp = Temperature.new(100)
+puts temp.celsius    # => 100
+puts temp.fahrenheit # => 212.0
+puts temp.kelvin     # => 373.15
 
-# c.radius = 10  # => NoMethodError! ไม่สามารถ set ค่าได้
+# temp.celsius = 50  # => Error! NoMethodError (ตั้งค่าไม่ได้)
 ```
 
-### attr_writer - เขียนค่าได้อย่างเดียว
+### attr_writer - เขียนได้อย่างเดียว
 
 ```ruby
-class PasswordManager
-  attr_writer :password
-  
+class Password
+  attr_writer :password  # สร้าง setter method: def password=(val); @password = val; end
+
   def initialize(password)
     @password = password
   end
-  
-  def authenticate(input)
-    input == @password
+
+  def valid?(input)
+    @password == input
   end
 end
 
-pm = PasswordManager.new("secret123")
-puts pm.authenticate("secret123")  # => true
-puts pm.authenticate("wrong")      # => false
+pwd = Password.new("secret123")
+puts pwd.valid?("wrong")      # => false
+puts pwd.valid?("secret123")  # => true
 
-pm.password = "newpassword456"
-puts pm.authenticate("newpassword456")  # => true
+pwd.password = "newpassword"
+puts pwd.valid?("newpassword")  # => true
 
-# pm.password  # => NoMethodError! ไม่สามารถ get ค่าได้
+# puts pwd.password  # => Error! NoMethodError (อ่านไม่ได้)
 ```
 
 ### attr_accessor - อ่านและเขียนได้
 
 ```ruby
-class Student
-  attr_accessor :name, :grade
-  attr_reader :student_id  # อ่านอย่างเดียว
-  
-  @@count = 0
-  
-  def initialize(name, grade)
-    @@count += 1
-    @student_id = @@count
+class Person
+  attr_accessor :name, :age, :email
+
+  def initialize(name, age, email)
     @name = name
-    @grade = grade
+    @age = age
+    @email = email
   end
-  
-  def self.count
-    @@count
+
+  def introduce
+    puts "Hi, I'm #{@name}, #{@age} years old"
+    puts "Contact: #{@email}"
   end
-  
-  def to_s
-    "นักเรียน ##{@student_id}: #{@name} - เกรด: #{@grade}"
+
+  def adult?
+    @age >= 18
   end
 end
 
-s1 = Student.new("สมชาย", 3.5)
-s2 = Student.new("สมหญิง", 3.8)
+person = Person.new("Alice", 25, "alice@example.com")
+person.introduce
 
-puts s1          # => นักเรียน #1: สมชาย - เกรด: 3.5
-puts s2          # => นักเรียน #2: สมหญิง - เกรด: 3.8
+# อ่านค่า
+puts person.name   # => Alice
+puts person.age    # => 25
 
-# แก้ไขค่าได้
-s1.name = "สมชาย สุขสันต์"
-s1.grade = 3.7
+# เซ็ตค่า
+person.name = "Alice Smith"
+person.age = 26
+person.email = "alicesmith@example.com"
 
-puts s1          # => นักเรียน #1: สมชาย สุขสันต์ - เกรด: 3.7
-puts Student.count  # => 2
+person.introduce
+puts person.adult?  # => true
 ```
 
-### Custom Validation ใน Setter
+### ใช้หลาย attr พร้อมกัน
 
 ```ruby
-class BankAccount
-  attr_reader :balance, :owner
-  
-  def initialize(owner, initial_balance = 0)
-    @owner = owner
-    @balance = initial_balance
+class Car
+  attr_reader :make, :model, :year    # อ่านได้อย่างเดียว
+  attr_accessor :color, :mileage      # อ่านและเขียนได้
+  attr_writer :owner                  # เขียนได้อย่างเดียว
+
+  def initialize(make, model, year, color)
+    @make = make
+    @model = model
+    @year = year
+    @color = color
+    @mileage = 0
+    @owner = nil
   end
-  
-  def balance=(amount)
-    raise ArgumentError, "ยอดเงินต้องไม่ติดลบ" if amount < 0
-    @balance = amount
+
+  def info
+    puts "#{@year} #{@make} #{@model} (#{@color})"
+    puts "Mileage: #{@mileage} km"
   end
-  
-  def deposit(amount)
-    raise ArgumentError, "จำนวนเงินต้องมากกว่า 0" if amount <= 0
-    @balance += amount
-    puts "ฝากเงิน #{amount} บาท, ยอดคงเหลือ: #{@balance} บาท"
-  end
-  
-  def withdraw(amount)
-    raise ArgumentError, "จำนวนเงินต้องมากกว่า 0" if amount <= 0
-    raise "ยอดเงินไม่พอ" if amount > @balance
-    @balance -= amount
-    puts "ถอนเงิน #{amount} บาท, ยอดคงเหลือ: #{@balance} บาท"
+
+  def drive(km)
+    @mileage += km
+    puts "Drove #{km} km. Total: #{@mileage} km"
   end
 end
 
-account = BankAccount.new("สมชาย", 1000)
-account.deposit(500)   # => ฝากเงิน 500 บาท, ยอดคงเหลือ: 1500 บาท
-account.withdraw(200)  # => ถอนเงิน 200 บาท, ยอดคงเหลือ: 1300 บาท
-puts account.balance   # => 1300
+car = Car.new("Toyota", "Camry", 2022, "Silver")
+car.info
+car.drive(500)
+car.color = "White"  # เปลี่ยนสี
+car.owner = "Bob"    # เซ็ตเจ้าของ
+car.info
+
+# car.make = "Honda"   # Error! ไม่มี setter
+# puts car.owner       # Error! ไม่มี getter
+```
+
+### Custom Getter/Setter
+
+```ruby
+class Product
+  attr_reader :name
+
+  def initialize(name, price)
+    @name = name
+    self.price = price  # ใช้ setter ของตัวเอง
+  end
+
+  def price
+    "฿#{@price}"  # format ราคา
+  end
+
+  def price=(value)
+    raise ArgumentError, "Price must be positive" if value <= 0
+    @price = value
+  end
+
+  def raw_price
+    @price
+  end
+end
+
+item = Product.new("Book", 250)
+puts item.price      # => ฿250
+
+item.price = 300
+puts item.price      # => ฿300
 
 begin
-  account.balance = -100  # => ArgumentError!
+  item.price = -100  # จะ raise error
+rescue ArgumentError => e
+  puts "Error: #{e.message}"  # => Error: Price must be positive
+end
+```
+
+---
+
+## Step 207: Class Variables (@@var) และ Class Methods (self.method)
+
+### Class Variables
+
+Class variables ใช้ `@@` นำหน้า และแชร์ร่วมกันระหว่าง class และ instances ทั้งหมด
+
+```ruby
+class Counter
+  @@count = 0  # class variable
+
+  def initialize
+    @@count += 1
+    @id = @@count
+  end
+
+  def id
+    @id
+  end
+
+  def self.count  # class method
+    @@count
+  end
+
+  def self.reset
+    @@count = 0
+  end
+end
+
+puts Counter.count  # => 0
+
+c1 = Counter.new
+c2 = Counter.new
+c3 = Counter.new
+
+puts Counter.count  # => 3
+puts c1.id          # => 1
+puts c2.id          # => 2
+puts c3.id          # => 3
+
+Counter.reset
+puts Counter.count  # => 0
+
+c4 = Counter.new
+puts c4.id          # => 1
+```
+
+### Class Methods
+
+Class methods เรียกใช้ผ่าน class โดยตรง ไม่ใช่ผ่าน instance
+
+```ruby
+class MathHelper
+  # class methods ด้วย self
+  def self.square(n)
+    n * n
+  end
+
+  def self.cube(n)
+    n ** 3
+  end
+
+  def self.factorial(n)
+    return 1 if n <= 1
+    n * factorial(n - 1)
+  end
+
+  def self.fibonacci(n)
+    return n if n <= 1
+    fibonacci(n - 1) + fibonacci(n - 2)
+  end
+end
+
+puts MathHelper.square(5)     # => 25
+puts MathHelper.cube(3)       # => 27
+puts MathHelper.factorial(5)  # => 120
+puts MathHelper.fibonacci(8)  # => 21
+```
+
+### Factory Methods Pattern
+
+```ruby
+class Color
+  attr_reader :r, :g, :b
+
+  def initialize(r, g, b)
+    @r = r
+    @g = g
+    @b = b
+  end
+
+  # Factory methods ช่วยสร้าง object ด้วยวิธีต่างๆ
+  def self.from_hex(hex)
+    hex = hex.delete('#')
+    r = hex[0..1].to_i(16)
+    g = hex[2..3].to_i(16)
+    b = hex[4..5].to_i(16)
+    new(r, g, b)
+  end
+
+  def self.red
+    new(255, 0, 0)
+  end
+
+  def self.green
+    new(0, 255, 0)
+  end
+
+  def self.blue
+    new(0, 0, 255)
+  end
+
+  def self.white
+    new(255, 255, 255)
+  end
+
+  def self.black
+    new(0, 0, 0)
+  end
+
+  def to_hex
+    format("#%02X%02X%02X", @r, @g, @b)
+  end
+
+  def to_s
+    "rgb(#{@r}, #{@g}, #{@b})"
+  end
+end
+
+red = Color.red
+puts red               # => rgb(255, 0, 0)
+puts red.to_hex        # => #FF0000
+
+from_hex = Color.from_hex("#3498db")
+puts from_hex          # => rgb(52, 152, 219)
+
+custom = Color.new(128, 64, 32)
+puts custom.to_hex     # => #804020
+```
+
+### Class Methods ด้วย class << self
+
+```ruby
+class StringUtils
+  class << self
+    def palindrome?(str)
+      clean = str.downcase.gsub(/[^a-z0-9]/, '')
+      clean == clean.reverse
+    end
+
+    def word_count(str)
+      str.split.length
+    end
+
+    def truncate(str, length, omission = "...")
+      return str if str.length <= length
+      str[0, length - omission.length] + omission
+    end
+
+    def capitalize_words(str)
+      str.split.map(&:capitalize).join(' ')
+    end
+  end
+end
+
+puts StringUtils.palindrome?("A man a plan a canal Panama")  # => true
+puts StringUtils.word_count("Hello World Ruby")              # => 3
+puts StringUtils.truncate("Hello World", 8)                  # => Hello...
+puts StringUtils.capitalize_words("hello world ruby")        # => Hello World Ruby
+```
+
+---
+
+## Step 208: Constants ใน Class
+
+Constants ใน class ขึ้นต้นด้วยตัวพิมพ์ใหญ่
+
+```ruby
+class Circle
+  PI = Math::PI  # constant ใน class
+
+  def initialize(radius)
+    @radius = radius
+  end
+
+  def area
+    PI * @radius ** 2
+  end
+
+  def circumference
+    2 * PI * @radius
+  end
+end
+
+c = Circle.new(5)
+printf "Area: %.2f\n", c.area
+printf "Circumference: %.2f\n", c.circumference
+
+# เข้าถึง constant จากภายนอก
+puts Circle::PI
+```
+
+### Constants ที่ซับซ้อนกว่า
+
+```ruby
+class Config
+  VERSION = "1.0.0"
+  MAX_RETRIES = 3
+  TIMEOUT = 30
+  VALID_MODES = [:development, :production, :test].freeze
+  DEFAULT_SETTINGS = {
+    debug: false,
+    log_level: :info,
+    cache: true
+  }.freeze
+
+  def initialize(mode = :development)
+    unless VALID_MODES.include?(mode)
+      raise ArgumentError, "Invalid mode: #{mode}. Must be one of #{VALID_MODES}"
+    end
+    @mode = mode
+    @settings = DEFAULT_SETTINGS.dup
+  end
+
+  def setting(key)
+    @settings[key]
+  end
+
+  def update_setting(key, value)
+    @settings[key] = value
+  end
+
+  def info
+    puts "Config v#{VERSION}"
+    puts "Mode: #{@mode}"
+    puts "Settings: #{@settings}"
+  end
+end
+
+config = Config.new(:development)
+config.info
+
+puts Config::VERSION   # => 1.0.0
+puts Config::MAX_RETRIES  # => 3
+
+begin
+  bad_config = Config.new(:invalid)
 rescue ArgumentError => e
   puts "Error: #{e.message}"
 end
@@ -538,2455 +953,2591 @@ end
 
 ---
 
-## Step 207: Class Variables (@@variable)
-
-Class variables ถูกแชร์ระหว่าง instances ทุกตัวของ class
-
-```ruby
-class Counter
-  @@count = 0
-  @@instances = []
-  
-  def initialize(name)
-    @@count += 1
-    @name = name
-    @@instances << self
-  end
-  
-  def self.count
-    @@count
-  end
-  
-  def self.all_names
-    @@instances.map(&:name)
-  end
-  
-  def name
-    @name
-  end
-  
-  def to_s
-    "Counter ##{@@count}: #{@name}"
-  end
-end
-
-c1 = Counter.new("อัน")
-c2 = Counter.new("สอง")
-c3 = Counter.new("สาม")
-
-puts Counter.count        # => 3
-puts Counter.all_names.inspect  # => ["อัน", "สอง", "สาม"]
-```
-
-### ข้อควรระวังเรื่อง Class Variables กับ Inheritance
-
-```ruby
-class Animal
-  @@count = 0
-  
-  def initialize
-    @@count += 1
-  end
-  
-  def self.count
-    @@count
-  end
-end
-
-class Dog < Animal
-  # @@count ถูกแชร์กับ Animal!
-end
-
-class Cat < Animal
-end
-
-Dog.new
-Dog.new
-Cat.new
-
-puts Animal.count  # => 3 (รวมทั้งหมด!)
-puts Dog.count     # => 3 (เหมือนกัน!)
-
-# ทางแก้: ใช้ class instance variable แทน
-class AnimalV2
-  @count = 0
-  
-  def initialize
-    self.class.increment_count
-  end
-  
-  def self.count
-    @count
-  end
-  
-  def self.increment_count
-    @count ||= 0
-    @count += 1
-  end
-end
-
-class DogV2 < AnimalV2
-  @count = 0
-end
-
-class CatV2 < AnimalV2
-  @count = 0
-end
-
-DogV2.new
-DogV2.new
-CatV2.new
-
-puts DogV2.count   # => 2
-puts CatV2.count   # => 1
-```
-
----
-
-## Step 208: Class Methods (self.method)
-
-Class methods เรียกผ่านชื่อ class โดยตรง ไม่ต้องสร้าง object
-
-```ruby
-class MathHelper
-  # Class method
-  def self.square(n)
-    n * n
-  end
-  
-  def self.cube(n)
-    n * n * n
-  end
-  
-  def self.factorial(n)
-    return 1 if n <= 1
-    n * factorial(n - 1)
-  end
-  
-  def self.fibonacci(n)
-    return n if n <= 1
-    fibonacci(n - 1) + fibonacci(n - 2)
-  end
-  
-  def self.prime?(n)
-    return false if n < 2
-    (2..Math.sqrt(n)).none? { |i| n % i == 0 }
-  end
-end
-
-puts MathHelper.square(5)      # => 25
-puts MathHelper.cube(3)        # => 27
-puts MathHelper.factorial(6)   # => 720
-puts MathHelper.fibonacci(10)  # => 55
-puts MathHelper.prime?(17)     # => true
-puts MathHelper.prime?(15)     # => false
-```
-
-### Factory Methods
-
-```ruby
-class Date
-  attr_reader :year, :month, :day
-  
-  def initialize(year, month, day)
-    @year = year
-    @month = month
-    @day = day
-  end
-  
-  # Factory methods
-  def self.today
-    t = Time.now
-    new(t.year, t.month, t.day)
-  end
-  
-  def self.from_string(date_string)
-    parts = date_string.split("-").map(&:to_i)
-    new(parts[0], parts[1], parts[2])
-  end
-  
-  def self.from_array(arr)
-    new(arr[0], arr[1], arr[2])
-  end
-  
-  def to_s
-    "#{@year}-#{@month.to_s.rjust(2, '0')}-#{@day.to_s.rjust(2, '0')}"
-  end
-end
-
-d1 = Date.today
-d2 = Date.from_string("2024-03-15")
-d3 = Date.from_array([2024, 12, 25])
-
-puts d1  # => (วันนี้)
-puts d2  # => 2024-03-15
-puts d3  # => 2024-12-25
-```
-
-### Class Methods กับ Instance Methods รวมกัน
-
-```ruby
-class Temperature
-  attr_reader :celsius
-  
-  def initialize(celsius)
-    @celsius = celsius.to_f
-  end
-  
-  # Class methods สำหรับสร้าง Temperature จากหน่วยต่างๆ
-  def self.from_fahrenheit(f)
-    new((f - 32) * 5.0 / 9.0)
-  end
-  
-  def self.from_kelvin(k)
-    new(k - 273.15)
-  end
-  
-  # Instance methods สำหรับแปลงหน่วย
-  def to_fahrenheit
-    (@celsius * 9.0 / 5.0) + 32
-  end
-  
-  def to_kelvin
-    @celsius + 273.15
-  end
-  
-  def to_s
-    "#{@celsius.round(2)}°C"
-  end
-  
-  def freezing?
-    @celsius <= 0
-  end
-  
-  def boiling?
-    @celsius >= 100
-  end
-end
-
-t1 = Temperature.new(100)
-puts t1                        # => 100.0°C
-puts t1.to_fahrenheit          # => 212.0
-puts t1.to_kelvin              # => 373.15
-puts t1.boiling?               # => true
-
-t2 = Temperature.from_fahrenheit(32)
-puts t2                        # => 0.0°C
-puts t2.freezing?              # => true
-
-t3 = Temperature.from_kelvin(300)
-puts t3                        # => 26.85°C
-```
-
----
-
-## Step 209: Object Identity
+## Step 209: Object Identity (object_id, equal?, eql?, ==)
 
 ### object_id
 
 ```ruby
-# object_id - ID ที่ไม่ซ้ำกันของแต่ละ object
+# object_id คือ unique identifier ของแต่ละ object
 a = "hello"
 b = "hello"
 c = a
 
-puts a.object_id  # => 12345 (ตัวเลขใดก็ตาม)
-puts b.object_id  # => 67890 (ต่างกัน!)
-puts c.object_id  # => 12345 (เหมือน a)
+puts a.object_id   # ตัวเลขบางตัว เช่น 70123456
+puts b.object_id   # ตัวเลขต่างกัน (คนละ object)
+puts c.object_id   # เหมือนกับ a (ชี้ไป object เดียวกัน)
 
-puts a.object_id == b.object_id  # => false
-puts a.object_id == c.object_id  # => true
+puts a.object_id == b.object_id  # => false (คนละ object)
+puts a.object_id == c.object_id  # => true (object เดียวกัน)
 
-# Symbol มี object_id เดียวกันเสมอ
-puts :hello.object_id == :hello.object_id  # => true
-
-# Integer เล็กๆ มี object_id คงที่
-puts 1.object_id   # => 3
-puts 2.object_id   # => 5
-puts 100.object_id # => 201
+# Special objects มี object_id คงที่
+puts nil.object_id    # => 8
+puts true.object_id   # => 2
+puts false.object_id  # => 0
+puts 1.object_id      # => 3 (integer: 2n+1)
+puts 2.object_id      # => 5
 ```
 
-### equal? - เปรียบเทียบ Identity
+### equal?, eql?, ==
 
 ```ruby
 a = "hello"
 b = "hello"
 c = a
 
+# equal? - เปรียบเทียบ object identity (object เดียวกันไหม?)
 puts a.equal?(b)  # => false (คนละ object)
-puts a.equal?(c)  # => true  (object เดียวกัน)
+puts a.equal?(c)  # => true (object เดียวกัน)
 
-puts a == b       # => true  (ค่าเท่ากัน)
-puts a == c       # => true  (ค่าเท่ากัน)
-```
+# eql? - เปรียบเทียบ value และ type
+puts 1.eql?(1)    # => true
+puts 1.eql?(1.0)  # => false (ต่าง type)
+puts "hi".eql?("hi")  # => true
 
-### eql? - เปรียบเทียบค่าและประเภท
+# == - เปรียบเทียบ value (อาจมี type coercion)
+puts 1 == 1       # => true
+puts 1 == 1.0     # => true (coercion)
+puts "hi" == "hi" # => true
 
-```ruby
-puts 1.eql?(1)      # => true
-puts 1.eql?(1.0)    # => false (int vs float)
-puts 1 == 1.0       # => true  (== แปลงประเภทให้)
-
-puts "hello".eql?("hello")  # => true
-puts "hello".eql?("HELLO")  # => false
-```
-
-### == - เปรียบเทียบค่า
-
-```ruby
+# กับ custom class
 class Point
   attr_reader :x, :y
-  
+
   def initialize(x, y)
     @x = x
     @y = y
   end
-  
-  # Override ==
+
   def ==(other)
-    other.is_a?(Point) && @x == other.x && @y == other.y
+    other.is_a?(Point) && x == other.x && y == other.y
   end
-  
-  # Override eql? (ใช้ใน Hash)
+
   def eql?(other)
-    self == other
+    other.is_a?(Point) && x.eql?(other.x) && y.eql?(other.y)
   end
-  
-  # Override hash (ต้องทำเมื่อ override eql?)
+
   def hash
-    [@x, @y].hash
-  end
-  
-  def to_s
-    "(#{@x}, #{@y})"
+    [x, y].hash
   end
 end
 
 p1 = Point.new(1, 2)
 p2 = Point.new(1, 2)
-p3 = Point.new(3, 4)
+p3 = p1
 
-puts p1 == p2      # => true
-puts p1 == p3      # => false
-puts p1.equal?(p2) # => false (คนละ object)
+puts p1 == p2       # => true (ค่าเท่ากัน)
+puts p1.equal?(p2)  # => false (คนละ object)
+puts p1.equal?(p3)  # => true (object เดียวกัน)
+puts p1.eql?(p2)    # => true
+```
 
-# ใช้ใน Hash
-points = { p1 => "จุด A", p2 => "จุด B" }
-puts points.length  # => 1 (p1 และ p2 ถือว่าเป็น key เดียวกัน)
+### ใช้ == ใน Hash และ Array
+
+```ruby
+class Product
+  attr_reader :sku, :name
+
+  def initialize(sku, name, price)
+    @sku = sku
+    @name = name
+    @price = price
+  end
+
+  def ==(other)
+    other.is_a?(Product) && sku == other.sku
+  end
+
+  def eql?(other)
+    other.is_a?(Product) && sku.eql?(other.sku)
+  end
+
+  def hash
+    sku.hash
+  end
+end
+
+p1 = Product.new("SKU001", "Laptop", 25000)
+p2 = Product.new("SKU001", "Laptop Pro", 30000)
+p3 = Product.new("SKU002", "Mouse", 500)
+
+puts p1 == p2  # => true (same SKU)
+puts p1 == p3  # => false
+
+# ใช้ใน Array uniq
+products = [p1, p2, p3]
+puts products.uniq.length  # => 2 (p1 และ p2 ถือว่าเหมือนกัน)
+
+# ใช้ใน Set
+require 'set'
+product_set = Set.new([p1, p2, p3])
+puts product_set.size  # => 2
 ```
 
 ---
 
 ## Step 210: to_s และ inspect
 
-### to_s - แสดงผลแบบ Human-readable
+### to_s
+
+`to_s` คือ method ที่แปลง object เป็น String เมื่อใช้ใน string interpolation
 
 ```ruby
-class Person
-  def initialize(name, age)
-    @name = name
-    @age = age
+class Book
+  def initialize(title, author, pages)
+    @title = title
+    @author = author
+    @pages = pages
   end
-  
+
   def to_s
-    "#{@name} (อายุ #{@age} ปี)"
-  end
-  
-  def inspect
-    "#<Person name=#{@name.inspect}, age=#{@age}>"
+    "\"#{@title}\" by #{@author} (#{@pages} pages)"
   end
 end
 
-p = Person.new("สมชาย", 25)
-
-puts p            # => สมชาย (อายุ 25 ปี)  (เรียก to_s)
-puts p.to_s       # => สมชาย (อายุ 25 ปี)
-puts p.inspect    # => #<Person name="สมชาย", age=25>
-p p               # => #<Person name="สมชาย", age=25>  (p() เรียก inspect)
-
-# String interpolation เรียก to_s อัตโนมัติ
-puts "บุคคล: #{p}"  # => บุคคล: สมชาย (อายุ 25 ปี)
+book = Book.new("Ruby Programming", "Matz", 450)
+puts book            # => "Ruby Programming" by Matz (450 pages)
+puts "Book: #{book}" # => Book: "Ruby Programming" by Matz (450 pages)
+puts book.to_s       # => "Ruby Programming" by Matz (450 pages)
 ```
 
-### Default to_s และ inspect
+### inspect
+
+`inspect` ใช้สำหรับ debugging แสดงรายละเอียดมากกว่า `to_s`
 
 ```ruby
-class WithoutToS
-  def initialize(value)
-    @value = value
+class Point
+  def initialize(x, y)
+    @x = x
+    @y = y
+  end
+
+  def to_s
+    "(#{@x}, #{@y})"
+  end
+
+  def inspect
+    "#<Point x=#{@x}, y=#{@y}>"
   end
 end
 
-obj = WithoutToS.new(42)
-puts obj.to_s    # => #<WithoutToS:0x0000...> (ค่า default)
-puts obj.inspect # => #<WithoutToS:0x0000... @value=42>
+p1 = Point.new(3, 4)
+puts p1            # => (3, 4)  (ใช้ to_s)
+puts p1.inspect    # => #<Point x=3, y=4>
+p p1               # => #<Point x=3, y=4>  (p ใช้ inspect)
+
+# Array ใช้ inspect ของ elements
+points = [Point.new(1,2), Point.new(3,4)]
+puts points.inspect
+# => [#<Point x=1, y=2>, #<Point x=3, y=4>]
+```
+
+### ตัวอย่างสมบูรณ์
+
+```ruby
+class Invoice
+  attr_reader :number, :items, :date
+
+  def initialize(number, date = Date.today)
+    @number = number
+    @date = date
+    @items = []
+  end
+
+  def add_item(description, quantity, unit_price)
+    @items << {
+      description: description,
+      quantity: quantity,
+      unit_price: unit_price,
+      total: quantity * unit_price
+    }
+  end
+
+  def subtotal
+    @items.sum { |item| item[:total] }
+  end
+
+  def vat(rate = 0.07)
+    subtotal * rate
+  end
+
+  def total
+    subtotal + vat
+  end
+
+  def to_s
+    "Invoice ##{@number} (#{@items.length} items) - Total: ฿#{format('%.2f', total)}"
+  end
+
+  def inspect
+    "#<Invoice number=#{@number.inspect} date=#{@date.inspect} items=#{@items.length} total=#{format('%.2f', total)}>"
+  end
+
+  def print_invoice
+    puts "=" * 50
+    puts "Invoice ##{@number}"
+    puts "Date: #{@date}"
+    puts "-" * 50
+    puts format("%-25s %5s %10s %10s", "Description", "Qty", "Unit", "Total")
+    puts "-" * 50
+    @items.each do |item|
+      puts format("%-25s %5d %10.2f %10.2f",
+        item[:description], item[:quantity],
+        item[:unit_price], item[:total])
+    end
+    puts "-" * 50
+    puts format("%-40s %10.2f", "Subtotal:", subtotal)
+    puts format("%-40s %10.2f", "VAT (7%):", vat)
+    puts format("%-40s %10.2f", "Total:", total)
+    puts "=" * 50
+  end
+end
+
+require 'date'
+inv = Invoice.new("INV-2024-001", Date.new(2024, 1, 15))
+inv.add_item("Ruby Programming Book", 2, 350)
+inv.add_item("Ruby on Rails Course", 1, 1200)
+inv.add_item("RSpec Testing Guide", 3, 280)
+
+puts inv          # ใช้ to_s
+p inv             # ใช้ inspect
+inv.print_invoice
 ```
 
 ---
 
-## Step 211: freeze
+## Step 211: freeze / frozen?
 
-`freeze` ทำให้ object ไม่สามารถแก้ไขได้
+`freeze` ป้องกันไม่ให้ object ถูกแก้ไข
 
 ```ruby
-# String freeze
-str = "hello"
-str << " world"
-puts str  # => hello world
-
+# freeze string
+str = "Hello"
 str.freeze
-begin
-  str << "!"  # => FrozenError
-rescue FrozenError => e
-  puts "Error: #{e.message}"
-end
+
+str << " World"   # => FrozenError (RuntimeError ใน Ruby เก่ากว่า)
+str.upcase!       # => FrozenError
 
 puts str.frozen?  # => true
 
-# Integer, Symbol, nil, true, false ถูก freeze อยู่แล้ว
-puts 42.frozen?     # => true
-puts :symbol.frozen? # => true
-puts nil.frozen?    # => true
+# freeze array
+arr = [1, 2, 3].freeze
+arr << 4          # => FrozenError
+arr[0] = 10       # => FrozenError
+puts arr.frozen?  # => true
+
+# freeze hash
+hash = { a: 1, b: 2 }.freeze
+hash[:c] = 3      # => FrozenError
+hash.delete(:a)   # => FrozenError
 ```
 
-### Freeze กับ Object
+### freeze ใน class
 
 ```ruby
-class Config
+class Configuration
+  DEFAULTS = {
+    host: "localhost",
+    port: 3000,
+    debug: false
+  }.freeze  # prevent modification
+
+  MAX_CONNECTIONS = 100
+  VALID_ENVIRONMENTS = %w[development staging production].freeze
+
   attr_reader :host, :port, :debug
-  
-  def initialize(host, port, debug = false)
-    @host = host
-    @port = port
-    @debug = debug
+
+  def initialize(env = "development")
+    unless VALID_ENVIRONMENTS.include?(env)
+      raise ArgumentError, "Invalid environment: #{env}"
+    end
+    @env = env
+    @host = DEFAULTS[:host]
+    @port = DEFAULTS[:port]
+    @debug = DEFAULTS[:debug]
   end
-  
-  def to_s
-    "#{@host}:#{@port} (debug: #{@debug})"
+
+  def production?
+    @env == "production"
   end
 end
 
-config = Config.new("localhost", 3000, true)
-config.freeze
+config = Configuration.new("development")
+puts config.host
+puts Configuration::MAX_CONNECTIONS
 
-puts config.frozen?  # => true
-
-# ไม่สามารถแก้ไข instance variable ได้
 begin
-  config.instance_variable_set(:@host, "example.com")
-rescue FrozenError => e
-  puts "Error: #{e.message}"
+  Configuration::DEFAULTS[:host] = "hacked"
+rescue => e
+  puts "Cannot modify: #{e.class}"  # => Cannot modify: FrozenError
 end
+```
 
-puts config  # => localhost:3000 (debug: true)  ยังเหมือนเดิม
+### dup vs freeze
+
+```ruby
+str = "Hello"
+str.freeze
+
+# dup สร้าง copy ที่ไม่ frozen
+copy = str.dup
+copy << " World"  # ทำได้!
+puts copy         # => Hello World
+puts copy.frozen? # => false
+
+# clone รักษา frozen state
+clone = str.clone
+puts clone.frozen?  # => true
 ```
 
 ---
 
 ## Step 212: dup vs clone
 
-ทั้งสองสร้าง shallow copy ของ object แต่มีความแตกต่าง
-
 ```ruby
-class MyObject
-  attr_accessor :value, :items
-  
-  def initialize(value, items = [])
-    @value = value
-    @items = items
+class Config
+  attr_accessor :settings, :name
+
+  def initialize(name)
+    @name = name
+    @settings = { debug: false, timeout: 30 }
   end
-  
+
   def to_s
-    "MyObject(#{@value}, #{@items})"
+    "Config(#{@name}): #{@settings}"
   end
 end
 
-original = MyObject.new(42, [1, 2, 3])
-original.freeze
+original = Config.new("main")
+original.settings[:debug] = true
 
-# dup - ไม่สืบทอดสถานะ frozen
+# dup - shallow copy
 duped = original.dup
-puts duped.frozen?  # => false
-duped.value = 100   # ทำได้
+puts duped.name         # => main
+puts duped.settings     # => {:debug=>true, :timeout=>30}
 
-# clone - สืบทอดสถานะ frozen
-cloned = original.clone
-puts cloned.frozen? # => true
-begin
-  cloned.value = 100
-rescue FrozenError => e
-  puts "clone frozen: #{e.message}"
+duped.name = "copied"
+duped.settings[:timeout] = 60
+
+puts original.name       # => main (ไม่เปลี่ยน)
+puts original.settings   # => {:debug=>true, :timeout=>60} (เปลี่ยน! เพราะ shallow copy)
+
+# Deep copy ต้องทำเอง
+class Config
+  def deep_dup
+    copy = dup
+    copy.settings = settings.dup
+    copy
+  end
 end
+
+original2 = Config.new("main2")
+original2.settings[:debug] = true
+
+deep_copy = original2.deep_dup
+deep_copy.settings[:timeout] = 999
+
+puts original2.settings  # => {:debug=>true, :timeout=>30} (ไม่เปลี่ยน)
 ```
 
-### Shallow Copy
+### clone vs dup
 
 ```ruby
-original = MyObject.new(42, [1, 2, 3])
-copy = original.dup
+# ความแตกต่างหลัก:
+# 1. clone รักษา frozen state, dup ไม่รักษา
+# 2. clone คัดลอก singleton methods, dup ไม่คัดลอก
+# 3. clone คัดลอก internal state markers
 
-# เปลี่ยน @value ของ copy ไม่กระทบ original
-copy.value = 999
-puts original.value  # => 42
-puts copy.value      # => 999
+frozen_str = "hello".freeze
+puts frozen_str.dup.frozen?    # => false
+puts frozen_str.clone.frozen?  # => true
 
-# แต่ @items ชี้ไปที่ Array เดียวกัน!
-copy.items << 4
-puts original.items.inspect  # => [1, 2, 3, 4]  (เปลี่ยนไปด้วย!)
+# Singleton methods
+obj = Object.new
+def obj.hello
+  "Hello from singleton!"
+end
 
-# Deep copy ทำโดยใช้ Marshal
-deep_copy = Marshal.load(Marshal.dump(original))
-deep_copy.items << 5
-puts original.items.inspect   # => [1, 2, 3, 4]  (ไม่เปลี่ยน)
-puts deep_copy.items.inspect  # => [1, 2, 3, 4, 5]
+cloned = obj.clone
+duped = obj.dup
+
+puts cloned.hello   # => Hello from singleton!
+# puts duped.hello  # => NoMethodError (ไม่มี singleton method)
 ```
 
 ---
 
 ## Step 213: Struct
 
-Struct เป็นวิธีสร้าง class ง่ายๆ สำหรับเก็บข้อมูล
+Struct คือวิธีสร้าง class อย่างง่ายที่มี attributes กำหนดไว้
 
 ```ruby
 # สร้าง Struct
 Point = Struct.new(:x, :y)
 
-p1 = Point.new(1, 2)
-puts p1.x  # => 1
-puts p1.y  # => 2
-puts p1    # => #<struct Point x=1, y=2>
+p1 = Point.new(3, 4)
+puts p1.x     # => 3
+puts p1.y     # => 4
+puts p1       # => #<struct Point x=3, y=4>
 
-# Struct มี == ในตัว
-p2 = Point.new(1, 2)
-p3 = Point.new(3, 4)
+# Struct มี == ให้เลยโดย default
+p2 = Point.new(3, 4)
+p3 = Point.new(1, 2)
 puts p1 == p2  # => true
 puts p1 == p3  # => false
 
-# Struct ใช้งานเหมือน Array และ Hash
-puts p1.to_a.inspect     # => [1, 2]
-puts p1.to_h.inspect     # => {:x=>1, :y=>2}
-puts p1.members.inspect  # => [:x, :y]
+# แปลงเป็น Array หรือ Hash
+puts p1.to_a.inspect    # => [3, 4]
+puts p1.to_h.inspect    # => {:x=>3, :y=>4}
 ```
 
-### Struct พร้อม Methods
+### Struct กับ Methods เพิ่มเติม
 
 ```ruby
-Person = Struct.new(:name, :age) do
+Person = Struct.new(:name, :age, :email) do
   def adult?
     age >= 18
   end
-  
-  def greeting
-    "สวัสดี, ฉันชื่อ #{name} อายุ #{age} ปี"
+
+  def greet
+    "Hello, I'm #{name}!"
   end
-  
+
   def to_s
     "#{name} (#{age})"
   end
 end
 
-p = Person.new("สมชาย", 25)
-puts p.adult?    # => true
-puts p.greeting  # => สวัสดี, ฉันชื่อ สมชาย อายุ 25 ปี
-puts p           # => สมชาย (25)
+alice = Person.new("Alice", 25, "alice@example.com")
+bob = Person.new("Bob", 16, "bob@example.com")
+
+puts alice.greet    # => Hello, I'm Alice!
+puts alice.adult?   # => true
+puts bob.adult?     # => false
+puts alice          # => Alice (25)
+
+# Struct members
+puts Person.members.inspect  # => [:name, :age, :email]
+
+# Iterate ค่า
+alice.each_pair do |member, value|
+  puts "#{member}: #{value}"
+end
 ```
 
-### Struct เป็น Value Object
+### Struct ใน Practice
 
 ```ruby
-Address = Struct.new(:street, :city, :country, keyword_init: true)
+# ใช้ Struct สำหรับ Value Objects
+Coordinate = Struct.new(:latitude, :longitude) do
+  def distance_to(other)
+    # Haversine formula (simplified)
+    lat_diff = (latitude - other.latitude).abs
+    lon_diff = (longitude - other.longitude).abs
+    Math.sqrt(lat_diff**2 + lon_diff**2) * 111  # rough km
+  end
 
-home = Address.new(
-  street: "123 ถนนสุขุมวิท",
-  city: "กรุงเทพฯ",
-  country: "ไทย"
-)
+  def to_s
+    "(#{latitude}°, #{longitude}°)"
+  end
+end
 
-puts home.city    # => กรุงเทพฯ
-puts home.to_h.inspect
-# => {:street=>"123 ถนนสุขุมวิท", :city=>"กรุงเทพฯ", :country=>"ไทย"}
+bangkok = Coordinate.new(13.7563, 100.5018)
+chiangmai = Coordinate.new(18.7883, 98.9853)
+
+puts bangkok        # => (13.7563°, 100.5018°)
+puts chiangmai      # => (18.7883°, 98.9853°)
+puts "Distance: #{bangkok.distance_to(chiangmai).round(0)} km"
+
+# Struct เป็น immutable ได้ด้วย keyword_init
+Config = Struct.new(:host, :port, :debug, keyword_init: true)
+config = Config.new(host: "localhost", port: 3000, debug: false)
+puts config.host   # => localhost
+puts config.port   # => 3000
 ```
 
 ---
 
 ## Step 214: OpenStruct
 
-OpenStruct สร้าง object ที่เพิ่ม attribute ได้ตามต้องการ
+OpenStruct ช่วยสร้าง object แบบ dynamic ที่เพิ่ม attributes ได้ตอน runtime
 
 ```ruby
 require 'ostruct'
 
-person = OpenStruct.new(name: "สมชาย", age: 25)
-puts person.name  # => สมชาย
-puts person.age   # => 25
+# สร้าง OpenStruct
+person = OpenStruct.new(name: "Alice", age: 30)
+puts person.name    # => Alice
+puts person.age     # => 30
 
-# เพิ่ม attribute ใหม่ได้ตลอดเวลา
-person.email = "somchai@example.com"
-person.city = "กรุงเทพฯ"
+# เพิ่ม attribute ใหม่ได้เลย
+person.email = "alice@example.com"
+person.job = "Developer"
+puts person.email   # => alice@example.com
+puts person.job     # => Developer
 
-puts person.email  # => somchai@example.com
-puts person.city   # => กรุงเทพฯ
+# Predicate method อัตโนมัติ
+puts person.name?   # => true (มีค่าและไม่ nil/false)
 
-# ตรวจสอบ attribute ที่ไม่มี
-puts person.phone.inspect  # => nil (ไม่ใช่ error)
-
+# แปลงเป็น Hash
 puts person.to_h.inspect
-# => {:name=>"สมชาย", :age=>25, :email=>"somchai@example.com", :city=>"กรุงเทพฯ"}
 ```
 
-### OpenStruct ใช้กับ JSON/API Response
+### OpenStruct สำหรับ Config
 
 ```ruby
 require 'ostruct'
-require 'json'
 
-# จำลอง API response
-api_response = '{
-  "user": {
-    "id": 1,
-    "name": "สมชาย",
-    "email": "somchai@example.com",
-    "profile": {
-      "bio": "นักพัฒนา Ruby",
-      "location": "กรุงเทพฯ"
-    }
-  }
-}'
+def create_config(options = {})
+  config = OpenStruct.new(
+    host: "localhost",
+    port: 3000,
+    debug: false,
+    max_connections: 10
+  )
 
-data = JSON.parse(api_response)
-user = OpenStruct.new(data["user"])
+  options.each do |key, value|
+    config.send("#{key}=", value)
+  end
 
-puts user.name   # => สมชาย
-puts user.email  # => somchai@example.com
+  config
+end
 
-# Profile เป็น Hash ต้องแปลงเอง
-profile = OpenStruct.new(user.profile)
-puts profile.bio       # => นักพัฒนา Ruby
-puts profile.location  # => กรุงเทพฯ
+dev_config = create_config(debug: true)
+prod_config = create_config(host: "example.com", port: 443, debug: false)
+
+puts "Dev: #{dev_config.host}:#{dev_config.port} debug=#{dev_config.debug}"
+puts "Prod: #{prod_config.host}:#{prod_config.port} debug=#{prod_config.debug}"
+```
+
+### เปรียบเทียบ Struct vs OpenStruct
+
+```ruby
+require 'ostruct'
+
+puts "=== Struct ==="
+Point = Struct.new(:x, :y)
+p1 = Point.new(1, 2)
+puts p1.x
+# p1.z = 3  # => NoMethodError
+
+puts "\n=== OpenStruct ==="
+p2 = OpenStruct.new(x: 1, y: 2)
+p2.z = 3    # ได้!
+puts p2.x
+puts p2.z
+
+# Performance: Struct เร็วกว่า OpenStruct มาก
+# ใช้ Struct เมื่อรู้ attributes ล่วงหน้า
+# ใช้ OpenStruct เมื่อต้องการความยืดหยุ่น
 ```
 
 ---
 
-## Step 215: Comparable Module กับ Classes
+## Step 215: Comparable Module ใน Class
+
+Comparable module ช่วยเพิ่ม comparison operators โดยเพียงแค่ implement `<=>`
 
 ```ruby
-class Weight
+class Temperature
   include Comparable
-  
-  attr_reader :value, :unit
-  
-  CONVERSIONS = {
-    "kg" => 1.0,
-    "g"  => 0.001,
-    "lb" => 0.453592,
-    "oz" => 0.0283495
-  }
-  
-  def initialize(value, unit = "kg")
-    @value = value.to_f
-    @unit = unit
+
+  attr_reader :degrees
+
+  def initialize(degrees)
+    @degrees = degrees
   end
-  
-  def to_kg
-    @value * CONVERSIONS[@unit]
-  end
-  
-  # Comparable ต้องการแค่ <=>
+
+  # Spaceship operator - ต้อง implement เพื่อใช้ Comparable
   def <=>(other)
-    to_kg <=> other.to_kg
+    degrees <=> other.degrees
   end
-  
+
   def to_s
-    "#{@value} #{@unit}"
+    "#{degrees}°"
   end
 end
 
-w1 = Weight.new(1, "kg")
-w2 = Weight.new(500, "g")
-w3 = Weight.new(2, "kg")
-w4 = Weight.new(2.2, "lb")
+temps = [Temperature.new(100), Temperature.new(37), Temperature.new(0), Temperature.new(22)]
 
-puts w1 > w2   # => true  (1kg > 500g)
-puts w1 == w2  # => false (1000g != 500g... wait)
-puts w2 < w1   # => true
+puts temps.min         # => 0°
+puts temps.max         # => 100°
+puts temps.sort.map(&:to_s).inspect
+# => ["0°", "22°", "37°", "100°"]
 
-weights = [w3, w1, w4, w2]
-sorted = weights.sort
-sorted.each { |w| puts w }
-# => 500 g
-# => 2.2 lb
-# => 1 kg
-# => 2 kg
+t1 = Temperature.new(37)
+t2 = Temperature.new(100)
 
-puts weights.min  # => 500 g
-puts weights.max  # => 2 kg
+puts t1 < t2   # => true
+puts t1 > t2   # => false
+puts t1 <= t2  # => true
+puts t1.between?(Temperature.new(0), Temperature.new(100))  # => true
+puts temps.sort.first   # => 0°
+```
 
-# clamp
-w = Weight.new(1.5, "kg")
-puts w.clamp(w1, w3)  # อยู่ระหว่าง 1kg ถึง 2kg
+### Comparable ใน Class ที่ซับซ้อน
+
+```ruby
+class Version
+  include Comparable
+
+  attr_reader :major, :minor, :patch
+
+  def initialize(version_string)
+    parts = version_string.split('.').map(&:to_i)
+    @major = parts[0] || 0
+    @minor = parts[1] || 0
+    @patch = parts[2] || 0
+  end
+
+  def <=>(other)
+    return major <=> other.major unless major == other.major
+    return minor <=> other.minor unless minor == other.minor
+    patch <=> other.patch
+  end
+
+  def to_s
+    "#{major}.#{minor}.#{patch}"
+  end
+end
+
+v1 = Version.new("1.2.3")
+v2 = Version.new("1.2.4")
+v3 = Version.new("2.0.0")
+v4 = Version.new("1.2.3")
+
+puts v1 < v2   # => true
+puts v1 > v3   # => false
+puts v1 == v4  # => true
+
+versions = [v3, v1, v2, Version.new("1.0.0")]
+puts versions.sort.map(&:to_s).inspect
+# => ["1.0.0", "1.2.3", "1.2.4", "2.0.0"]
+
+puts versions.max  # => 2.0.0
 ```
 
 ---
 
-## Step 216: Building a Full Example - Bank Account System
+## Step 216: Building Example - BankAccount Class
 
 ```ruby
-# ระบบบัญชีธนาคารสมบูรณ์
-
-class Transaction
-  attr_reader :type, :amount, :description, :timestamp, :balance_after
-  
-  TYPES = [:deposit, :withdrawal, :transfer_in, :transfer_out]
-  
-  def initialize(type, amount, description, balance_after)
-    raise ArgumentError, "ประเภทธุรกรรมไม่ถูกต้อง" unless TYPES.include?(type)
-    @type = type
-    @amount = amount.to_f
-    @description = description
-    @timestamp = Time.now
-    @balance_after = balance_after.to_f
-  end
-  
-  def to_s
-    type_str = case @type
-               when :deposit then "ฝากเงิน"
-               when :withdrawal then "ถอนเงิน"
-               when :transfer_in then "รับโอน"
-               when :transfer_out then "โอนออก"
-               end
-    
-    "#{@timestamp.strftime('%Y-%m-%d %H:%M')} | #{type_str} #{@amount} บาท | #{@description} | คงเหลือ: #{@balance_after} บาท"
-  end
-end
-
 class BankAccount
-  include Comparable
-  
-  attr_reader :account_number, :owner, :balance, :transactions
-  
+  attr_reader :account_number, :owner, :balance, :account_type
+
   @@total_accounts = 0
-  @@all_accounts = {}
-  
-  def initialize(owner, initial_balance = 0)
+  @@next_account_number = 1000
+
+  def initialize(owner, initial_deposit = 0, account_type = :checking)
+    raise ArgumentError, "Initial deposit cannot be negative" if initial_deposit < 0
+    raise ArgumentError, "Invalid account type" unless [:checking, :savings].include?(account_type)
+
     @@total_accounts += 1
-    @account_number = generate_account_number
+    @@next_account_number += 1
+
+    @account_number = "ACC#{@@next_account_number}"
     @owner = owner
-    @balance = initial_balance.to_f
+    @balance = initial_deposit
+    @account_type = account_type
     @transactions = []
-    @frozen_status = false
-    
-    @@all_accounts[@account_number] = self
-    
-    if initial_balance > 0
-      @transactions << Transaction.new(
-        :deposit, initial_balance, "ยอดเปิดบัญชี", @balance
+    @created_at = Time.now
+
+    record_transaction(:initial_deposit, initial_deposit, "Account opened") if initial_deposit > 0
+  end
+
+  def deposit(amount, description = "Deposit")
+    validate_amount(amount)
+    @balance += amount
+    record_transaction(:deposit, amount, description)
+    puts "✓ Deposited ฿#{format_amount(amount)}. Balance: ฿#{format_amount(@balance)}"
+    self
+  end
+
+  def withdraw(amount, description = "Withdrawal")
+    validate_amount(amount)
+    raise "Insufficient funds. Available: ฿#{format_amount(@balance)}" if amount > @balance
+    @balance -= amount
+    record_transaction(:withdrawal, amount, description)
+    puts "✓ Withdrew ฿#{format_amount(amount)}. Balance: ฿#{format_amount(@balance)}"
+    self
+  end
+
+  def transfer_to(target_account, amount, description = nil)
+    desc = description || "Transfer to #{target_account.account_number}"
+    withdraw(amount, desc)
+    target_account.deposit(amount, "Transfer from #{@account_number}")
+    puts "✓ Transfer complete"
+    self
+  end
+
+  def interest_rate
+    case @account_type
+    when :savings then 0.025
+    when :checking then 0.001
+    end
+  end
+
+  def apply_interest
+    interest = (@balance * interest_rate).round(2)
+    deposit(interest, "Monthly interest (#{(interest_rate * 100).round(1)}%)")
+  end
+
+  def statement(last_n = nil)
+    puts "\n" + "=" * 55
+    puts " Account Statement"
+    puts " Account: #{@account_number}"
+    puts " Owner:   #{@owner}"
+    puts " Type:    #{@account_type.to_s.capitalize}"
+    puts " Opened:  #{@created_at.strftime('%Y-%m-%d')}"
+    puts "=" * 55
+    puts format("%-12s %-10s %-20s %10s", "Date", "Type", "Description", "Amount")
+    puts "-" * 55
+
+    txns = last_n ? @transactions.last(last_n) : @transactions
+    txns.each do |t|
+      sign = t[:type] == :deposit || t[:type] == :initial_deposit ? "+" : "-"
+      puts format("%-12s %-10s %-20s %+10.2f",
+        t[:date].strftime('%Y-%m-%d'),
+        t[:type].to_s.split('_').map(&:capitalize).first(2).join(' '),
+        t[:description][0..19],
+        t[:type] == :withdrawal ? -t[:amount] : t[:amount]
       )
     end
+
+    puts "-" * 55
+    puts format("%-42s %10.2f", "Current Balance:", @balance)
+    puts "=" * 55
+    puts
   end
-  
-  def deposit(amount, description = "ฝากเงิน")
-    validate_amount(amount)
-    check_frozen
-    
-    @balance += amount
-    @transactions << Transaction.new(:deposit, amount, description, @balance)
-    puts "ฝากเงินสำเร็จ: +#{amount} บาท, ยอดคงเหลือ: #{@balance} บาท"
-    self
-  end
-  
-  def withdraw(amount, description = "ถอนเงิน")
-    validate_amount(amount)
-    check_frozen
-    raise "ยอดเงินไม่เพียงพอ (มี #{@balance} บาท ต้องการ #{amount} บาท)" if amount > @balance
-    
-    @balance -= amount
-    @transactions << Transaction.new(:withdrawal, amount, description, @balance)
-    puts "ถอนเงินสำเร็จ: -#{amount} บาท, ยอดคงเหลือ: #{@balance} บาท"
-    self
-  end
-  
-  def transfer_to(target_account, amount, description = "โอนเงิน")
-    validate_amount(amount)
-    check_frozen
-    raise "ยอดเงินไม่เพียงพอ" if amount > @balance
-    
-    @balance -= amount
-    @transactions << Transaction.new(
-      :transfer_out, amount, 
-      "#{description} -> #{target_account.account_number}", @balance
-    )
-    
-    target_account.receive_transfer(self, amount, description)
-    puts "โอนเงินสำเร็จ: #{amount} บาท -> บัญชี #{target_account.account_number}"
-    self
-  end
-  
-  def receive_transfer(from_account, amount, description)
-    @balance += amount
-    @transactions << Transaction.new(
-      :transfer_in, amount,
-      "#{description} <- #{from_account.account_number}", @balance
-    )
-  end
-  
-  def freeze_account
-    @frozen_status = true
-    puts "บัญชี #{@account_number} ถูกระงับแล้ว"
-  end
-  
-  def unfreeze_account
-    @frozen_status = false
-    puts "บัญชี #{@account_number} ถูกยกเลิกการระงับแล้ว"
-  end
-  
-  def frozen_account?
-    @frozen_status
-  end
-  
-  def statement(last_n = nil)
-    txns = last_n ? @transactions.last(last_n) : @transactions
-    
-    puts "\n" + "="*60
-    puts "รายการเดินบัญชี"
-    puts "บัญชีเลขที่: #{@account_number}"
-    puts "เจ้าของ: #{@owner}"
-    puts "ยอดคงเหลือปัจจุบัน: #{@balance} บาท"
-    puts "-"*60
-    
-    if txns.empty?
-      puts "ไม่มีรายการ"
-    else
-      txns.each { |t| puts t }
-    end
-    
-    puts "="*60
-  end
-  
-  def <=>(other)
-    @balance <=> other.balance
-  end
-  
-  def to_s
-    "บัญชี #{@account_number} (#{@owner}) ยอด: #{@balance} บาท"
-  end
-  
-  def inspect
-    "#<BankAccount account=#{@account_number}, owner=#{@owner}, balance=#{@balance}>"
-  end
-  
+
   def self.total_accounts
     @@total_accounts
   end
-  
-  def self.find(account_number)
-    @@all_accounts[account_number]
+
+  def to_s
+    "BankAccount[#{@account_number}] #{@owner}: ฿#{format_amount(@balance)}"
   end
-  
-  def self.all
-    @@all_accounts.values
+
+  def inspect
+    "#<BankAccount account_number=#{@account_number.inspect} owner=#{@owner.inspect} " \
+    "balance=#{@balance} type=#{@account_type}>"
   end
-  
-  def self.richest
-    @@all_accounts.values.max
-  end
-  
+
   private
-  
-  def generate_account_number
-    "ACC-#{Time.now.to_i}-#{@@total_accounts.to_s.rjust(4, '0')}"
-  end
-  
+
   def validate_amount(amount)
-    raise ArgumentError, "จำนวนเงินต้องเป็นตัวเลขบวก" unless amount.is_a?(Numeric) && amount > 0
+    raise ArgumentError, "Amount must be a positive number" unless amount.is_a?(Numeric) && amount > 0
   end
-  
-  def check_frozen
-    raise "บัญชีถูกระงับการใช้งาน" if @frozen_status
+
+  def record_transaction(type, amount, description)
+    @transactions << {
+      type: type,
+      amount: amount,
+      description: description,
+      date: Time.now,
+      balance_after: @balance
+    }
+  end
+
+  def format_amount(amount)
+    format("%.2f", amount)
   end
 end
 
-# === ทดสอบระบบ ===
+# ทดสอบ BankAccount
+puts "=== BankAccount Demo ==="
+puts "Total accounts: #{BankAccount.total_accounts}"
 
-puts "=== สร้างบัญชี ==="
-acc1 = BankAccount.new("สมชาย สุขสันต์", 10000)
-acc2 = BankAccount.new("สมหญิง รักดี", 5000)
-acc3 = BankAccount.new("สมศักดิ์ มั่งมี", 50000)
+alice = BankAccount.new("Alice", 10000, :savings)
+bob = BankAccount.new("Bob", 5000, :checking)
 
-puts "\n=== ธุรกรรม ==="
-acc1.deposit(5000, "รับเงินเดือน")
-acc1.withdraw(2000, "ค่าเช่าบ้าน")
-acc1.transfer_to(acc2, 1000, "ส่งเงินน้องสาว")
+puts "Total accounts: #{BankAccount.total_accounts}"
 
-acc2.deposit(3000, "รับเงินค่าจ้าง")
-acc2.withdraw(500, "ค่าอาหาร")
+alice.deposit(5000, "Salary")
+alice.deposit(2000, "Freelance work")
+alice.withdraw(3000, "Rent payment")
 
-puts "\n=== บัญชี acc1 ==="
-acc1.statement
+bob.deposit(3000, "Bonus")
+alice.transfer_to(bob, 1500, "Loan repayment")
 
-puts "\n=== บัญชี acc2 ==="
-acc2.statement
+alice.apply_interest
 
-puts "\n=== สถิติ ==="
-puts "จำนวนบัญชีทั้งหมด: #{BankAccount.total_accounts}"
-puts "บัญชีที่รวยที่สุด: #{BankAccount.richest}"
+alice.statement
+bob.statement
 
-puts "\n=== เปรียบเทียบบัญชี ==="
-puts acc1 > acc2 ? "#{acc1.owner} รวยกว่า" : "#{acc2.owner} รวยกว่า"
-
-accounts = BankAccount.all
-sorted = accounts.sort_by(&:balance).reverse
-puts "\nจัดอันดับตามยอดเงิน:"
-sorted.each_with_index do |acc, i|
-  puts "#{i+1}. #{acc}"
-end
-
-puts "\n=== ทดสอบ Freeze ==="
-acc1.freeze_account
-begin
-  acc1.deposit(1000)
-rescue RuntimeError => e
-  puts "Error: #{e.message}"
-end
-acc1.unfreeze_account
-acc1.deposit(1000, "ฝากหลังปลดระงับ")
+puts alice
+puts alice.inspect
 ```
 
 ---
 
-## Step 217-230: เทคนิคเพิ่มเติม
-
-### Protected Methods
+## Step 217: Building Example - Person Class
 
 ```ruby
-class Employee
-  def initialize(name, salary)
+class Person
+  include Comparable
+
+  attr_accessor :name, :email, :phone
+  attr_reader :birth_date, :id
+
+  @@count = 0
+
+  def initialize(name, birth_date, email = nil, phone = nil)
+    @@count += 1
+    @id = @@count
     @name = name
-    @salary = salary
-  end
-  
-  def >(other)
-    salary > other.salary  # เรียก protected method
-  end
-  
-  def to_s
-    "#{@name}: #{@salary} บาท"
-  end
-  
-  protected
-  
-  def salary
-    @salary
-  end
-end
-
-e1 = Employee.new("สมชาย", 50000)
-e2 = Employee.new("สมหญิง", 60000)
-
-puts e1 > e2   # => false
-puts e2 > e1   # => true
-
-# e1.salary  # => NoMethodError (ไม่สามารถเรียกจากภายนอก class)
-```
-
-### Private Methods
-
-```ruby
-class User
-  attr_reader :username, :email
-  
-  def initialize(username, email, password)
-    @username = username
+    @birth_date = parse_date(birth_date)
     @email = email
-    @password_hash = hash_password(password)
+    @phone = phone
+    @friends = []
+    @hobbies = []
   end
-  
-  def authenticate(password)
-    hash_password(password) == @password_hash
+
+  def age
+    now = Date.today
+    years = now.year - @birth_date.year
+    years -= 1 if now < Date.new(now.year, @birth_date.month, @birth_date.day)
+    years
   end
-  
+
+  def adult?
+    age >= 18
+  end
+
+  def birthday_today?
+    today = Date.today
+    @birth_date.month == today.month && @birth_date.day == today.day
+  end
+
+  def days_until_birthday
+    today = Date.today
+    this_year_birthday = Date.new(today.year, @birth_date.month, @birth_date.day)
+    this_year_birthday = Date.new(today.year + 1, @birth_date.month, @birth_date.day) if this_year_birthday < today
+    (this_year_birthday - today).to_i
+  end
+
+  def add_friend(person)
+    unless @friends.include?(person)
+      @friends << person
+      person.add_friend(self) unless person.friends.include?(self)
+      puts "#{@name} and #{person.name} are now friends!"
+    end
+  end
+
+  def add_hobby(hobby)
+    @hobbies << hobby unless @hobbies.include?(hobby)
+  end
+
+  def friends
+    @friends.dup
+  end
+
+  def hobbies
+    @hobbies.dup
+  end
+
+  def mutual_friends_with(person)
+    @friends & person.friends
+  end
+
+  def <=>(other)
+    age <=> other.age
+  end
+
   def to_s
-    "#{@username} <#{@email}>"
+    "#{@name} (age #{age})"
   end
-  
+
+  def inspect
+    "#<Person id=#{@id} name=#{@name.inspect} age=#{age}>"
+  end
+
+  def profile
+    puts "=" * 40
+    puts "Profile"
+    puts "=" * 40
+    puts "ID:      #{@id}"
+    puts "Name:    #{@name}"
+    puts "Age:     #{age}"
+    puts "Born:    #{@birth_date.strftime('%B %d, %Y')}"
+    puts "Email:   #{@email || 'N/A'}"
+    puts "Phone:   #{@phone || 'N/A'}"
+    puts "Adult:   #{adult? ? 'Yes' : 'No'}"
+    puts "Birthday in #{days_until_birthday} days" unless birthday_today?
+    puts "*** TODAY IS BIRTHDAY! ***" if birthday_today?
+    puts "Friends: #{@friends.map(&:name).join(', ')}" unless @friends.empty?
+    puts "Hobbies: #{@hobbies.join(', ')}" unless @hobbies.empty?
+    puts "=" * 40
+  end
+
+  def self.count
+    @@count
+  end
+
   private
-  
-  def hash_password(password)
-    # จำลอง hashing
-    password.chars.map(&:ord).sum.to_s(16)
+
+  def parse_date(date)
+    case date
+    when Date then date
+    when String then Date.parse(date)
+    else raise ArgumentError, "Invalid date format"
+    end
   end
 end
 
-u = User.new("somchai", "somchai@example.com", "secret123")
-puts u.authenticate("secret123")  # => true
-puts u.authenticate("wrong")      # => false
-puts u  # => somchai <somchai@example.com>
+require 'date'
+alice = Person.new("Alice", "1995-06-15", "alice@example.com", "081-234-5678")
+bob = Person.new("Bob", "1998-03-22", "bob@example.com")
+charlie = Person.new("Charlie", "2000-11-30", "charlie@example.com")
 
-begin
-  u.hash_password("test")  # => NoMethodError
-rescue NoMethodError => e
-  puts "Error: #{e.message}"
-end
-```
+alice.add_hobby("Programming")
+alice.add_hobby("Reading")
+alice.add_hobby("Hiking")
+bob.add_hobby("Gaming")
+bob.add_hobby("Programming")
 
-### Method Visibility
+alice.add_friend(bob)
+bob.add_friend(charlie)
+alice.add_friend(charlie)
 
-```ruby
-class Example
-  def public_method
-    "ใครก็เรียกได้"
-  end
-  
-  protected
-  
-  def protected_method
-    "เรียกได้จาก class เดียวกันและ subclass"
-  end
-  
-  private
-  
-  def private_method
-    "เรียกได้จาก object เดียวกันเท่านั้น"
-  end
-  
-  public
-  
-  def another_public
-    "กลับมา public"
-  end
-  
-  private :another_public  # สามารถเปลี่ยน visibility ทีหลัง
-end
+alice.profile
+bob.profile
 
-e = Example.new
-puts e.public_method  # => ใครก็เรียกได้
-# e.protected_method  # => NoMethodError
-# e.private_method    # => NoMethodError
-```
+puts "Mutual friends between Alice and Charlie:"
+mutual = alice.mutual_friends_with(charlie)
+mutual.each { |f| puts "  - #{f.name}" }
 
-### Singleton Methods (Methods เฉพาะ Object)
+people = [alice, bob, charlie]
+puts "\nSorted by age:"
+people.sort.each { |p| puts "  #{p}" }
 
-```ruby
-dog = Object.new
-
-def dog.speak
-  "โฮ่ง!"
-end
-
-def dog.fetch(item)
-  "วิ่งไปเอา #{item} มาแล้ว!"
-end
-
-puts dog.speak        # => โฮ่ง!
-puts dog.fetch("ลูกบอล")  # => วิ่งไปเอา ลูกบอล มาแล้ว!
-
-cat = Object.new
-# cat.speak  # => NoMethodError (cat ไม่มี speak)
+puts "\nYoungest: #{people.min}"
+puts "Oldest: #{people.max}"
+puts "Total people created: #{Person.count}"
 ```
 
 ---
 
-## แบบฝึกหัด Part 11 (30 ข้อ)
-
-### ระดับง่าย (ข้อ 1-10)
-
-**ข้อ 1:** สร้าง class `Rectangle` ที่มี `width` และ `height` พร้อม methods `area`, `perimeter`, `square?`
+## Step 218: Building Example - Rectangle Class
 
 ```ruby
-# เฉลย
 class Rectangle
-  attr_accessor :width, :height
-  
-  def initialize(width, height)
+  include Comparable
+
+  attr_reader :width, :height, :color
+
+  def initialize(width, height, color = "transparent")
+    raise ArgumentError, "Width must be positive" unless width > 0
+    raise ArgumentError, "Height must be positive" unless height > 0
     @width = width.to_f
     @height = height.to_f
+    @color = color
+    @x = 0.0
+    @y = 0.0
   end
-  
+
   def area
     @width * @height
   end
-  
+
   def perimeter
     2 * (@width + @height)
   end
-  
+
+  def diagonal
+    Math.sqrt(@width**2 + @height**2)
+  end
+
   def square?
     @width == @height
   end
-  
+
+  def resize!(scale_factor)
+    raise ArgumentError, "Scale factor must be positive" unless scale_factor > 0
+    @width *= scale_factor
+    @height *= scale_factor
+    self
+  end
+
+  def scale_to_fit(max_width, max_height)
+    scale_w = max_width.to_f / @width
+    scale_h = max_height.to_f / @height
+    scale = [scale_w, scale_h].min
+    Rectangle.new(@width * scale, @height * scale, @color)
+  end
+
+  def move_to(x, y)
+    @x = x.to_f
+    @y = y.to_f
+    self
+  end
+
+  def overlaps?(other)
+    x_overlap = @x < other.instance_variable_get(:@x) + other.width &&
+                @x + @width > other.instance_variable_get(:@x)
+    y_overlap = @y < other.instance_variable_get(:@y) + other.height &&
+                @y + @height > other.instance_variable_get(:@y)
+    x_overlap && y_overlap
+  end
+
+  def contains?(x, y)
+    x.between?(@x, @x + @width) && y.between?(@y, @y + @height)
+  end
+
+  def <=>(other)
+    area <=> other.area
+  end
+
+  def ==(other)
+    other.is_a?(Rectangle) && width == other.width && height == other.height
+  end
+
+  def +(other)
+    # ขยาย bounding box
+    new_width = [@width, other.width].max
+    new_height = @height + other.height
+    Rectangle.new(new_width, new_height)
+  end
+
   def to_s
-    "สี่เหลี่ยมผืนผ้า #{@width}x#{@height}"
+    square_note = square? ? " (Square)" : ""
+    "Rectangle #{@width}x#{@height}#{square_note} [area=#{format('%.2f', area)}, color=#{@color}]"
+  end
+
+  def inspect
+    "#<Rectangle w=#{@width} h=#{@height} area=#{format('%.2f', area)} " \
+    "pos=(#{@x},#{@y}) color=#{@color.inspect}>"
+  end
+
+  def draw_ascii
+    w = [@width.ceil, 40].min
+    h = [@height.ceil, 20].min
+    puts "+" + "-" * (w - 2) + "+"
+    (h - 2).times { puts "|" + " " * (w - 2) + "|" }
+    puts "+" + "-" * (w - 2) + "+"
   end
 end
 
-r1 = Rectangle.new(5, 3)
-puts r1.area         # => 15.0
-puts r1.perimeter    # => 16.0
-puts r1.square?      # => false
+# ทดสอบ Rectangle
+r1 = Rectangle.new(10, 5, "red")
+r2 = Rectangle.new(7, 7, "blue")
+r3 = Rectangle.new(3, 8, "green")
 
-r2 = Rectangle.new(4, 4)
-puts r2.square?      # => true
+puts r1
+puts r2
+puts r3
+
+puts "\nComparisons:"
+puts "r1 > r2: #{r1 > r2}"
+puts "r2 square?: #{r2.square?}"
+
+rects = [r1, r2, r3]
+puts "\nSorted by area:"
+rects.sort.each { |r| puts "  #{r}" }
+
+puts "\nLargest: #{rects.max}"
+puts "Smallest: #{rects.min}"
+
+puts "\nDiagonal of r1: #{format('%.2f', r1.diagonal)}"
+
+r1.move_to(0, 0)
+r4 = Rectangle.new(8, 4)
+r4.move_to(5, 3)
+puts "\nr1 overlaps r4: #{r1.overlaps?(r4)}"
+
+puts "\nr1 scaled to fit 5x5:"
+fitted = r1.scale_to_fit(5, 5)
+puts fitted
+
+puts "\nASCII art of 10x5 rectangle:"
+Rectangle.new(10, 5).draw_ascii
 ```
 
-**ข้อ 2:** สร้าง class `Circle` ที่มี `radius` พร้อม methods `area`, `circumference`, `diameter`
+---
+
+## Step 219-230: แบบฝึกหัด 30 ข้อ พร้อมเฉลย
+
+### ข้อที่ 1: สร้าง class Dog
+
+**โจทย์:** สร้าง class `Dog` ที่มี name, breed, age และ methods bark, eat, sleep, birthday
 
 ```ruby
-# เฉลย
-class Circle
-  attr_accessor :radius
-  
-  PI = Math::PI
-  
-  def initialize(radius)
-    raise ArgumentError, "รัศมีต้องมากกว่า 0" if radius <= 0
-    @radius = radius.to_f
+class Dog
+  attr_accessor :name, :breed, :age
+
+  def initialize(name, breed, age)
+    @name = name
+    @breed = breed
+    @age = age
   end
-  
-  def area
-    PI * @radius ** 2
+
+  def bark
+    puts "#{@name} says: Woof! Woof!"
   end
-  
-  def circumference
-    2 * PI * @radius
+
+  def eat(food)
+    puts "#{@name} eats #{food}. Yum!"
   end
-  
-  def diameter
-    2 * @radius
+
+  def sleep_time
+    puts "#{@name} is sleeping... Zzz..."
   end
-  
+
+  def birthday
+    @age += 1
+    puts "Happy Birthday #{@name}! Now #{@age} years old!"
+  end
+
   def to_s
-    "วงกลมรัศมี #{@radius}"
+    "#{@name} (#{@breed}, age #{@age})"
   end
 end
 
-c = Circle.new(7)
-puts c.area.round(2)          # => 153.94
-puts c.circumference.round(2) # => 43.98
-puts c.diameter               # => 14.0
+dog = Dog.new("Rex", "Labrador", 3)
+dog.bark
+dog.eat("chicken")
+dog.sleep_time
+dog.birthday
+puts dog
 ```
 
-**ข้อ 3:** สร้าง class `Stack` ที่ทำงานแบบ Last-In-First-Out พร้อม `push`, `pop`, `peek`, `empty?`, `size`
+### ข้อที่ 2: Stack Class
+
+**โจทย์:** สร้าง class `Stack` ที่มี push, pop, peek, empty?, size
 
 ```ruby
-# เฉลย
 class Stack
   def initialize
     @data = []
   end
-  
+
   def push(item)
     @data.push(item)
     self
   end
-  
+
   def pop
-    raise "Stack is empty!" if empty?
+    raise "Stack is empty" if empty?
     @data.pop
   end
-  
+
   def peek
-    raise "Stack is empty!" if empty?
+    raise "Stack is empty" if empty?
     @data.last
   end
-  
+
   def empty?
     @data.empty?
   end
-  
+
   def size
     @data.size
   end
-  
+
   def to_s
-    "Stack#{@data.inspect}"
+    "Stack: #{@data.inspect}"
   end
 end
 
-s = Stack.new
-s.push(1).push(2).push(3)
-puts s.peek    # => 3
-puts s.pop     # => 3
-puts s.size    # => 2
-puts s.empty?  # => false
+stack = Stack.new
+stack.push(1).push(2).push(3)
+puts stack           # => Stack: [1, 2, 3]
+puts stack.peek      # => 3
+puts stack.pop       # => 3
+puts stack.size      # => 2
+puts stack.empty?    # => false
 ```
 
-**ข้อ 4:** สร้าง class `Queue` แบบ FIFO พร้อม `enqueue`, `dequeue`, `front`, `empty?`, `size`
+### ข้อที่ 3: Queue Class
+
+**โจทย์:** สร้าง class `Queue` ที่มี enqueue, dequeue, front, empty?, size
 
 ```ruby
-# เฉลย
 class Queue
   def initialize
     @data = []
   end
-  
+
   def enqueue(item)
     @data.push(item)
     self
   end
-  
+
   def dequeue
-    raise "Queue is empty!" if empty?
+    raise "Queue is empty" if empty?
     @data.shift
   end
-  
+
   def front
-    raise "Queue is empty!" if empty?
+    raise "Queue is empty" if empty?
     @data.first
   end
-  
+
   def empty?
     @data.empty?
   end
-  
+
   def size
     @data.size
   end
-  
+
   def to_s
-    "Queue#{@data.inspect}"
+    "Queue(front→back): #{@data.inspect}"
   end
 end
 
 q = Queue.new
-q.enqueue("ลูกค้าที่ 1").enqueue("ลูกค้าที่ 2").enqueue("ลูกค้าที่ 3")
-puts q.front    # => ลูกค้าที่ 1
-puts q.dequeue  # => ลูกค้าที่ 1
-puts q.size     # => 2
+q.enqueue("Alice").enqueue("Bob").enqueue("Charlie")
+puts q
+puts q.front     # => Alice
+puts q.dequeue   # => Alice
+puts q           # => Queue(front→back): ["Bob", "Charlie"]
 ```
 
-**ข้อ 5:** สร้าง class `Person` ด้วย `attr_accessor` พร้อม method `greet` ที่รับ Person object อื่น
+### ข้อที่ 4: Matrix Class
+
+**โจทย์:** สร้าง class `Matrix2x2` ที่มี +, *, determinant, transpose
 
 ```ruby
-# เฉลย
-class Person
-  attr_accessor :name, :age, :city
-  
-  def initialize(name, age, city = "ไม่ระบุ")
-    @name = name
-    @age = age
-    @city = city
-  end
-  
-  def greet(other)
-    "สวัสดี #{other.name}! ฉันชื่อ #{@name} มาจาก#{@city}"
-  end
-  
-  def older_than?(other)
-    @age > other.age
-  end
-  
-  def to_s
-    "#{@name} (#{@age}) จาก#{@city}"
-  end
-end
-
-p1 = Person.new("สมชาย", 25, "กรุงเทพฯ")
-p2 = Person.new("สมหญิง", 30, "เชียงใหม่")
-
-puts p1.greet(p2)       # => สวัสดี สมหญิง! ฉันชื่อ สมชาย มาจากกรุงเทพฯ
-puts p2.older_than?(p1) # => true
-```
-
-**ข้อ 6:** สร้าง class `Counter` ที่นับจำนวน สามารถ `increment`, `decrement`, `reset`, มี class variable นับจำนวน instance ทั้งหมด
-
-```ruby
-# เฉลย
-class Counter
-  @@instance_count = 0
-  
-  attr_reader :value, :name
-  
-  def initialize(name, start = 0)
-    @@instance_count += 1
-    @name = name
-    @value = start
-    @min_value = nil
-    @max_value = nil
-  end
-  
-  def increment(by = 1)
-    @value += by
-    self
-  end
-  
-  def decrement(by = 1)
-    @value -= by
-    self
-  end
-  
-  def reset
-    @value = 0
-    self
-  end
-  
-  def self.instance_count
-    @@instance_count
-  end
-  
-  def to_s
-    "#{@name}: #{@value}"
-  end
-end
-
-c1 = Counter.new("ผู้เข้าชม")
-c2 = Counter.new("คลิก", 100)
-
-c1.increment.increment.increment
-c2.decrement(10)
-
-puts c1  # => ผู้เข้าชม: 3
-puts c2  # => คลิก: 90
-puts Counter.instance_count  # => 2
-```
-
-**ข้อ 7:** สร้าง class `Product` ด้วย Struct
-
-```ruby
-# เฉลย
-Product = Struct.new(:name, :price, :category, :quantity) do
-  def total_value
-    price * quantity
-  end
-  
-  def discount(percent)
-    discounted_price = price * (1 - percent / 100.0)
-    Product.new(name, discounted_price, category, quantity)
-  end
-  
-  def in_stock?
-    quantity > 0
-  end
-  
-  def to_s
-    "#{name} - ราคา: #{price} บาท (#{quantity} ชิ้น)"
-  end
-end
-
-p1 = Product.new("MacBook", 59900, "คอมพิวเตอร์", 5)
-p2 = Product.new("iPhone", 32900, "โทรศัพท์", 0)
-
-puts p1                     # => MacBook - ราคา: 59900 บาท (5 ชิ้น)
-puts p1.total_value         # => 299500
-puts p1.in_stock?           # => true
-puts p2.in_stock?           # => false
-
-discounted = p1.discount(10)
-puts discounted.price       # => 53910.0
-```
-
-**ข้อ 8:** สร้าง class `Library` ที่เก็บ Book objects พร้อม `add_book`, `remove_book`, `find_by_title`, `find_by_author`
-
-```ruby
-# เฉลย
-class Book
-  attr_reader :title, :author, :isbn, :year
-  
-  def initialize(title, author, isbn, year)
-    @title = title
-    @author = author
-    @isbn = isbn
-    @year = year
-  end
-  
-  def to_s
-    "\"#{@title}\" โดย #{@author} (#{@year})"
-  end
-end
-
-class Library
-  def initialize(name)
-    @name = name
-    @books = []
-  end
-  
-  def add_book(book)
-    @books << book
-    puts "เพิ่มหนังสือ: #{book.title}"
-    self
-  end
-  
-  def remove_book(isbn)
-    removed = @books.find { |b| b.isbn == isbn }
-    if removed
-      @books.delete(removed)
-      puts "ลบหนังสือ: #{removed.title}"
-    else
-      puts "ไม่พบหนังสือ ISBN: #{isbn}"
-    end
-    self
-  end
-  
-  def find_by_title(title)
-    @books.select { |b| b.title.downcase.include?(title.downcase) }
-  end
-  
-  def find_by_author(author)
-    @books.select { |b| b.author.downcase.include?(author.downcase) }
-  end
-  
-  def total_books
-    @books.length
-  end
-  
-  def to_s
-    "ห้องสมุด #{@name} มีหนังสือ #{@books.length} เล่ม"
-  end
-end
-
-lib = Library.new("ห้องสมุดกลาง")
-lib.add_book(Book.new("Ruby Programming", "Matz", "978-1-2345", 2020))
-    .add_book(Book.new("Rails in Action", "Ryan Bigg", "978-2-3456", 2021))
-    .add_book(Book.new("Ruby Metaprogramming", "Paolo", "978-3-4567", 2022))
-
-puts lib
-results = lib.find_by_title("ruby")
-results.each { |b| puts b }
-```
-
-**ข้อ 9:** สร้าง class `ShoppingCart` ด้วย `add_item`, `remove_item`, `total`, `checkout`
-
-```ruby
-# เฉลย
-CartItem = Struct.new(:name, :price, :quantity) do
-  def subtotal
-    price * quantity
-  end
-  
-  def to_s
-    "#{name} x#{quantity} = #{subtotal} บาท"
-  end
-end
-
-class ShoppingCart
-  attr_reader :items
-  
-  def initialize
-    @items = {}
-  end
-  
-  def add_item(name, price, quantity = 1)
-    if @items[name]
-      @items[name] = CartItem.new(name, price, @items[name].quantity + quantity)
-    else
-      @items[name] = CartItem.new(name, price, quantity)
-    end
-    puts "เพิ่ม #{name} x#{quantity}"
-    self
-  end
-  
-  def remove_item(name)
-    if @items.delete(name)
-      puts "ลบ #{name} ออกแล้ว"
-    else
-      puts "ไม่พบสินค้า #{name}"
-    end
-    self
-  end
-  
-  def total
-    @items.values.sum(&:subtotal)
-  end
-  
-  def item_count
-    @items.values.sum(&:quantity)
-  end
-  
-  def checkout
-    puts "\n=== ใบเสร็จ ==="
-    @items.values.each { |item| puts item }
-    puts "-"*30
-    puts "รวมทั้งหมด: #{total} บาท"
-    puts "จำนวนสินค้า: #{item_count} ชิ้น"
-    @items.clear
-    puts "ขอบคุณที่ใช้บริการ!"
-  end
-  
-  def to_s
-    "ตะกร้า (#{item_count} ชิ้น, รวม #{total} บาท)"
-  end
-end
-
-cart = ShoppingCart.new
-cart.add_item("Mac Book", 59900)
-    .add_item("Magic Mouse", 2900)
-    .add_item("AirPods", 7900, 2)
-cart.checkout
-```
-
-**ข้อ 10:** สร้าง class `Stopwatch` ด้วย `start`, `stop`, `pause`, `resume`, `elapsed_time`
-
-```ruby
-# เฉลย
-class Stopwatch
-  def initialize
-    @start_time = nil
-    @elapsed = 0
-    @running = false
-    @laps = []
-  end
-  
-  def start
-    raise "Stopwatch is already running" if @running
-    @start_time = Time.now
-    @running = true
-    puts "เริ่มจับเวลา"
-    self
-  end
-  
-  def stop
-    raise "Stopwatch is not running" unless @running
-    @elapsed += Time.now - @start_time
-    @running = false
-    puts "หยุดจับเวลา: #{elapsed_time.round(3)} วินาที"
-    self
-  end
-  
-  def pause
-    stop
-  end
-  
-  def resume
-    start
-  end
-  
-  def reset
-    @start_time = nil
-    @elapsed = 0
-    @running = false
-    @laps = []
-    puts "รีเซ็ตแล้ว"
-    self
-  end
-  
-  def lap
-    raise "Stopwatch is not running" unless @running
-    lap_time = elapsed_time
-    @laps << lap_time
-    puts "Lap #{@laps.length}: #{lap_time.round(3)} วินาที"
-    self
-  end
-  
-  def elapsed_time
-    if @running
-      @elapsed + (Time.now - @start_time)
-    else
-      @elapsed
-    end
-  end
-  
-  def running?
-    @running
-  end
-  
-  def to_s
-    status = @running ? "กำลังทำงาน" : "หยุด"
-    "Stopwatch (#{status}) - #{elapsed_time.round(3)} วินาที"
-  end
-end
-
-sw = Stopwatch.new
-sw.start
-sleep(0.1)
-sw.lap
-sleep(0.1)
-sw.stop
-puts sw.elapsed_time.round(2)  # => ~0.2
-```
-
-### ระดับกลาง (ข้อ 11-20)
-
-**ข้อ 11:** สร้าง class `Matrix` สำหรับเมตริกซ์ 2x2 ด้วย operations `+`, `-`, `*`
-
-```ruby
-# เฉลย
 class Matrix2x2
   attr_reader :a, :b, :c, :d
-  
-  # [a b]
-  # [c d]
+
   def initialize(a, b, c, d)
-    @a, @b, @c, @d = a.to_f, b.to_f, c.to_f, d.to_f
+    @a, @b, @c, @d = a, b, c, d
   end
-  
+
   def +(other)
-    Matrix2x2.new(
-      @a + other.a, @b + other.b,
-      @c + other.c, @d + other.d
-    )
+    Matrix2x2.new(@a + other.a, @b + other.b, @c + other.c, @d + other.d)
   end
-  
-  def -(other)
-    Matrix2x2.new(
-      @a - other.a, @b - other.b,
-      @c - other.c, @d - other.d
-    )
-  end
-  
+
   def *(other)
-    if other.is_a?(Numeric)
-      Matrix2x2.new(@a*other, @b*other, @c*other, @d*other)
-    elsif other.is_a?(Matrix2x2)
-      Matrix2x2.new(
-        @a*other.a + @b*other.c, @a*other.b + @b*other.d,
-        @c*other.a + @d*other.c, @c*other.b + @d*other.d
-      )
-    end
+    Matrix2x2.new(
+      @a * other.a + @b * other.c,
+      @a * other.b + @b * other.d,
+      @c * other.a + @d * other.c,
+      @c * other.b + @d * other.d
+    )
   end
-  
+
   def determinant
     @a * @d - @b * @c
   end
-  
+
   def transpose
     Matrix2x2.new(@a, @c, @b, @d)
   end
-  
-  def ==(other)
-    [@a, @b, @c, @d] == [other.a, other.b, other.c, other.d]
-  end
-  
+
   def to_s
-    "[#{@a} #{@b}]\n[#{@c} #{@d}]"
+    "| #{@a} #{@b} |\n| #{@c} #{@d} |"
   end
 end
 
 m1 = Matrix2x2.new(1, 2, 3, 4)
 m2 = Matrix2x2.new(5, 6, 7, 8)
 
-puts "m1 + m2:"
-puts m1 + m2
-
-puts "\nm1 * m2:"
-puts m1 * m2
-
-puts "\ndet(m1) = #{m1.determinant}"  # => -2.0
+puts "M1:\n#{m1}"
+puts "M2:\n#{m2}"
+puts "M1 + M2:\n#{m1 + m2}"
+puts "M1 * M2:\n#{m1 * m2}"
+puts "Det(M1): #{m1.determinant}"
+puts "Transpose(M1):\n#{m1.transpose}"
 ```
 
-**ข้อ 12:** สร้าง class `Playlist` สำหรับเพลย์ลิสต์เพลง ด้วย `add_song`, `remove_song`, `shuffle`, `next_song`, `duration`
+### ข้อที่ 5: LinkedList Node
+
+**โจทย์:** สร้าง class `Node` และ `LinkedList` ที่มี append, prepend, delete, include?, to_s
 
 ```ruby
-# เฉลย
-Song = Struct.new(:title, :artist, :duration) do
-  def to_s
-    "#{title} - #{artist} (#{duration}s)"
+class Node
+  attr_accessor :value, :next_node
+
+  def initialize(value, next_node = nil)
+    @value = value
+    @next_node = next_node
   end
 end
 
-class Playlist
-  include Enumerable
-  
-  attr_reader :name
-  
-  def initialize(name)
-    @name = name
-    @songs = []
-    @current_index = 0
+class LinkedList
+  def initialize
+    @head = nil
+    @size = 0
   end
-  
-  def add_song(song)
-    @songs << song
-    self
-  end
-  
-  def remove_song(title)
-    @songs.reject! { |s| s.title == title }
-    self
-  end
-  
-  def shuffle!
-    @songs.shuffle!
-    @current_index = 0
-    self
-  end
-  
-  def current_song
-    @songs[@current_index]
-  end
-  
-  def next_song
-    @current_index = (@current_index + 1) % @songs.length unless @songs.empty?
-    current_song
-  end
-  
-  def prev_song
-    @current_index = (@current_index - 1) % @songs.length unless @songs.empty?
-    current_song
-  end
-  
-  def total_duration
-    @songs.sum(&:duration)
-  end
-  
-  def each(&block)
-    @songs.each(&block)
-  end
-  
-  def size
-    @songs.size
-  end
-  
-  def to_s
-    "Playlist: #{@name} (#{@songs.length} เพลง, #{total_duration} วินาที)"
-  end
-end
 
-playlist = Playlist.new("ฟังตอนเช้า")
-playlist.add_song(Song.new("Shape of You", "Ed Sheeran", 235))
-         .add_song(Song.new("Blinding Lights", "The Weeknd", 200))
-         .add_song(Song.new("Dance Monkey", "Tones and I", 210))
-
-puts playlist
-puts "เพลงปัจจุบัน: #{playlist.current_song}"
-puts "เพลงถัดไป: #{playlist.next_song}"
-puts "เพลงทั้งหมด:"
-playlist.each { |s| puts "  #{s}" }
-```
-
-**ข้อ 13:** สร้าง `class TodoList` ด้วย `add`, `complete`, `remove`, `pending_tasks`, `completed_tasks`
-
-```ruby
-# เฉลย
-class Task
-  attr_reader :id, :title, :created_at
-  attr_accessor :completed, :priority
-  
-  @@next_id = 1
-  
-  def initialize(title, priority = :normal)
-    @id = @@next_id
-    @@next_id += 1
-    @title = title
-    @priority = priority
-    @created_at = Time.now
-    @completed = false
-    @completed_at = nil
-  end
-  
-  def complete!
-    @completed = true
-    @completed_at = Time.now
-    self
-  end
-  
-  def completed?
-    @completed
-  end
-  
-  def to_s
-    status = @completed ? "[✓]" : "[ ]"
-    "#{status} ##{@id} #{@title} (#{@priority})"
-  end
-end
-
-class TodoList
-  def initialize(name = "My Tasks")
-    @name = name
-    @tasks = []
-  end
-  
-  def add(title, priority = :normal)
-    task = Task.new(title, priority)
-    @tasks << task
-    puts "เพิ่มงาน: #{title}"
-    task
-  end
-  
-  def complete(id)
-    task = find_task(id)
-    if task
-      task.complete!
-      puts "เสร็จงาน: #{task.title}"
+  def append(value)
+    if @head.nil?
+      @head = Node.new(value)
     else
-      puts "ไม่พบงาน ##{id}"
+      current = @head
+      current = current.next_node while current.next_node
+      current.next_node = Node.new(value)
+    end
+    @size += 1
+    self
+  end
+
+  def prepend(value)
+    @head = Node.new(value, @head)
+    @size += 1
+    self
+  end
+
+  def delete(value)
+    return if @head.nil?
+    if @head.value == value
+      @head = @head.next_node
+      @size -= 1
+      return
+    end
+    current = @head
+    while current.next_node
+      if current.next_node.value == value
+        current.next_node = current.next_node.next_node
+        @size -= 1
+        return
+      end
+      current = current.next_node
     end
   end
-  
-  def remove(id)
-    task = find_task(id)
-    if task
-      @tasks.delete(task)
-      puts "ลบงาน: #{task.title}"
+
+  def include?(value)
+    current = @head
+    while current
+      return true if current.value == value
+      current = current.next_node
     end
+    false
   end
-  
-  def pending_tasks
-    @tasks.reject(&:completed?)
+
+  def size
+    @size
   end
-  
-  def completed_tasks
-    @tasks.select(&:completed?)
-  end
-  
-  def show
-    puts "\n=== #{@name} ==="
-    puts "งานที่ค้างอยู่:"
-    pending_tasks.each { |t| puts "  #{t}" }
-    puts "งานที่เสร็จแล้ว:"
-    completed_tasks.each { |t| puts "  #{t}" }
-    puts "รวม: #{@tasks.length} งาน (เสร็จ: #{completed_tasks.length}, ค้าง: #{pending_tasks.length})"
-  end
-  
-  private
-  
-  def find_task(id)
-    @tasks.find { |t| t.id == id }
+
+  def to_s
+    result = []
+    current = @head
+    while current
+      result << current.value.to_s
+      current = current.next_node
+    end
+    result.join(" -> ")
   end
 end
 
-todo = TodoList.new("งานประจำวัน")
-todo.add("ตรวจสอบอีเมล", :high)
-t2 = todo.add("เขียน report")
-todo.add("ประชุมทีม", :high)
-todo.add("อ่านหนังสือ", :low)
-
-todo.complete(1)
-todo.complete(t2.id)
-todo.show
+list = LinkedList.new
+list.append(1).append(2).append(3)
+list.prepend(0)
+puts list               # => 0 -> 1 -> 2 -> 3
+puts list.size          # => 4
+puts list.include?(2)   # => true
+list.delete(2)
+puts list               # => 0 -> 1 -> 3
+puts list.include?(2)   # => false
 ```
 
-**ข้อ 14:** สร้าง class `Fraction` สำหรับเศษส่วน ด้วย operations `+`, `-`, `*`, `/`
+### ข้อที่ 6-10: เพิ่มเติม
 
 ```ruby
-# เฉลย
+# ข้อที่ 6: Timer class
+class Timer
+  def initialize
+    @elapsed = 0
+    @running = false
+    @start_time = nil
+  end
+
+  def start
+    unless @running
+      @start_time = Time.now
+      @running = true
+    end
+    self
+  end
+
+  def stop
+    if @running
+      @elapsed += Time.now - @start_time
+      @running = false
+    end
+    self
+  end
+
+  def reset
+    @elapsed = 0
+    @running = false
+    @start_time = nil
+    self
+  end
+
+  def elapsed
+    if @running
+      @elapsed + (Time.now - @start_time)
+    else
+      @elapsed
+    end
+  end
+
+  def to_s
+    mins = elapsed.to_i / 60
+    secs = elapsed % 60
+    format("%02d:%05.2f", mins, secs)
+  end
+end
+
+t = Timer.new
+t.start
+sleep(0.1)
+t.stop
+puts "Elapsed: #{t}"
+```
+
+```ruby
+# ข้อที่ 7: Fraction class
 class Fraction
   include Comparable
-  
   attr_reader :numerator, :denominator
-  
-  def initialize(numerator, denominator = 1)
-    raise ArgumentError, "ตัวส่วนต้องไม่เป็น 0" if denominator == 0
-    
+
+  def initialize(numerator, denominator)
+    raise ZeroDivisionError, "Denominator cannot be zero" if denominator == 0
     sign = denominator < 0 ? -1 : 1
     g = gcd(numerator.abs, denominator.abs)
-    
     @numerator = sign * numerator / g
     @denominator = denominator.abs / g
   end
-  
+
   def +(other)
-    other = Fraction.new(other) if other.is_a?(Integer)
     Fraction.new(
-      @numerator * other.denominator + other.numerator * @denominator,
-      @denominator * other.denominator
+      numerator * other.denominator + other.numerator * denominator,
+      denominator * other.denominator
     )
   end
-  
+
   def -(other)
-    other = Fraction.new(other) if other.is_a?(Integer)
     Fraction.new(
-      @numerator * other.denominator - other.numerator * @denominator,
-      @denominator * other.denominator
+      numerator * other.denominator - other.numerator * denominator,
+      denominator * other.denominator
     )
   end
-  
+
   def *(other)
-    other = Fraction.new(other) if other.is_a?(Integer)
-    Fraction.new(@numerator * other.numerator, @denominator * other.denominator)
+    Fraction.new(numerator * other.numerator, denominator * other.denominator)
   end
-  
+
   def /(other)
-    other = Fraction.new(other) if other.is_a?(Integer)
-    Fraction.new(@numerator * other.denominator, @denominator * other.numerator)
+    Fraction.new(numerator * other.denominator, denominator * other.numerator)
   end
-  
+
   def <=>(other)
-    (@numerator * other.denominator) <=> (other.numerator * @denominator)
+    (numerator * other.denominator) <=> (other.numerator * denominator)
   end
-  
-  def ==(other)
-    @numerator == other.numerator && @denominator == other.denominator
-  end
-  
+
   def to_f
-    @numerator.to_f / @denominator
+    numerator.to_f / denominator
   end
-  
+
   def to_s
-    @denominator == 1 ? "#{@numerator}" : "#{@numerator}/#{@denominator}"
+    denominator == 1 ? numerator.to_s : "#{numerator}/#{denominator}"
   end
-  
+
   private
-  
+
   def gcd(a, b)
-    b == 0 ? a : gcd(b, a % b)
+    b.zero? ? a : gcd(b, a % b)
   end
 end
 
-f1 = Fraction.new(1, 2)
-f2 = Fraction.new(1, 3)
-f3 = Fraction.new(3, 4)
-
-puts f1 + f2   # => 5/6
-puts f1 - f2   # => 1/6
-puts f1 * f2   # => 1/6
-puts f1 / f2   # => 3/2
-puts f1 > f2   # => true
-
-fractions = [f3, f1, f2]
-puts fractions.sort.map(&:to_s).inspect  # => ["1/3", "1/2", "3/4"]
+a = Fraction.new(1, 2)
+b = Fraction.new(1, 3)
+puts "#{a} + #{b} = #{a + b}"    # => 1/2 + 1/3 = 5/6
+puts "#{a} * #{b} = #{a * b}"    # => 1/2 * 1/3 = 1/6
+puts "#{a} / #{b} = #{a / b}"    # => 1/2 / 1/3 = 3/2
+puts "#{a} > #{b}: #{a > b}"     # => 1/2 > 1/3: true
 ```
 
-**ข้อ 15:** สร้าง class `EventEmitter` (Observer pattern)
+```ruby
+# ข้อที่ 8: Calendar Event
+class CalendarEvent
+  include Comparable
+
+  attr_accessor :title, :description
+  attr_reader :start_time, :end_time, :location
+
+  def initialize(title, start_time, duration_minutes, location = nil, description = nil)
+    @title = title
+    @start_time = start_time
+    @end_time = start_time + duration_minutes * 60
+    @location = location
+    @description = description
+  end
+
+  def duration_minutes
+    ((@end_time - @start_time) / 60).round
+  end
+
+  def overlaps?(other)
+    start_time < other.end_time && end_time > other.start_time
+  end
+
+  def <=>(other)
+    start_time <=> other.start_time
+  end
+
+  def to_s
+    time_str = "#{start_time.strftime('%H:%M')}-#{end_time.strftime('%H:%M')}"
+    "#{title} (#{time_str}#{@location ? ", #{@location}" : ""})"
+  end
+end
+
+now = Time.now
+events = [
+  CalendarEvent.new("Team Meeting", now + 3600, 60, "Conference Room A"),
+  CalendarEvent.new("Lunch", now + 7200, 60, "Cafeteria"),
+  CalendarEvent.new("Code Review", now + 1800, 30),
+  CalendarEvent.new("Deploy", now + 5400, 45, "Remote"),
+]
+
+puts "Events (sorted):"
+events.sort.each { |e| puts "  #{e}" }
+
+overlap = events[0].overlaps?(events[1])
+puts "\nMeeting overlaps with Lunch: #{overlap}"
+```
 
 ```ruby
-# เฉลย
-class EventEmitter
-  def initialize
-    @listeners = Hash.new { |h, k| h[k] = [] }
+# ข้อที่ 9: Password Generator
+class PasswordGenerator
+  LOWERCASE = ('a'..'z').to_a
+  UPPERCASE = ('A'..'Z').to_a
+  DIGITS = ('0'..'9').to_a
+  SPECIAL = %w[! @ # $ % ^ & * ( ) - _ = + [ ] { } ; : , . < > ?]
+
+  def initialize(length: 12, uppercase: true, digits: true, special: true)
+    @length = length
+    @chars = LOWERCASE.dup
+    @chars += UPPERCASE if uppercase
+    @chars += DIGITS if digits
+    @chars += SPECIAL if special
   end
-  
-  def on(event, &block)
-    @listeners[event] << block
-    self
+
+  def generate
+    Array.new(@length) { @chars.sample }.join
   end
-  
-  def emit(event, *args)
-    @listeners[event].each { |listener| listener.call(*args) }
-    self
+
+  def generate_multiple(count)
+    Array.new(count) { generate }
   end
-  
-  def off(event)
-    @listeners.delete(event)
-    self
-  end
-  
-  def once(event, &block)
-    wrapper = nil
-    wrapper = ->(args) do
-      block.call(*args)
-      off_one(event, wrapper)
+
+  def self.strength(password)
+    score = 0
+    score += 1 if password.length >= 8
+    score += 1 if password.length >= 12
+    score += 1 if password =~ /[A-Z]/
+    score += 1 if password =~ /[a-z]/
+    score += 1 if password =~ /[0-9]/
+    score += 1 if password =~ /[^A-Za-z0-9]/
+
+    case score
+    when 0..2 then "Weak"
+    when 3..4 then "Medium"
+    when 5    then "Strong"
+    else           "Very Strong"
     end
-    @listeners[event] << wrapper
+  end
+end
+
+gen = PasswordGenerator.new(length: 16)
+password = gen.generate
+puts "Password: #{password}"
+puts "Strength: #{PasswordGenerator.strength(password)}"
+
+puts "\n5 passwords:"
+gen.generate_multiple(5).each_with_index do |p, i|
+  puts "#{i+1}. #{p} (#{PasswordGenerator.strength(p)})"
+end
+```
+
+```ruby
+# ข้อที่ 10: Shopping Cart
+class ShoppingCart
+  class Item
+    attr_reader :name, :price, :quantity
+
+    def initialize(name, price, quantity = 1)
+      @name = name
+      @price = price.to_f
+      @quantity = quantity
+    end
+
+    def quantity=(qty)
+      raise ArgumentError, "Quantity must be positive" unless qty > 0
+      @quantity = qty
+    end
+
+    def total
+      @price * @quantity
+    end
+
+    def to_s
+      "#{@name} x#{@quantity} @ ฿#{format('%.2f', @price)} = ฿#{format('%.2f', total)}"
+    end
+  end
+
+  def initialize
+    @items = {}
+    @discount = 0
+  end
+
+  def add(name, price, quantity = 1)
+    if @items.key?(name)
+      @items[name].quantity += quantity
+    else
+      @items[name] = Item.new(name, price, quantity)
+    end
+    puts "Added #{quantity}x #{name}"
     self
   end
-  
-  def listeners_count(event)
-    @listeners[event].length
+
+  def remove(name)
+    if @items.delete(name)
+      puts "Removed #{name}"
+    else
+      puts "#{name} not in cart"
+    end
+    self
   end
-  
+
+  def apply_discount(percent)
+    @discount = percent
+    puts "Applied #{percent}% discount"
+    self
+  end
+
+  def subtotal
+    @items.values.sum(&:total)
+  end
+
+  def discount_amount
+    subtotal * @discount / 100.0
+  end
+
+  def total
+    subtotal - discount_amount
+  end
+
+  def empty?
+    @items.empty?
+  end
+
+  def item_count
+    @items.values.sum(&:quantity)
+  end
+
+  def receipt
+    puts "\n" + "=" * 45
+    puts "       SHOPPING RECEIPT"
+    puts "=" * 45
+    @items.values.each { |item| puts "  #{item}" }
+    puts "-" * 45
+    puts format("  %-30s %8.2f", "Subtotal:", subtotal)
+    if @discount > 0
+      puts format("  %-30s %8.2f", "Discount (#{@discount}%):", -discount_amount)
+    end
+    puts format("  %-30s %8.2f", "TOTAL:", total)
+    puts "=" * 45
+    puts "  Items: #{item_count}"
+    puts
+  end
+end
+
+cart = ShoppingCart.new
+cart.add("Apple", 15, 3)
+    .add("Banana", 10, 5)
+    .add("Orange", 20, 2)
+    .add("Apple", 15, 2)  # เพิ่ม Apple อีก
+    .apply_discount(10)
+
+cart.receipt
+```
+
+### ข้อที่ 11-20: ระดับกลาง
+
+```ruby
+# ข้อที่ 11: Inventory System
+class Inventory
+  class Product
+    attr_accessor :name, :price, :quantity
+    attr_reader :sku
+
+    def initialize(sku, name, price, quantity = 0)
+      @sku = sku
+      @name = name
+      @price = price.to_f
+      @quantity = quantity
+    end
+
+    def value
+      @price * @quantity
+    end
+
+    def low_stock?(threshold = 10)
+      @quantity <= threshold
+    end
+
+    def to_s
+      format("%-10s %-25s %8.2f %8d %10.2f", @sku, @name, @price, @quantity, value)
+    end
+  end
+
+  def initialize
+    @products = {}
+  end
+
+  def add_product(sku, name, price, quantity = 0)
+    @products[sku] = Product.new(sku, name, price, quantity)
+    puts "Added product: #{name} (#{sku})"
+    self
+  end
+
+  def restock(sku, quantity)
+    product = find!(sku)
+    product.quantity += quantity
+    puts "Restocked #{product.name}: +#{quantity} (total: #{product.quantity})"
+  end
+
+  def sell(sku, quantity)
+    product = find!(sku)
+    raise "Insufficient stock for #{product.name}" if product.quantity < quantity
+    product.quantity -= quantity
+    puts "Sold #{quantity}x #{product.name} (remaining: #{product.quantity})"
+  end
+
+  def total_value
+    @products.values.sum(&:value)
+  end
+
+  def low_stock_products(threshold = 10)
+    @products.values.select { |p| p.low_stock?(threshold) }
+  end
+
+  def report
+    puts "\n" + "=" * 65
+    puts format("%-10s %-25s %8s %8s %10s", "SKU", "Name", "Price", "Qty", "Value")
+    puts "=" * 65
+    @products.values.sort_by(&:sku).each { |p| puts p }
+    puts "=" * 65
+    puts format("%-45s %10.2f", "Total Inventory Value:", total_value)
+    puts
+
+    unless low_stock_products.empty?
+      puts "⚠ Low Stock Products:"
+      low_stock_products.each { |p| puts "  - #{p.name} (#{p.quantity} remaining)" }
+    end
+    puts
+  end
+
   private
-  
-  def off_one(event, block)
-    @listeners[event].delete(block)
+
+  def find!(sku)
+    @products[sku] || raise("Product not found: #{sku}")
   end
 end
 
-emitter = EventEmitter.new
+inv = Inventory.new
+inv.add_product("SKU001", "Laptop", 25000, 50)
+   .add_product("SKU002", "Mouse", 500, 100)
+   .add_product("SKU003", "Keyboard", 1200, 8)
+   .add_product("SKU004", "Monitor", 8500, 25)
+   .add_product("SKU005", "USB Hub", 350, 5)
 
-emitter.on(:data) { |data| puts "ได้รับข้อมูล: #{data}" }
-emitter.on(:data) { |data| puts "Log: #{data}" }
-emitter.on(:error) { |err| puts "Error: #{err}" }
+inv.sell("SKU001", 3)
+inv.sell("SKU002", 20)
+inv.restock("SKU003", 50)
 
-emitter.emit(:data, "Hello World")
-emitter.emit(:error, "Connection failed")
-
-puts "\nจำนวน listeners: #{emitter.listeners_count(:data)}"
-emitter.off(:data)
-puts "หลัง off: #{emitter.listeners_count(:data)}"
+inv.report
 ```
 
-### ระดับยาก (ข้อ 16-25)
+```ruby
+# ข้อที่ 12: Text Statistics
+class TextStats
+  def initialize(text)
+    @text = text
+  end
 
-**ข้อ 16:** สร้าง class `Graph` สำหรับ undirected graph ด้วย BFS/DFS
+  def word_count
+    words.length
+  end
+
+  def char_count(include_spaces: true)
+    include_spaces ? @text.length : @text.delete(' ').length
+  end
+
+  def sentence_count
+    @text.split(/[.!?]+/).reject(&:empty?).length
+  end
+
+  def paragraph_count
+    @text.split(/\n\n+/).reject(&:empty?).length
+  end
+
+  def average_word_length
+    return 0 if words.empty?
+    (words.sum(&:length).to_f / words.length).round(2)
+  end
+
+  def most_common_words(n = 10)
+    word_frequency.sort_by { |_, count| -count }.first(n)
+  end
+
+  def reading_time_minutes(words_per_minute = 200)
+    (word_count.to_f / words_per_minute).ceil
+  end
+
+  def unique_words
+    words.map(&:downcase).uniq.length
+  end
+
+  def flesch_reading_ease
+    return 0 if sentence_count == 0
+    syllable_avg = words.sum { |w| count_syllables(w) }.to_f / words.length
+    206.835 - 1.015 * (word_count.to_f / sentence_count) - 84.6 * syllable_avg
+  end
+
+  def report
+    puts "=== Text Statistics ==="
+    puts "Characters (with spaces): #{char_count}"
+    puts "Characters (no spaces): #{char_count(include_spaces: false)}"
+    puts "Words: #{word_count}"
+    puts "Unique words: #{unique_words}"
+    puts "Sentences: #{sentence_count}"
+    puts "Paragraphs: #{paragraph_count}"
+    puts "Avg word length: #{average_word_length} chars"
+    puts "Reading time: ~#{reading_time_minutes} min"
+    puts "\nTop 5 words:"
+    most_common_words(5).each do |word, count|
+      puts "  '#{word}': #{count} times"
+    end
+  end
+
+  private
+
+  def words
+    @text.split(/\W+/).reject(&:empty?)
+  end
+
+  def word_frequency
+    words.map(&:downcase).tally
+  end
+
+  def count_syllables(word)
+    word = word.downcase
+    count = word.scan(/[aeiou]/).length
+    count -= word.scan(/[aeiou]{2}/).length
+    count -= 1 if word.end_with?('e') && count > 1
+    [count, 1].max
+  end
+end
+
+text = """
+Ruby is a dynamic, open source programming language with a focus on simplicity and productivity.
+It has an elegant syntax that is natural to read and easy to write.
+
+Ruby was created by Yukihiro Matsumoto in Japan. He blended parts of his favorite languages to create
+a new language that balanced functional programming with imperative programming.
+
+Ruby on Rails, or Rails, is a server-side web application framework written in Ruby.
+It is a model-view-controller framework providing default structures for a database, web service, and web pages.
+"""
+
+stats = TextStats.new(text)
+stats.report
+```
+
+### ข้อที่ 21-30: ระดับสูง
 
 ```ruby
-# เฉลย
-class Graph
+# ข้อที่ 21: Observer Pattern
+module Observable
+  def self.included(base)
+    base.instance_variable_set(:@observers, [])
+    base.extend(ClassMethods)
+  end
+
+  module ClassMethods
+    def observers
+      @observers
+    end
+
+    def add_observer(observer)
+      @observers << observer
+    end
+  end
+
+  def notify_observers(event, data = nil)
+    self.class.observers.each do |observer|
+      observer.update(event, data, self) if observer.respond_to?(:update)
+    end
+  end
+end
+
+class EventLogger
+  def update(event, data, source)
+    puts "[LOG] #{source.class}: #{event} - #{data.inspect}"
+  end
+end
+
+class EmailNotifier
+  def update(event, data, source)
+    puts "[EMAIL] Sending notification for event: #{event}"
+  end
+end
+
+class StockMarket
+  include Observable
+  attr_reader :symbol, :price
+
+  def initialize(symbol, initial_price)
+    @symbol = symbol
+    @price = initial_price
+  end
+
+  def update_price(new_price)
+    old_price = @price
+    @price = new_price
+    change = ((new_price - old_price) / old_price * 100).round(2)
+    notify_observers(:price_changed, { symbol: @symbol, old: old_price, new: new_price, change: change })
+  end
+end
+
+logger = EventLogger.new
+notifier = EmailNotifier.new
+
+StockMarket.add_observer(logger)
+StockMarket.add_observer(notifier)
+
+aapl = StockMarket.new("AAPL", 150.0)
+aapl.update_price(155.0)
+aapl.update_price(148.5)
+```
+
+```ruby
+# ข้อที่ 22: Memoization
+class Fibonacci
   def initialize
-    @adjacency = Hash.new { |h, k| h[k] = [] }
+    @cache = { 0 => 0, 1 => 1 }
   end
-  
-  def add_edge(from, to)
-    @adjacency[from] << to unless @adjacency[from].include?(to)
-    @adjacency[to] << from unless @adjacency[to].include?(from)
-    self
+
+  def calculate(n)
+    return @cache[n] if @cache.key?(n)
+    @cache[n] = calculate(n - 1) + calculate(n - 2)
   end
-  
-  def add_vertex(vertex)
-    @adjacency[vertex] unless @adjacency.key?(vertex)
-    self
-  end
-  
-  def vertices
-    @adjacency.keys
-  end
-  
-  def neighbors(vertex)
-    @adjacency[vertex]
-  end
-  
-  def bfs(start)
-    visited = []
-    queue = [start]
-    
-    while !queue.empty?
-      vertex = queue.shift
-      next if visited.include?(vertex)
-      
-      visited << vertex
-      @adjacency[vertex].each do |neighbor|
-        queue << neighbor unless visited.include?(neighbor)
-      end
-    end
-    
-    visited
-  end
-  
-  def dfs(start, visited = [])
-    return visited if visited.include?(start)
-    
-    visited << start
-    @adjacency[start].each do |neighbor|
-      dfs(neighbor, visited)
-    end
-    
-    visited
-  end
-  
-  def connected?(v1, v2)
-    bfs(v1).include?(v2)
-  end
-  
-  def to_s
-    @adjacency.map { |v, neighbors| "#{v} -> #{neighbors.join(', ')}" }.join("\n")
+
+  def sequence(n)
+    (0..n).map { |i| calculate(i) }
   end
 end
 
-g = Graph.new
-g.add_edge("A", "B")
- .add_edge("A", "C")
- .add_edge("B", "D")
- .add_edge("C", "D")
- .add_edge("D", "E")
-
-puts "BFS จาก A: #{g.bfs('A').inspect}"
-puts "DFS จาก A: #{g.dfs('A').inspect}"
-puts "A connected to E? #{g.connected?('A', 'E')}"
-puts "\nGraph:\n#{g}"
+fib = Fibonacci.new
+puts fib.sequence(15).inspect
+puts "F(50) = #{fib.calculate(50)}"
 ```
 
-**ข้อ 17:** สร้าง class `Cache` ด้วย LRU (Least Recently Used) eviction
-
 ```ruby
-# เฉลย
-class LRUCache
-  def initialize(capacity)
-    @capacity = capacity
-    @cache = {}
-    @order = []  # LRU order
-  end
-  
-  def get(key)
-    return nil unless @cache.key?(key)
-    
-    # อัปเดต access order
-    @order.delete(key)
-    @order.push(key)
-    
-    @cache[key]
-  end
-  
-  def put(key, value)
-    if @cache.key?(key)
-      @order.delete(key)
-    elsif @cache.size >= @capacity
-      # Evict least recently used
-      lru_key = @order.shift
-      @cache.delete(lru_key)
-      puts "Evicted: #{lru_key}"
-    end
-    
-    @cache[key] = value
-    @order.push(key)
-    self
-  end
-  
-  def size
-    @cache.size
-  end
-  
-  def to_s
-    "LRUCache(#{@cache.inspect})"
-  end
-end
-
-cache = LRUCache.new(3)
-cache.put("a", 1)
-cache.put("b", 2)
-cache.put("c", 3)
-
-puts cache.get("a")   # => 1 (a is most recently used)
-cache.put("d", 4)     # => Evicted: b (b was least recently used)
-
-puts cache.get("b").inspect  # => nil (evicted)
-puts cache.get("c")          # => 3
-puts cache
-```
-
-**ข้อ 18:** สร้าง class `StateMachine` สำหรับ traffic light
-
-```ruby
-# เฉลย
-class StateMachine
-  class InvalidTransition < StandardError; end
-  
-  attr_reader :current_state
-  
-  def initialize(initial_state)
-    @current_state = initial_state
-    @transitions = {}
-    @callbacks = {}
-  end
-  
-  def add_transition(from, event, to)
-    @transitions[[from, event]] = to
-    self
-  end
-  
-  def on_transition(from, to, &block)
-    @callbacks[[from, to]] = block
-    self
-  end
-  
-  def trigger(event)
-    key = [@current_state, event]
-    new_state = @transitions[key]
-    
-    unless new_state
-      raise InvalidTransition, "ไม่สามารถเปลี่ยนจาก #{@current_state} ด้วย #{event}"
-    end
-    
-    old_state = @current_state
-    @current_state = new_state
-    
-    callback = @callbacks[[old_state, new_state]]
-    callback.call(old_state, new_state) if callback
-    
-    puts "#{old_state} -> #{new_state} (#{event})"
-    self
-  end
-  
-  def can_trigger?(event)
-    @transitions.key?([@current_state, event])
-  end
-end
-
-# Traffic Light
-light = StateMachine.new(:red)
-light.add_transition(:red, :go, :green)
-     .add_transition(:green, :slow, :yellow)
-     .add_transition(:yellow, :stop, :red)
-
-light.on_transition(:red, :green) { puts "เขียว! ไปได้เลย" }
-light.on_transition(:green, :yellow) { puts "เหลือง! เตรียมหยุด" }
-light.on_transition(:yellow, :red) { puts "แดง! หยุด" }
-
-puts "สถานะเริ่มต้น: #{light.current_state}"
-light.trigger(:go)
-light.trigger(:slow)
-light.trigger(:stop)
-puts "สถานะสุดท้าย: #{light.current_state}"
-
-begin
-  light.trigger(:slow)  # ไม่สามารถทำได้จาก red
-rescue StateMachine::InvalidTransition => e
-  puts "Error: #{e.message}"
-end
-```
-
-**ข้อ 19:** สร้าง class `RPN_Calculator` (Reverse Polish Notation)
-
-```ruby
-# เฉลย
-class RPNCalculator
-  class CalculatorError < StandardError; end
-  
-  OPERATIONS = {
-    "+" => ->(a, b) { a + b },
-    "-" => ->(a, b) { a - b },
-    "*" => ->(a, b) { a * b },
-    "/" => ->(a, b) { raise CalculatorError, "หารด้วย 0" if b == 0; a.to_f / b },
-    "**" => ->(a, b) { a ** b },
-    "%" => ->(a, b) { a % b }
+# ข้อที่ 23: State Machine
+class TrafficLight
+  STATES = [:red, :yellow, :green]
+  TRANSITIONS = {
+    red: :green,
+    green: :yellow,
+    yellow: :red
   }
-  
+
+  attr_reader :state
+
   def initialize
-    @stack = []
+    @state = :red
     @history = []
   end
-  
-  def calculate(expression)
-    @stack = []
-    tokens = expression.split
-    
-    tokens.each do |token|
-      if OPERATIONS.key?(token)
-        raise CalculatorError, "ต้องการตัวเลขอย่างน้อย 2 ตัว" if @stack.size < 2
-        b = @stack.pop
-        a = @stack.pop
-        result = OPERATIONS[token].call(a, b)
-        @stack.push(result)
-      else
-        @stack.push(token.to_f)
-      end
-    end
-    
-    raise CalculatorError, "Expression ไม่ถูกต้อง" if @stack.size != 1
-    
-    result = @stack.first
-    @history << { expression: expression, result: result }
-    result
-  end
-  
-  def history
-    @history.map { |h| "#{h[:expression]} = #{h[:result]}" }
-  end
-  
-  def last_result
-    @history.last&.[](:result)
-  end
-end
 
-calc = RPNCalculator.new
-
-puts calc.calculate("3 4 +")       # => 7.0   (3+4)
-puts calc.calculate("10 2 /")      # => 5.0   (10/2)
-puts calc.calculate("5 1 2 + 4 * + 3 -")  # => 14.0  (5 + (1+2)*4 - 3)
-puts calc.calculate("2 3 **")      # => 8.0   (2^3)
-
-puts "\nประวัติการคำนวณ:"
-calc.history.each { |h| puts "  #{h}" }
-```
-
-**ข้อ 20:** สร้าง class `TreeNode` และ `BinaryTree`
-
-```ruby
-# เฉลย
-class TreeNode
-  attr_accessor :value, :left, :right
-  
-  def initialize(value)
-    @value = value
-    @left = nil
-    @right = nil
-  end
-  
-  def leaf?
-    @left.nil? && @right.nil?
-  end
-  
-  def to_s
-    @value.to_s
-  end
-end
-
-class BinarySearchTree
-  def initialize
-    @root = nil
-  end
-  
-  def insert(value)
-    @root = insert_node(@root, value)
+  def next_state
+    old_state = @state
+    @state = TRANSITIONS[@state]
+    @history << { from: old_state, to: @state, time: Time.now }
+    puts "Traffic light: #{old_state.upcase} → #{@state.upcase}"
     self
   end
-  
-  def include?(value)
-    find_node(@root, value) != nil
+
+  def red?    = @state == :red
+  def yellow? = @state == :yellow
+  def green?  = @state == :green
+
+  def safe_to_go?
+    @state == :green
   end
-  
-  def inorder
-    result = []
-    inorder_traverse(@root, result)
-    result
+
+  def history
+    @history.last(5)
   end
-  
-  def preorder
-    result = []
-    preorder_traverse(@root, result)
-    result
-  end
-  
-  def height
-    calculate_height(@root)
-  end
-  
-  def min
-    return nil if @root.nil?
-    node = @root
-    node = node.left while node.left
-    node.value
-  end
-  
-  def max
-    return nil if @root.nil?
-    node = @root
-    node = node.right while node.right
-    node.value
-  end
-  
-  private
-  
-  def insert_node(node, value)
-    return TreeNode.new(value) if node.nil?
-    
-    if value < node.value
-      node.left = insert_node(node.left, value)
-    elsif value > node.value
-      node.right = insert_node(node.right, value)
-    end
-    
-    node
-  end
-  
-  def find_node(node, value)
-    return nil if node.nil?
-    return node if node.value == value
-    
-    if value < node.value
-      find_node(node.left, value)
-    else
-      find_node(node.right, value)
-    end
-  end
-  
-  def inorder_traverse(node, result)
-    return if node.nil?
-    inorder_traverse(node.left, result)
-    result << node.value
-    inorder_traverse(node.right, result)
-  end
-  
-  def preorder_traverse(node, result)
-    return if node.nil?
-    result << node.value
-    preorder_traverse(node.left, result)
-    preorder_traverse(node.right, result)
-  end
-  
-  def calculate_height(node)
-    return 0 if node.nil?
-    1 + [calculate_height(node.left), calculate_height(node.right)].max
+
+  def to_s
+    "TrafficLight[#{@state.upcase}]"
   end
 end
 
-bst = BinarySearchTree.new
-[5, 3, 7, 1, 4, 6, 8].each { |v| bst.insert(v) }
-
-puts "Inorder: #{bst.inorder.inspect}"   # => [1, 3, 4, 5, 6, 7, 8]
-puts "Min: #{bst.min}"                   # => 1
-puts "Max: #{bst.max}"                   # => 8
-puts "Height: #{bst.height}"             # => 3
-puts "Include 4? #{bst.include?(4)}"     # => true
-puts "Include 9? #{bst.include?(9)}"     # => false
+light = TrafficLight.new
+puts light
+puts "Safe to go? #{light.safe_to_go?}"
+5.times { light.next_state }
+puts light
 ```
 
-### ระดับท้าทาย (ข้อ 21-30)
-
-**ข้อ 21-30:** โจทย์ท้าทาย
-
 ```ruby
-# ข้อ 21: สร้าง class Vector ใน 3D space
-class Vector3D
-  include Comparable
-  
-  attr_reader :x, :y, :z
-  
-  def initialize(x, y, z)
-    @x, @y, @z = x.to_f, y.to_f, z.to_f
+# ข้อที่ 24: Chess Piece
+class ChessPiece
+  SYMBOLS = {
+    king:   { white: '♔', black: '♚' },
+    queen:  { white: '♕', black: '♛' },
+    rook:   { white: '♖', black: '♜' },
+    bishop: { white: '♗', black: '♝' },
+    knight: { white: '♘', black: '♞' },
+    pawn:   { white: '♙', black: '♟' }
+  }
+
+  attr_reader :type, :color, :position
+
+  def initialize(type, color, position)
+    raise ArgumentError, "Invalid piece type" unless SYMBOLS.key?(type)
+    raise ArgumentError, "Color must be :white or :black" unless [:white, :black].include?(color)
+    @type = type
+    @color = color
+    @position = position
+    @move_count = 0
   end
-  
-  def +(other)
-    Vector3D.new(@x + other.x, @y + other.y, @z + other.z)
+
+  def symbol
+    SYMBOLS[@type][@color]
   end
-  
-  def -(other)
-    Vector3D.new(@x - other.x, @y - other.y, @z - other.z)
+
+  def move_to(new_position)
+    if valid_move?(new_position)
+      old_pos = @position
+      @position = new_position
+      @move_count += 1
+      puts "#{symbol} moved from #{old_pos} to #{new_position}"
+      true
+    else
+      puts "Invalid move!"
+      false
+    end
   end
-  
-  def *(scalar)
-    Vector3D.new(@x * scalar, @y * scalar, @z * scalar)
+
+  def file
+    @position[0]  # letter (a-h)
   end
-  
-  def dot(other)
-    @x * other.x + @y * other.y + @z * other.z
+
+  def rank
+    @position[1].to_i  # number (1-8)
   end
-  
-  def cross(other)
-    Vector3D.new(
-      @y * other.z - @z * other.y,
-      @z * other.x - @x * other.z,
-      @x * other.y - @y * other.x
-    )
-  end
-  
-  def magnitude
-    Math.sqrt(@x**2 + @y**2 + @z**2)
-  end
-  
-  def normalize
-    m = magnitude
-    raise "Zero vector" if m == 0
-    Vector3D.new(@x/m, @y/m, @z/m)
-  end
-  
-  def angle_with(other)
-    cos_angle = dot(other) / (magnitude * other.magnitude)
-    Math.acos(cos_angle) * 180 / Math::PI
-  end
-  
-  def <=>(other)
-    magnitude <=> other.magnitude
-  end
-  
-  def ==(other)
-    [@x, @y, @z] == [other.x, other.y, other.z]
-  end
-  
+
   def to_s
-    "(#{@x.round(2)}, #{@y.round(2)}, #{@z.round(2)})"
+    "#{@color.to_s.capitalize} #{@type.to_s.capitalize} at #{@position}"
+  end
+
+  private
+
+  def valid_move?(pos)
+    pos =~ /\A[a-h][1-8]\z/
   end
 end
 
-v1 = Vector3D.new(1, 2, 3)
-v2 = Vector3D.new(4, 5, 6)
+king = ChessPiece.new(:king, :white, "e1")
+queen = ChessPiece.new(:queen, :black, "d8")
 
-puts v1 + v2              # => (5.0, 7.0, 9.0)
-puts v1.dot(v2)           # => 32.0
-puts v1.cross(v2)         # => (-3.0, 6.0, -3.0)
-puts v1.magnitude.round(3) # => 3.742
-puts v1.angle_with(v2).round(2)  # => 12.93 degrees
+puts king
+puts queen
+king.move_to("e2")
+king.move_to("e3")
+puts king
+```
 
+```ruby
+# ข้อที่ 25: Polynomial
+class Polynomial
+  attr_reader :coefficients
 
-# ข้อ 22-30 เป็นโจทย์ให้ทำด้วยตัวเอง:
-# ข้อ 22: สร้าง Polynomial class ที่คำนวณค่า polynomial ได้
-# ข้อ 23: สร้าง LinkedList class ด้วย add, remove, reverse
-# ข้อ 24: สร้าง PriorityQueue class
-# ข้อ 25: สร้าง Observable pattern ด้วย Subject และ Observer
-# ข้อ 26: สร้าง Money class ที่จัดการ currency
-# ข้อ 27: สร้าง Calendar class
-# ข้อ 28: สร้าง FileSystem simulation ด้วย tree structure
-# ข้อ 29: สร้าง ChessBoard class
-# ข้อ 30: สร้าง MiniDatabase class ด้วย CRUD operations
+  # coefficients: [c0, c1, c2, ...] สำหรับ c0 + c1*x + c2*x^2 + ...
+  def initialize(*coefficients)
+    @coefficients = coefficients.dup
+    # ตัด trailing zeros
+    @coefficients.pop while @coefficients.last == 0 && @coefficients.length > 1
+  end
+
+  def degree
+    @coefficients.length - 1
+  end
+
+  def evaluate(x)
+    @coefficients.each_with_index.sum { |c, i| c * (x ** i) }
+  end
+
+  def +(other)
+    max_len = [coefficients.length, other.coefficients.length].max
+    new_coeffs = Array.new(max_len, 0)
+    coefficients.each_with_index { |c, i| new_coeffs[i] += c }
+    other.coefficients.each_with_index { |c, i| new_coeffs[i] += c }
+    Polynomial.new(*new_coeffs)
+  end
+
+  def *(scalar)
+    Polynomial.new(*coefficients.map { |c| c * scalar })
+  end
+
+  def derivative
+    return Polynomial.new(0) if degree == 0
+    new_coeffs = coefficients[1..].each_with_index.map { |c, i| c * (i + 1) }
+    Polynomial.new(*new_coeffs)
+  end
+
+  def to_s
+    return "0" if @coefficients == [0]
+
+    terms = @coefficients.each_with_index.reverse_each.filter_map do |c, i|
+      next if c == 0
+      if i == 0
+        c.to_s
+      elsif i == 1
+        c == 1 ? "x" : c == -1 ? "-x" : "#{c}x"
+      else
+        c == 1 ? "x^#{i}" : c == -1 ? "-x^#{i}" : "#{c}x^#{i}"
+      end
+    end
+
+    terms.join(" + ").gsub("+ -", "- ")
+  end
+end
+
+p1 = Polynomial.new(1, 2, 3)  # 1 + 2x + 3x^2
+p2 = Polynomial.new(4, 1)     # 4 + x
+puts "p1 = #{p1}"
+puts "p2 = #{p2}"
+puts "p1 + p2 = #{p1 + p2}"
+puts "p1(2) = #{p1.evaluate(2)}"
+puts "p1' = #{p1.derivative}"
+```
+
+```ruby
+# ข้อที่ 26-30: รวมตัวอย่างเพิ่มเติม
+
+# ข้อที่ 26: Contact Book
+class ContactBook
+  Contact = Struct.new(:name, :phone, :email, :group) do
+    def to_s
+      "#{name} | #{phone} | #{email} | #{group}"
+    end
+  end
+
+  def initialize
+    @contacts = []
+  end
+
+  def add(name, phone, email, group = "General")
+    @contacts << Contact.new(name, phone, email, group)
+    puts "Added: #{name}"
+    self
+  end
+
+  def search(query)
+    query = query.downcase
+    @contacts.select do |c|
+      c.name.downcase.include?(query) ||
+      c.phone.include?(query) ||
+      c.email.downcase.include?(query)
+    end
+  end
+
+  def by_group(group)
+    @contacts.select { |c| c.group.downcase == group.downcase }
+  end
+
+  def delete(name)
+    before = @contacts.length
+    @contacts.reject! { |c| c.name == name }
+    @contacts.length < before ? puts("Deleted: #{name}") : puts("Not found: #{name}")
+  end
+
+  def all
+    @contacts.sort_by(&:name)
+  end
+
+  def list
+    puts "\n=== Contact Book (#{@contacts.length} contacts) ==="
+    all.each { |c| puts "  #{c}" }
+    puts
+  end
+end
+
+book = ContactBook.new
+book.add("Alice Smith", "081-111-1111", "alice@example.com", "Friends")
+    .add("Bob Jones", "082-222-2222", "bob@example.com", "Work")
+    .add("Charlie Brown", "083-333-3333", "charlie@example.com", "Friends")
+    .add("Diana Prince", "084-444-4444", "diana@example.com", "Work")
+
+book.list
+
+puts "Search 'alice':"
+book.search("alice").each { |c| puts "  #{c}" }
+
+puts "\nWork contacts:"
+book.by_group("Work").each { |c| puts "  #{c}" }
+```
+
+```ruby
+# ข้อที่ 27: Rate Limiter
+class RateLimiter
+  def initialize(max_requests:, per_seconds:)
+    @max_requests = max_requests
+    @per_seconds = per_seconds
+    @requests = []
+  end
+
+  def allow?
+    now = Time.now
+    @requests.reject! { |t| t < now - @per_seconds }
+
+    if @requests.length < @max_requests
+      @requests << now
+      true
+    else
+      false
+    end
+  end
+
+  def wait_time
+    return 0 unless @requests.length >= @max_requests
+    oldest = @requests.first
+    [@per_seconds - (Time.now - oldest), 0].max
+  end
+
+  def stats
+    {
+      current_requests: @requests.length,
+      max_requests: @max_requests,
+      period_seconds: @per_seconds,
+      allowed: @requests.length < @max_requests
+    }
+  end
+end
+
+limiter = RateLimiter.new(max_requests: 3, per_seconds: 5)
+10.times do |i|
+  if limiter.allow?
+    puts "Request #{i + 1}: ALLOWED"
+  else
+    puts "Request #{i + 1}: RATE LIMITED (wait #{limiter.wait_time.round(1)}s)"
+  end
+end
+```
+
+```ruby
+# ข้อที่ 28: File-like Object (StringIO-like)
+class StringBuffer
+  attr_reader :pos
+
+  def initialize(initial = "")
+    @buffer = initial.dup
+    @pos = 0
+  end
+
+  def write(str)
+    @buffer[@pos, str.length] = str
+    @pos += str.length
+    str.length
+  end
+
+  def read(n = nil)
+    if n.nil?
+      result = @buffer[@pos..]
+      @pos = @buffer.length
+    else
+      result = @buffer[@pos, n]
+      @pos += (result&.length || 0)
+    end
+    result
+  end
+
+  def seek(offset, whence = :set)
+    case whence
+    when :set then @pos = offset
+    when :cur then @pos += offset
+    when :end then @pos = @buffer.length + offset
+    end
+    @pos = @pos.clamp(0, @buffer.length)
+  end
+
+  def rewind
+    @pos = 0
+  end
+
+  def eof?
+    @pos >= @buffer.length
+  end
+
+  def size
+    @buffer.length
+  end
+
+  def string
+    @buffer.dup
+  end
+
+  def truncate(new_size = 0)
+    @buffer = @buffer[0, new_size] || ""
+    @pos = @pos.clamp(0, @buffer.length)
+  end
+end
+
+buf = StringBuffer.new
+buf.write("Hello, World!")
+buf.rewind
+puts buf.read(5)   # => Hello
+puts buf.read      # => , World!
+puts buf.eof?      # => true
+buf.rewind
+puts buf.string    # => Hello, World!
+```
+
+```ruby
+# ข้อที่ 29: Money Class
+class Money
+  include Comparable
+
+  CURRENCIES = {
+    "THB" => "฿",
+    "USD" => "$",
+    "EUR" => "€",
+    "GBP" => "£",
+    "JPY" => "¥"
+  }
+
+  EXCHANGE_RATES = {
+    "USD_THB" => 35.5,
+    "EUR_THB" => 38.2,
+    "GBP_THB" => 44.1,
+    "JPY_THB" => 0.24
+  }
+
+  attr_reader :amount, :currency
+
+  def initialize(amount, currency = "THB")
+    raise ArgumentError, "Amount cannot be negative" if amount < 0
+    raise ArgumentError, "Unknown currency: #{currency}" unless CURRENCIES.key?(currency)
+    @amount = amount.to_f.round(2)
+    @currency = currency
+  end
+
+  def +(other)
+    other_in_same = other.convert_to(currency)
+    Money.new(@amount + other_in_same.amount, currency)
+  end
+
+  def -(other)
+    other_in_same = other.convert_to(currency)
+    raise "Result cannot be negative" if other_in_same.amount > @amount
+    Money.new(@amount - other_in_same.amount, currency)
+  end
+
+  def *(factor)
+    Money.new(@amount * factor, currency)
+  end
+
+  def <=>(other)
+    in_thb <=> other.in_thb
+  end
+
+  def convert_to(target_currency)
+    return self if currency == target_currency
+    thb_amount = in_thb
+    if target_currency == "THB"
+      Money.new(thb_amount, "THB")
+    else
+      rate_key = "#{target_currency}_THB"
+      rate = EXCHANGE_RATES[rate_key]
+      raise "No exchange rate for #{target_currency}" unless rate
+      Money.new(thb_amount / rate, target_currency)
+    end
+  end
+
+  def in_thb
+    return @amount if currency == "THB"
+    rate_key = "#{currency}_THB"
+    rate = EXCHANGE_RATES[rate_key]
+    raise "No exchange rate for #{currency}" unless rate
+    @amount * rate
+  end
+
+  def symbol
+    CURRENCIES[currency]
+  end
+
+  def to_s
+    "#{symbol}#{format('%.2f', @amount)} #{currency}"
+  end
+end
+
+price = Money.new(1000, "THB")
+tip = Money.new(10, "USD")
+puts "Price: #{price}"
+puts "Tip (USD): #{tip}"
+puts "Tip in THB: #{tip.convert_to('THB')}"
+puts "Total: #{price + tip}"
+
+prices = [
+  Money.new(500, "THB"),
+  Money.new(20, "USD"),
+  Money.new(15, "EUR"),
+]
+puts "\nSorted by value (THB equivalent):"
+prices.sort.each { |p| puts "  #{p} = #{p.convert_to('THB')}" }
+```
+
+```ruby
+# ข้อที่ 30: Game Character
+class GameCharacter
+  CLASSES = %i[warrior mage rogue]
+  BASE_STATS = {
+    warrior: { hp: 150, mp: 50, attack: 25, defense: 20, speed: 10 },
+    mage:    { hp: 80, mp: 200, attack: 15, defense: 8, speed: 12 },
+    rogue:   { hp: 100, mp: 80, attack: 30, defense: 12, speed: 20 }
+  }
+
+  attr_reader :name, :character_class, :level, :experience
+  attr_accessor :equipment
+
+  def initialize(name, character_class)
+    raise ArgumentError, "Invalid class" unless CLASSES.include?(character_class)
+    @name = name
+    @character_class = character_class
+    @level = 1
+    @experience = 0
+    @stats = BASE_STATS[character_class].dup
+    @current_hp = max_hp
+    @current_mp = max_mp
+    @equipment = {}
+    @skills = []
+    @alive = true
+  end
+
+  def max_hp = @stats[:hp] + (@level - 1) * 10
+  def max_mp = @stats[:mp] + (@level - 1) * 5
+  def attack_power = @stats[:attack] + (@level - 1) * 3
+  def defense_power = @stats[:defense] + (@level - 1) * 2
+
+  def hp = @current_hp
+  def mp = @current_mp
+  def alive? = @alive
+
+  def heal(amount)
+    old_hp = @current_hp
+    @current_hp = [@current_hp + amount, max_hp].min
+    healed = @current_hp - old_hp
+    puts "#{@name} healed #{healed} HP (#{@current_hp}/#{max_hp})"
+  end
+
+  def take_damage(amount)
+    damage = [amount - defense_power, 1].max
+    @current_hp -= damage
+    puts "#{@name} takes #{damage} damage! (#{[@current_hp, 0].max}/#{max_hp} HP)"
+    if @current_hp <= 0
+      @current_hp = 0
+      @alive = false
+      puts "#{@name} has been defeated!"
+    end
+  end
+
+  def attack(target)
+    damage = attack_power + rand(-5..5)
+    puts "#{@name} attacks #{target.name} for #{damage} damage!"
+    target.take_damage(damage)
+  end
+
+  def gain_experience(amount)
+    @experience += amount
+    puts "#{@name} gained #{amount} EXP (total: #{@experience})"
+    level_up while @experience >= experience_to_next_level
+  end
+
+  def experience_to_next_level
+    @level * 100
+  end
+
+  def status
+    hp_bar = progress_bar(@current_hp, max_hp, 20)
+    mp_bar = progress_bar(@current_mp, max_mp, 20)
+    puts "=" * 45
+    puts "#{@name} (#{@character_class.to_s.capitalize}) - Level #{@level}"
+    puts "HP: #{hp_bar} #{@current_hp}/#{max_hp}"
+    puts "MP: #{mp_bar} #{@current_mp}/#{max_mp}"
+    puts "ATK: #{attack_power}  DEF: #{defense_power}  SPD: #{@stats[:speed]}"
+    puts "EXP: #{@experience}/#{experience_to_next_level}"
+    puts "=" * 45
+  end
+
+  private
+
+  def level_up
+    if @experience >= experience_to_next_level
+      @level += 1
+      @current_hp = max_hp
+      @current_mp = max_mp
+      puts "🎉 #{@name} leveled up to Level #{@level}!"
+    end
+  end
+
+  def progress_bar(current, max, width)
+    filled = (current.to_f / max * width).round
+    "[" + "█" * filled + "░" * (width - filled) + "]"
+  end
+end
+
+hero = GameCharacter.new("Aragorn", :warrior)
+enemy = GameCharacter.new("Goblin", :rogue)
+
+hero.status
+enemy.status
+
+puts "\n=== Battle! ==="
+hero.attack(enemy)
+enemy.attack(hero)
+hero.heal(30)
+hero.attack(enemy)
+enemy.attack(hero)
+hero.attack(enemy)
+
+hero.gain_experience(150)
+hero.status
 ```
 
 ---
 
-## สรุป Part 11
+## สรุปตอนที่ 11
 
-ใน Part นี้ เราได้เรียนรู้:
+ในตอนนี้เราได้เรียนรู้:
 
-1. **OOP คืออะไร** - แนวคิดหลัก 4 อย่าง: Encapsulation, Inheritance, Polymorphism, Abstraction
-2. **Class Definition** - การสร้าง class ด้วยคีย์เวิร์ด `class`
-3. **Instance Variables** (`@variable`) - เก็บข้อมูลเฉพาะของแต่ละ object
-4. **Instance Methods** - ฟังก์ชันที่เรียกผ่าน object
-5. **initialize** - constructor ที่ถูกเรียกอัตโนมัติเมื่อสร้าง object
-6. **attr_reader/writer/accessor** - ช่วยสร้าง getter/setter อัตโนมัติ
-7. **Class Variables** (`@@variable`) - ตัวแปรที่แชร์ระหว่าง instances
-8. **Class Methods** (`self.method`) - methods ที่เรียกผ่านชื่อ class
-9. **Object Identity** - `object_id`, `equal?`, `eql?`, `==`
-10. **to_s, inspect, freeze** - methods พิเศษของ Object
-11. **dup vs clone** - shallow copy
-12. **Struct** - วิธีสร้าง class ข้อมูลอย่างง่าย
-13. **OpenStruct** - object ที่เพิ่ม attribute ได้แบบ dynamic
-14. **Comparable** - module สำหรับเปรียบเทียบ objects
+1. **OOP Concepts** - Encapsulation, Inheritance, Polymorphism, Abstraction
+2. **Class Definition** - `class...end`, naming conventions, open classes
+3. **Instance Variables** - `@var`, nil default, `instance_variables`
+4. **initialize** - constructor, default values, keyword arguments
+5. **Instance Methods** - method chaining กับ `self`
+6. **Accessors** - `attr_reader`, `attr_writer`, `attr_accessor`
+7. **Class Variables** - `@@var`, shared state
+8. **Class Methods** - `self.method`, factory pattern
+9. **Constants** - uppercase naming, freezing constants
+10. **Object Identity** - `object_id`, `equal?`, `eql?`, `==`
+11. **to_s / inspect** - string representation
+12. **freeze** - immutability
+13. **dup vs clone** - shallow copy, singleton methods
+14. **Struct** - lightweight value objects
+15. **OpenStruct** - dynamic attributes
+16. **Comparable** - `<=>` และ comparison operators
+17. **Complete Examples** - BankAccount, Person, Rectangle
 
-**ต่อไป:** Part 12 - Inheritance (การสืบทอด)
+---
+
+*ตอนต่อไป: Part 12 - Inheritance*
