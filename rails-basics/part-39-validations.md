@@ -1,361 +1,865 @@
-# Part 39: Validations (ขั้นตอนที่ 861-880)
+# ตอนที่ 39: Validations (Steps 861-880)
 
 ## บทนำ
 
-Validations คือกลไกที่ใช้ตรวจสอบข้อมูลก่อนที่จะบันทึกลงฐานข้อมูล Rails มี validation helpers ที่ใช้งานง่าย พร้อมกับระบบ custom validations ที่ยืดหยุ่น
+Validations ใน Rails ช่วยให้แน่ใจว่าข้อมูลที่บันทึกลง database มีความถูกต้องและสมบูรณ์ Rails มี built-in validators มากมายและยังสามารถสร้าง custom validators ได้
 
 ---
 
-## ขั้นตอนที่ 861: Validation Helpers พื้นฐาน
-
-### presence
-
-```ruby
-class Article < ApplicationRecord
-  validates :title, presence: true
-  validates :body, presence: true
-  validates :user, presence: true  # ตรวจสอบ association ด้วย
-
-  # หลาย fields พร้อมกัน
-  validates :title, :body, :status, presence: true
-end
-
-article = Article.new
-article.valid?   # => false
-article.errors[:title]  # => ["can't be blank"]
-article.errors.full_messages  # => ["Title can't be blank", "Body can't be blank"]
-```
-
-### length
+## Step 861: validates :presence
 
 ```ruby
 class User < ApplicationRecord
-  validates :username, length: { minimum: 3 }
-  validates :username, length: { maximum: 50 }
-  validates :username, length: { in: 3..50 }
-  validates :username, length: { is: 10 }  # ต้องเท่ากับ 10
+  # ต้องมีค่า (ไม่เป็น nil หรือ empty string)
+  validates :name, presence: true
+  validates :email, presence: true
+  
+  # หลาย attributes พร้อมกัน
+  validates :name, :email, :password, presence: true
+end
 
-  validates :bio, length: {
-    maximum: 500,
-    too_long: "ไม่เกิน %{count} ตัวอักษร"
-  }
+# ใช้งาน
+user = User.new
+user.valid?    # => false
+user.errors[:name]   # => ["can't be blank"]
+user.errors.full_messages  # => ["Name can't be blank", "Email can't be blank"]
 
-  validates :pin, length: {
-    minimum: 4,
-    maximum: 6,
-    too_short: "PIN ต้องมีอย่างน้อย %{count} หลัก",
-    too_long: "PIN ต้องไม่เกิน %{count} หลัก"
+user = User.new(name: "สมชาย", email: "somchai@example.com")
+user.valid?    # => true
+
+# Custom message
+validates :name, presence: { message: "กรุณากรอกชื่อ" }
+validates :email, presence: { message: "กรุณากรอกอีเมล" }
+```
+
+---
+
+## Step 862: validates :length
+
+```ruby
+class User < ApplicationRecord
+  # ความยาว minimum
+  validates :name, length: { minimum: 2 }
+  
+  # ความยาว maximum
+  validates :bio, length: { maximum: 500 }
+  
+  # ความยาว range
+  validates :username, length: { in: 3..20 }
+  validates :password, length: { in: 8..128 }
+  
+  # ความยาว exact
+  validates :postal_code, length: { is: 5 }
+  validates :pin, length: { is: 6 }
+  
+  # Custom messages
+  validates :name, length: {
+    minimum: 2,
+    maximum: 100,
+    too_short: "ชื่อสั้นเกินไป (ขั้นต่ำ %{count} ตัวอักษร)",
+    too_long: "ชื่อยาวเกินไป (สูงสุด %{count} ตัวอักษร)"
   }
+  
+  # นับด้วย token แทน char
+  validates :content, length: { maximum: 1000, tokenizer: ->(str) { str.split } }
+  # นับ words ไม่ใช่ characters
 end
 ```
 
-### numericality
+---
+
+## Step 863: validates :numericality
 
 ```ruby
 class Product < ApplicationRecord
-  validates :price, numericality: true                     # ตัวเลขเท่านั้น
-  validates :price, numericality: { greater_than: 0 }      # > 0
-  validates :price, numericality: { greater_than_or_equal_to: 0 }  # >= 0
-  validates :price, numericality: { less_than: 10000 }     # < 10000
-  validates :price, numericality: { less_than_or_equal_to: 9999 }  # <= 9999
-  validates :quantity, numericality: { only_integer: true } # ต้องเป็น integer
-  validates :discount, numericality: {
+  # ต้องเป็นตัวเลข
+  validates :price, numericality: true
+  
+  # ต้องเป็น integer
+  validates :quantity, numericality: { only_integer: true }
+  
+  # ค่า minimum
+  validates :price, numericality: { greater_than: 0 }
+  validates :price, numericality: { greater_than_or_equal_to: 0 }
+  
+  # ค่า maximum
+  validates :discount, numericality: { less_than: 100 }
+  validates :discount, numericality: { less_than_or_equal_to: 100 }
+  
+  # ค่าเฉพาะ
+  validates :rating, numericality: { equal_to: 5 }
+  validates :score, numericality: { other_than: 0 }
+  
+  # รวมหลาย conditions
+  validates :price, numericality: {
     greater_than_or_equal_to: 0,
-    less_than_or_equal_to: 100,
-    message: "ต้องอยู่ระหว่าง 0-100"
+    less_than: 1_000_000,
+    message: "ราคาต้องอยู่ระหว่าง 0 ถึง 999,999"
   }
+  
+  # อนุญาต odd/even numbers
+  validates :even_number, numericality: { even: true }
+  validates :odd_number, numericality: { odd: true }
 end
 ```
 
-### format
+---
+
+## Step 864: validates :format
 
 ```ruby
 class User < ApplicationRecord
-  validates :email, format: { with: /\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/i,
-                               message: "รูปแบบอีเมลไม่ถูกต้อง" }
-
-  validates :username, format: { with: /\A[a-zA-Z0-9_]+\z/,
-                                  message: "ใช้ได้เฉพาะตัวอักษร ตัวเลข และ _" }
-
-  validates :phone, format: { with: /\A0[0-9]{8,9}\z/,
-                               message: "เบอร์โทรไม่ถูกต้อง" }
-
-  validates :url, format: { with: URI::DEFAULT_PARSER.make_regexp(%w[http https]),
-                             allow_blank: true,
-                             message: "URL ไม่ถูกต้อง" }
+  # ตรวจสอบ format ด้วย regex
+  validates :email, format: { with: /\A[^@\s]+@[^@\s]+\.[^@\s]+\z/ }
+  
+  # Custom message
+  validates :email, format: {
+    with: /\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/i,
+    message: "รูปแบบอีเมลไม่ถูกต้อง"
+  }
+  
+  # ไม่ match กับ regex
+  validates :username, format: { without: /\s/, message: "ชื่อผู้ใช้ไม่สามารถมีช่องว่าง" }
+  
+  # Phone number (Thai)
+  validates :phone, format: {
+    with: /\A0[0-9]{8,9}\z/,
+    message: "เบอร์โทรศัพท์ไม่ถูกต้อง",
+    allow_blank: true
+  }
+  
+  # URL
+  validates :website, format: {
+    with: /\Ahttps?:\/\/[^\s]+\z/,
+    message: "URL ไม่ถูกต้อง",
+    allow_blank: true
+  }
+  
+  # Password strength
+  validates :password, format: {
+    with: /\A(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
+    message: "รหัสผ่านต้องมีตัวพิมพ์เล็ก พิมพ์ใหญ่ และตัวเลข"
+  }
+  
+  # Username (alphanumeric + underscore)
+  validates :username, format: {
+    with: /\A[a-zA-Z0-9_]+\z/,
+    message: "ชื่อผู้ใช้ใช้ได้เฉพาะตัวอักษรและตัวเลขและ _"
+  }
 end
 ```
 
-### inclusion / exclusion
+---
+
+## Step 865: validates :inclusion / :exclusion
+
+### inclusion
 
 ```ruby
-class Article < ApplicationRecord
-  validates :status, inclusion: {
-    in: %w[draft pending published archived],
-    message: "สถานะ %{value} ไม่ถูกต้อง"
-  }
-
-  validates :category, exclusion: {
-    in: %w[spam inappropriate],
-    message: "ไม่สามารถใช้หมวดหมู่นี้"
+class Post < ApplicationRecord
+  # ต้องอยู่ใน list
+  validates :status, inclusion: { in: %w[draft published archived] }
+  validates :status, inclusion: { in: ["draft", "published", "archived"],
+                                    message: "สถานะ '%{value}' ไม่ถูกต้อง" }
+  
+  # ด้วย range
+  validates :rating, inclusion: { in: 1..5 }
+  
+  # ด้วย lambda
+  validates :role, inclusion: { in: -> (user) { User::ROLES } }
+  
+  # Case insensitive
+  validates :country_code, inclusion: {
+    in: -> (rec) { ISO3166::Country.codes.map(&:downcase) }
   }
 end
 
-class Size < ApplicationRecord
-  validates :value, inclusion: { in: ["small", "medium", "large", "extra_large"] }
+# Enum จัดการ inclusion อัตโนมัติ
+class Post < ApplicationRecord
+  enum status: { draft: 0, published: 1, archived: 2 }
+  # validates status เป็น enum values อัตโนมัติ
 end
 ```
 
-### uniqueness
+### exclusion
 
 ```ruby
 class User < ApplicationRecord
+  # ต้องไม่อยู่ใน list
+  validates :username, exclusion: {
+    in: %w[admin superuser root system moderator],
+    message: "ชื่อนี้ไม่อนุญาตให้ใช้"
+  }
+  
+  validates :role, exclusion: {
+    in: ["super_admin"],
+    message: "ไม่สามารถกำหนด role นี้ได้"
+  }
+end
+```
+
+---
+
+## Step 866: validates :uniqueness
+
+```ruby
+class User < ApplicationRecord
+  # ต้องไม่ซ้ำกับ records อื่น
   validates :email, uniqueness: true
-  validates :email, uniqueness: { case_sensitive: false }  # ไม่สนใจ case
-
-  # scope: unique ภายใน scope
-  validates :username, uniqueness: {
-    scope: :organization_id,
-    message: "ชื่อ username นี้ถูกใช้ในองค์กรแล้ว"
+  
+  # Case insensitive
+  validates :username, uniqueness: { case_sensitive: false }
+  
+  # Scoped uniqueness
+  validates :name, uniqueness: { scope: :company_id }
+  # ชื่อ unique ภายใน company เดียวกัน
+  
+  # หลาย scopes
+  validates :email, uniqueness: {
+    scope: [:organization_id, :role],
+    message: "อีเมลนี้มีใน organization แล้ว"
   }
+  
+  # Custom message
+  validates :email, uniqueness: { message: "อีเมลนี้ถูกใช้งานแล้ว" }
+end
 
-  validates :title, uniqueness: {
-    scope: [:user_id, :year],
-    message: "คุณมีบทความชื่อนี้ในปีนี้แล้ว"
+# ข้อควรระวัง: uniqueness validation ไม่ปลอดภัย 100%
+# เพิ่ม database index unique เพื่อป้องกัน race condition
+class AddUniqueIndexToUsers < ActiveRecord::Migration[7.0]
+  def change
+    add_index :users, :email, unique: true
+    add_index :users, :username, unique: true
+  end
+end
+```
+
+---
+
+## Step 867: validates :confirmation
+
+```ruby
+class User < ApplicationRecord
+  validates :password, confirmation: true
+  # ต้องการ attribute :password_confirmation ใน form
+  
+  validates :email, confirmation: {
+    case_sensitive: false,
+    message: "อีเมลยืนยันไม่ตรงกัน"
   }
 end
 
-# หมายเหตุ: uniqueness validation ใน Rails ไม่ thread-safe 100%
-# ควรเพิ่ม unique index ใน database ด้วย:
-# add_index :users, :email, unique: true
-# add_index :users, [:username, :organization_id], unique: true
+# ใน form ต้องมี field confirmation
+# <%= form.password_field :password %>
+# <%= form.password_field :password_confirmation %>
 ```
 
-### acceptance
+---
+
+## Step 868: validates :acceptance
 
 ```ruby
 class Registration < ApplicationRecord
+  # ต้องยอมรับ (เหมาะสำหรับ checkbox)
   validates :terms_of_service, acceptance: true
   validates :privacy_policy, acceptance: true
-  validates :age_confirmation, acceptance: { accept: ["yes", "true"] }
-end
-```
-
-### confirmation
-
-```ruby
-class User < ApplicationRecord
-  validates :email, confirmation: true
-  validates :password, confirmation: {
-    case_sensitive: false,
-    message: "รหัสผ่านไม่ตรงกัน"
+  
+  # กำหนดค่าที่ accept ได้
+  validates :terms_of_service, acceptance: { accept: ["1", "yes", true] }
+  
+  # Custom message
+  validates :terms_of_service, acceptance: {
+    message: "กรุณายอมรับข้อตกลงการใช้งาน"
   }
 end
-
-# ใน view:
-# <%= form.text_field :password_confirmation %>
 ```
 
 ---
 
-## ขั้นตอนที่ 862: Conditional Validations
+## Step 869: Custom Validation Methods
 
 ```ruby
-class Article < ApplicationRecord
-  # if: symbol
-  validates :published_at, presence: true, if: :published?
-  validates :review_note, presence: true, if: :pending_review?
-
-  # if: Proc
-  validates :discount_reason, presence: true,
-    if: -> { discount.present? && discount > 0 }
-
-  # unless
-  validates :draft_note, presence: true, unless: :published?
-
-  # Multiple conditions
-  validates :approval_note,
-    presence: true,
-    if: :requires_approval?,
-    unless: :admin?
-
-  # on: ระบุว่า validate เมื่อไหร่
-  validates :password, presence: true, on: :create
-  validates :reason, presence: true, on: :update
-  validates :terms, acceptance: true, on: :create
-
-  # on: custom context
-  validates :credit_card, presence: true, on: :payment
-
-  def published?
-    status == "published"
-  end
-
-  def pending_review?
-    status == "pending"
-  end
-
-  def requires_approval?
-    category&.requires_approval?
-  end
-end
-
-# ใช้งาน custom context:
-article.valid?(:payment)
-article.save(context: :payment)
-```
-
----
-
-## ขั้นตอนที่ 863: Custom Validations
-
-### validate Method
-
-```ruby
-class Article < ApplicationRecord
-  validate :title_must_be_unique_within_30_days
-  validate :body_cannot_contain_banned_words
-  validate :publication_date_cannot_be_in_past, on: :create
-
+class Post < ApplicationRecord
+  validate :publish_date_cannot_be_in_the_past
+  validate :title_must_be_unique_for_user
+  validate :content_word_count
+  
   private
-
-  def title_must_be_unique_within_30_days
-    if Article.where(title: title)
-              .where("created_at > ?", 30.days.ago)
-              .where.not(id: id)
-              .exists?
-      errors.add(:title, "มีบทความชื่อนี้ในช่วง 30 วันที่ผ่านมาแล้ว")
+  
+  def publish_date_cannot_be_in_the_past
+    if publish_date.present? && publish_date < Date.today
+      errors.add(:publish_date, "ไม่สามารถย้อนหลังได้")
     end
   end
+  
+  def title_must_be_unique_for_user
+    if user && Post.where(user: user, title: title).where.not(id: id).exists?
+      errors.add(:title, "คุณมีบทความชื่อนี้อยู่แล้ว")
+    end
+  end
+  
+  def content_word_count
+    word_count = content.to_s.split.size
+    if word_count < 100
+      errors.add(:content, "เนื้อหาต้องมีอย่างน้อย 100 คำ (ปัจจุบัน #{word_count} คำ)")
+    end
+    if word_count > 10000
+      errors.add(:content, "เนื้อหาต้องไม่เกิน 10,000 คำ")
+    end
+  end
+end
+```
 
-  def body_cannot_contain_banned_words
-    banned_words = %w[spam inappropriate offensive]
-    banned_words.each do |word|
-      if body&.downcase&.include?(word)
-        errors.add(:body, "มีคำที่ไม่เหมาะสม: #{word}")
+### Custom Validation ที่ซับซ้อน
+
+```ruby
+class Order < ApplicationRecord
+  validate :products_in_stock
+  validate :total_amount_matches
+  validate :shipping_address_valid
+  
+  private
+  
+  def products_in_stock
+    order_items.each do |item|
+      unless item.product.sufficient_stock?(item.quantity)
+        errors.add(:base, "#{item.product.name} สต็อกไม่พอ (มี #{item.product.stock} ชิ้น)")
       end
     end
   end
-
-  def publication_date_cannot_be_in_past
-    if published_at.present? && published_at < Time.current
-      errors.add(:published_at, "ไม่สามารถตั้งเวลาย้อนหลังได้")
+  
+  def total_amount_matches
+    calculated = order_items.sum { |item| item.unit_price * item.quantity }
+    unless (total - calculated).abs < 0.01  # floating point tolerance
+      errors.add(:total, "ยอดรวมไม่ถูกต้อง")
+    end
+  end
+  
+  def shipping_address_valid
+    address = shipping_address
+    return if address.blank?
+    
+    unless address[:postal_code].to_s.match?(/\A\d{5}\z/)
+      errors.add(:base, "รหัสไปรษณีย์ไม่ถูกต้อง")
+    end
+    
+    unless address[:province].present?
+      errors.add(:base, "กรุณาระบุจังหวัด")
     end
   end
 end
 ```
 
-### Custom Validator Class
+---
+
+## Step 870: Custom Validator Classes
 
 ```ruby
 # app/validators/email_validator.rb
 class EmailValidator < ActiveModel::EachValidator
-  EMAIL_REGEX = /\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/i
-
   def validate_each(record, attribute, value)
-    unless value =~ EMAIL_REGEX
-      record.errors.add(attribute, options[:message] || "ไม่ใช่รูปแบบอีเมลที่ถูกต้อง")
+    unless value =~ /\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/i
+      record.errors.add(attribute, options[:message] || "รูปแบบอีเมลไม่ถูกต้อง")
     end
   end
 end
 
-# ใช้งาน:
+# ใช้งาน
 class User < ApplicationRecord
   validates :email, email: true
-  validates :work_email, email: { message: "รูปแบบอีเมลงานไม่ถูกต้อง" }
+  validates :backup_email, email: { message: "อีเมลสำรองไม่ถูกต้อง" }
+end
+```
+
+```ruby
+# app/validators/phone_validator.rb
+class PhoneValidator < ActiveModel::EachValidator
+  def validate_each(record, attribute, value)
+    return if value.blank? && options[:allow_blank]
+    
+    cleaned = value.to_s.gsub(/[\s\-]/, "")
+    unless cleaned.match?(/\A0[0-9]{8,9}\z/)
+      record.errors.add(attribute, "เบอร์โทรศัพท์ไม่ถูกต้อง")
+    end
+  end
 end
 
 # app/validators/url_validator.rb
 class UrlValidator < ActiveModel::EachValidator
   def validate_each(record, attribute, value)
-    return if value.blank? && options[:allow_blank]
-
+    return if value.blank?
+    
     begin
       uri = URI.parse(value)
-      valid = uri.is_a?(URI::HTTP) || uri.is_a?(URI::HTTPS)
-      valid &&= uri.host.present?
+      unless uri.is_a?(URI::HTTP) || uri.is_a?(URI::HTTPS)
+        record.errors.add(attribute, "ต้องเป็น URL ที่ขึ้นต้นด้วย http หรือ https")
+      end
     rescue URI::InvalidURIError
-      valid = false
+      record.errors.add(attribute, "URL ไม่ถูกต้อง")
     end
-
-    record.errors.add(attribute, "ไม่ใช่ URL ที่ถูกต้อง") unless valid
   end
 end
 
-# app/validators/thai_id_validator.rb
-class ThaiIdValidator < ActiveModel::EachValidator
+# app/validators/strong_password_validator.rb
+class StrongPasswordValidator < ActiveModel::EachValidator
   def validate_each(record, attribute, value)
     return if value.blank?
-
-    unless valid_thai_id?(value)
-      record.errors.add(attribute, "เลขบัตรประชาชนไม่ถูกต้อง")
+    
+    errors = []
+    errors << "ต้องมีตัวพิมพ์เล็กอย่างน้อย 1 ตัว" unless value.match?(/[a-z]/)
+    errors << "ต้องมีตัวพิมพ์ใหญ่อย่างน้อย 1 ตัว" unless value.match?(/[A-Z]/)
+    errors << "ต้องมีตัวเลขอย่างน้อย 1 ตัว" unless value.match?(/\d/)
+    errors << "ต้องมีอย่างน้อย 8 ตัวอักษร" if value.length < 8
+    
+    errors.each do |error|
+      record.errors.add(attribute, error)
     end
   end
+end
+```
 
-  private
+### ActiveModel::Validator class
 
-  def valid_thai_id?(id)
-    return false unless id =~ /\A\d{13}\z/
-
-    # Luhn algorithm สำหรับเลขบัตรประชาชนไทย
-    sum = (0..11).sum { |i| id[i].to_i * (13 - i) }
-    check_digit = (11 - (sum % 11)) % 10
-    check_digit == id[12].to_i
+```ruby
+# สำหรับ validate หลาย attributes พร้อมกัน
+class PersonValidator < ActiveModel::Validator
+  def validate(record)
+    if record.first_name.blank? && record.last_name.blank?
+      record.errors.add(:base, "ต้องมีชื่อหรือนามสกุลอย่างน้อยหนึ่งอย่าง")
+    end
   end
 end
 
-# ใช้งาน:
 class Person < ApplicationRecord
-  validates :national_id, thai_id: true
+  validates_with PersonValidator
 end
 ```
 
 ---
 
-## ขั้นตอนที่ 864: Validation Errors
-
-### จัดการ Errors
+## Step 871: Conditional Validations
 
 ```ruby
-article = Article.new(title: "")
-article.valid?  # => false
+class Post < ApplicationRecord
+  # if: method name
+  validates :published_at, presence: true, if: :published?
+  
+  # unless: method name
+  validates :draft_title, presence: true, unless: :published?
+  
+  # if: lambda/proc
+  validates :price, numericality: { greater_than: 0 },
+            if: -> { product_type == "paid" }
+  
+  validates :reason, presence: true,
+            if: -> (post) { post.archived? && post.age_days > 365 }
+  
+  # unless: lambda
+  validates :bio, presence: true,
+            unless: -> { guest_user? }
+  
+  # on: context
+  validates :terms_accepted, acceptance: true, on: :create
+  validates :current_password, presence: true, on: :update_password
+  
+  # Combined conditions
+  validates :price, numericality: { greater_than: 0 },
+            if: :paid?,
+            unless: :free_trial?
+  
+  private
+  
+  def published?
+    status == "published"
+  end
+  
+  def paid?
+    pricing_model == "paid"
+  end
+  
+  def free_trial?
+    trial_period?
+  end
+end
+```
 
-# ดู errors:
-article.errors                     # ActiveModel::Errors object
-article.errors[:title]             # => ["can't be blank"]
-article.errors[:body]              # => ["can't be blank"]
-article.errors.full_messages        # => ["Title can't be blank", "Body can't be blank"]
-article.errors.full_messages.join(", ")
+### Validation Context (on:)
 
-article.errors.messages            # => {title: ["can't be blank"], body: ["can't be blank"]}
-article.errors.details             # => {title: [{error: :blank}]}
-article.errors.count               # => 2
-article.errors.any?                # => true
-article.errors.empty?              # => false
+```ruby
+class User < ApplicationRecord
+  validates :name, presence: true
+  validates :email, presence: true, format: { with: URI::MailTo::EMAIL_REGEXP }
+  
+  # เฉพาะ create
+  validates :password, presence: true, on: :create
+  validates :terms_accepted, acceptance: true, on: :create
+  
+  # เฉพาะ update
+  validates :current_password, presence: true, on: :update_password
+  
+  # Custom context
+  validates :credit_card, presence: true, on: :payment
+end
 
-# เพิ่ม error:
-article.errors.add(:title, "ต้องมีความยาวอย่างน้อย 5 ตัวอักษร")
-article.errors.add(:base, "เกิดข้อผิดพลาดทั่วไป")  # ไม่ระบุ field
+# ใช้ custom context
+user.valid?(:payment)        # รัน validations สำหรับ :payment context
+user.save(context: :payment) # บันทึกพร้อม validation context
+```
 
-# ลบ error:
-article.errors.delete(:title)
+---
 
-# ใน Controller:
-def create
-  @article = Article.new(article_params)
-  if @article.save
-    redirect_to @article, notice: "สร้างบทความสำเร็จ"
-  else
-    render :new, status: :unprocessable_entity
+## Step 872: valid? / invalid? / errors
+
+```ruby
+user = User.new
+
+# ตรวจสอบ validity
+user.valid?    # => false (รัน validations)
+user.invalid?  # => true
+
+# หลัง valid? errors จะถูก populate
+user.errors                   # => ActiveModel::Errors object
+user.errors.any?              # => true
+user.errors.empty?            # => false
+user.errors.count             # => 3
+
+# ดึง errors
+user.errors[:name]            # => ["can't be blank"]
+user.errors[:email]           # => ["can't be blank", "is invalid"]
+user.errors.full_messages     # => ["Name can't be blank", "Email is invalid"]
+user.errors.messages          # => {name: ["can't be blank"], email: ["..."]}
+
+# เพิ่ม error
+user.errors.add(:name, "is too short")
+user.errors.add(:base, "ข้อผิดพลาดทั่วไป")
+
+# ลบ error
+user.errors.delete(:name)
+
+# ดู errors ทุก attributes
+user.errors.each do |error|
+  puts "#{error.attribute}: #{error.message}"
+end
+
+# ตรวจสอบ error เฉพาะ attribute
+user.errors.include?(:name)  # => true
+
+# Where (Rails 6.1+)
+user.errors.where(:email).each { |e| puts e.message }
+user.errors.where(:email, :invalid)  # เฉพาะ :invalid error
+```
+
+---
+
+## Step 873: Error Messages Customization
+
+### I18n Translations
+
+```yaml
+# config/locales/th.yml
+th:
+  activerecord:
+    errors:
+      messages:
+        blank: "ไม่สามารถเว้นว่างได้"
+        taken: "ถูกใช้งานแล้ว"
+        invalid: "ไม่ถูกต้อง"
+        too_short:
+          one: "สั้นเกินไป (ขั้นต่ำ 1 ตัวอักษร)"
+          other: "สั้นเกินไป (ขั้นต่ำ %{count} ตัวอักษร)"
+        too_long:
+          one: "ยาวเกินไป (สูงสุด 1 ตัวอักษร)"
+          other: "ยาวเกินไป (สูงสุด %{count} ตัวอักษร)"
+        not_a_number: "ต้องเป็นตัวเลข"
+        not_an_integer: "ต้องเป็นจำนวนเต็ม"
+        greater_than: "ต้องมากกว่า %{count}"
+        less_than: "ต้องน้อยกว่า %{count}"
+        greater_than_or_equal_to: "ต้องมากกว่าหรือเท่ากับ %{count}"
+        less_than_or_equal_to: "ต้องน้อยกว่าหรือเท่ากับ %{count}"
+        inclusion: "ไม่อยู่ในรายการที่อนุญาต"
+        exclusion: "ไม่อนุญาตให้ใช้ค่านี้"
+        confirmation: "ยืนยันไม่ตรงกัน"
+        accepted: "ต้องยอมรับ"
+        
+      models:
+        user:
+          attributes:
+            name:
+              blank: "กรุณากรอกชื่อ"
+              too_short: "ชื่อสั้นเกินไป"
+            email:
+              blank: "กรุณากรอกอีเมล"
+              taken: "อีเมลนี้ถูกใช้งานแล้ว"
+              invalid: "รูปแบบอีเมลไม่ถูกต้อง"
+            password:
+              blank: "กรุณากรอกรหัสผ่าน"
+              too_short: "รหัสผ่านสั้นเกินไป"
+```
+
+### ใช้ i18n ใน Validation
+
+```ruby
+class User < ApplicationRecord
+  validates :name, presence: { message: :blank }
+  # ใช้ key จาก i18n
+  
+  validates :email, uniqueness: { message: :taken }
+  
+  # หรือ interpolation
+  validates :name, length: {
+    minimum: 2,
+    too_short: :too_short  # ใช้ key จาก i18n
+  }
+end
+```
+
+### แสดง Error ใน Views
+
+```erb
+<!-- app/views/shared/_errors.html.erb -->
+<% if @object.errors.any? %>
+  <div class="alert alert-danger">
+    <h4>พบ <%= pluralize(@object.errors.count, "error") %></h4>
+    <ul>
+      <% @object.errors.full_messages.each do |message| %>
+        <li><%= message %></li>
+      <% end %>
+    </ul>
+  </div>
+<% end %>
+
+<!-- ใน form field -->
+<div class="form-group <%= 'has-error' if @user.errors[:email].any? %>">
+  <%= form.label :email %>
+  <%= form.email_field :email, class: "form-control" %>
+  <% if @user.errors[:email].any? %>
+    <p class="help-block text-danger">
+      <%= @user.errors[:email].join(", ") %>
+    </p>
+  <% end %>
+</div>
+```
+
+---
+
+## ตัวอย่าง Model ที่มี Validations สมบูรณ์
+
+```ruby
+# app/models/user.rb
+class User < ApplicationRecord
+  # Constants
+  ROLES = %w[member moderator admin].freeze
+  
+  # Attributes
+  attr_accessor :password, :password_confirmation, :current_password
+  
+  # Associations
+  has_many :posts, dependent: :destroy
+  has_one :profile, dependent: :destroy
+  
+  # Validations
+  
+  # Name
+  validates :name,
+    presence: { message: "กรุณากรอกชื่อ" },
+    length: { minimum: 2, maximum: 100,
+              too_short: "ชื่อสั้นเกินไป",
+              too_long: "ชื่อยาวเกินไป" },
+    format: { with: /\A[\p{L}\p{M}\s]+\z/u,
+              message: "ชื่อต้องเป็นตัวอักษรเท่านั้น" }
+  
+  # Email
+  validates :email,
+    presence: { message: "กรุณากรอกอีเมล" },
+    format: { with: URI::MailTo::EMAIL_REGEXP,
+              message: "รูปแบบอีเมลไม่ถูกต้อง" },
+    uniqueness: { case_sensitive: false,
+                  message: "อีเมลนี้ถูกใช้งานแล้ว" }
+  
+  # Password
+  validates :password,
+    presence: { message: "กรุณากรอกรหัสผ่าน", on: :create },
+    length: { minimum: 8, too_short: "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร",
+              allow_nil: true },
+    confirmation: { message: "รหัสผ่านยืนยันไม่ตรงกัน" }
+  
+  # Phone
+  validates :phone,
+    format: { with: /\A0[0-9]{8,9}\z/,
+              message: "เบอร์โทรศัพท์ไม่ถูกต้อง" },
+    allow_blank: true
+  
+  # Role
+  validates :role,
+    inclusion: { in: ROLES, message: "role '%{value}' ไม่ถูกต้อง" }
+  
+  # Age
+  validates :age,
+    numericality: { greater_than_or_equal_to: 0,
+                    less_than: 150,
+                    only_integer: true,
+                    message: "อายุไม่ถูกต้อง" },
+    allow_nil: true
+  
+  # Terms
+  validates :terms_accepted, acceptance: true, on: :create
+  
+  # Custom validations
+  validate :birthdate_cannot_be_future
+  validate :phone_format_check, if: :phone_changed?
+  
+  private
+  
+  def birthdate_cannot_be_future
+    if birthdate.present? && birthdate > Date.today
+      errors.add(:birthdate, "วันเกิดไม่สามารถเป็นอนาคตได้")
+    end
+  end
+  
+  def phone_format_check
+    return if phone.blank?
+    cleaned = phone.gsub(/[\s\-]/, "")
+    unless cleaned.match?(/\A0[0-9]{8,9}\z/)
+      errors.add(:phone, "รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง")
+    end
+  end
+end
+```
+
+---
+
+## แบบฝึกหัด (Steps 874-880)
+
+### แบบฝึกหัดที่ 1
+เพิ่ม validation presence สำหรับ title และ content ใน Post model
+
+**เฉลย:**
+```ruby
+class Post < ApplicationRecord
+  validates :title, presence: true
+  validates :content, presence: true
+  # หรือ
+  validates :title, :content, presence: true
+end
+```
+
+### แบบฝึกหัดที่ 2
+Validate ว่า username มีความยาว 3-20 ตัวอักษร
+
+**เฉลย:**
+```ruby
+validates :username, length: { in: 3..20,
+  too_short: "Username ต้องมีอย่างน้อย %{count} ตัวอักษร",
+  too_long: "Username ต้องไม่เกิน %{count} ตัวอักษร"
+}
+```
+
+### แบบฝึกหัดที่ 3
+Validate ว่า price เป็นตัวเลขที่มากกว่า 0
+
+**เฉลย:**
+```ruby
+validates :price, numericality: {
+  greater_than: 0,
+  message: "ราคาต้องมากกว่า 0"
+}
+```
+
+### แบบฝึกหัดที่ 4
+Validate format ของ email ด้วย regex
+
+**เฉลย:**
+```ruby
+validates :email, format: {
+  with: /\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/i,
+  message: "รูปแบบอีเมลไม่ถูกต้อง"
+}
+```
+
+### แบบฝึกหัดที่ 5
+Validate ว่า status อยู่ใน allowed values
+
+**เฉลย:**
+```ruby
+validates :status, inclusion: {
+  in: %w[draft published archived],
+  message: "สถานะ '%{value}' ไม่ถูกต้อง"
+}
+```
+
+### แบบฝึกหัดที่ 6
+Validate uniqueness ของ email (case insensitive)
+
+**เฉลย:**
+```ruby
+validates :email, uniqueness: { case_sensitive: false, message: "อีเมลนี้ถูกใช้งานแล้ว" }
+```
+
+### แบบฝึกหัดที่ 7
+Validate ว่า password และ password_confirmation ตรงกัน
+
+**เฉลย:**
+```ruby
+validates :password, confirmation: { message: "รหัสผ่านยืนยันไม่ตรงกัน" }
+# ในฟอร์มต้องมี password_confirmation field
+```
+
+### แบบฝึกหัดที่ 8
+สร้าง custom validation method ที่ตรวจสอบว่า end_date มาหลัง start_date
+
+**เฉลย:**
+```ruby
+validate :end_date_after_start_date
+
+private
+
+def end_date_after_start_date
+  return unless start_date && end_date
+  
+  if end_date <= start_date
+    errors.add(:end_date, "ต้องมาหลังวันเริ่มต้น")
+  end
+end
+```
+
+### แบบฝึกหัดที่ 9
+สร้าง EmailValidator class ที่ reuse ได้
+
+**เฉลย:**
+```ruby
+# app/validators/email_validator.rb
+class EmailValidator < ActiveModel::EachValidator
+  def validate_each(record, attribute, value)
+    unless value.to_s.match?(/\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/i)
+      record.errors.add(attribute, options[:message] || "ไม่ใช่อีเมลที่ถูกต้อง")
+    end
   end
 end
 
-# ใน View:
-<% if @article.errors.any? %>
+# ใช้งาน
+class User < ApplicationRecord
+  validates :email, email: true
+end
+```
+
+### แบบฝึกหัดที่ 10
+ใช้ conditional validation ที่รันเฉพาะตอน create
+
+**เฉลย:**
+```ruby
+validates :password, presence: true, on: :create
+validates :terms_accepted, acceptance: true, on: :create
+```
+
+### แบบฝึกหัดที่ 11
+แสดง validation errors ใน view
+
+**เฉลย:**
+```erb
+<% if @user.errors.any? %>
   <div class="alert alert-danger">
-    <h4><%= pluralize(@article.errors.count, "error") %> ต้องแก้ไข:</h4>
     <ul>
-      <% @article.errors.full_messages.each do |msg| %>
+      <% @user.errors.full_messages.each do |msg| %>
         <li><%= msg %></li>
       <% end %>
     </ul>
@@ -363,320 +867,208 @@ end
 <% end %>
 ```
 
----
+### แบบฝึกหัดที่ 12
+ใช้ allow_blank option กับ validation
 
-## ขั้นตอนที่ 865: save, save!, valid?, invalid?
-
+**เฉลย:**
 ```ruby
-article = Article.new(title: "")
+validates :website, format: {
+  with: /\Ahttps?:\/\//,
+  message: "ต้องขึ้นต้นด้วย http:// หรือ https://"
+}, allow_blank: true
 
-# valid? และ invalid?
-article.valid?   # => false (runs validations)
-article.invalid? # => true
-
-# save
-article.save     # => false (ถ้า validation fail)
-article.save!    # => raises ActiveRecord::RecordInvalid
-
-# create
-Article.create(title: "")   # => Article object กับ errors
-Article.create!(title: "")  # => raises ActiveRecord::RecordInvalid
-
-# update
-article = Article.find(1)
-article.update(title: "")   # => false
-article.update!(title: "")  # => raises ActiveRecord::RecordInvalid
-
-# skip validations (ระวัง! ใช้เมื่อจำเป็น)
-article.save(validate: false)
-article.update_column(:title, "")   # ไม่ run validations, ไม่ update timestamps
-article.update_columns(title: "")   # ไม่ run validations, ไม่ update timestamps
-article.update_attribute(:title, "") # ข้าม validations บาง ส่วน
-
-# rescue error:
-begin
-  article.save!
-rescue ActiveRecord::RecordInvalid => e
-  Rails.logger.error "Validation failed: #{e.record.errors.full_messages}"
-  raise
-end
+validates :phone, format: { with: /\A0[0-9]{8,9}\z/ }, allow_nil: true
 ```
 
----
+### แบบฝึกหัดที่ 13
+เพิ่ม i18n translations สำหรับ validation errors ในภาษาไทย
 
-## ขั้นตอนที่ 866: accepts_nested_attributes_for
-
-```ruby
-class Article < ApplicationRecord
-  has_one :seo_meta, dependent: :destroy
-  has_many :tags, through: :article_tags
-
-  accepts_nested_attributes_for :seo_meta,
-    allow_destroy: true,
-    reject_if: :all_blank
-
-  accepts_nested_attributes_for :article_tags,
-    allow_destroy: true,
-    reject_if: proc { |attrs| attrs["tag_id"].blank? }
-
-  # หรือ custom reject_if:
-  accepts_nested_attributes_for :comments,
-    reject_if: ->(attrs) { attrs["body"].blank? },
-    allow_destroy: true,
-    limit: 5  # จำกัดจำนวน records
-end
-
-class SeoMeta < ApplicationRecord
-  belongs_to :article
-  validates :meta_title, length: { maximum: 60 }
-  validates :meta_description, length: { maximum: 160 }
-end
-
-# Controller:
-def article_params
-  params.require(:article).permit(
-    :title, :body, :status,
-    seo_meta_attributes: [:id, :meta_title, :meta_description, :_destroy],
-    article_tags_attributes: [:id, :tag_id, :_destroy]
-  )
-end
-
-# View:
-<%= form_with model: @article do |f| %>
-  <%= f.text_field :title %>
-
-  <%= f.fields_for :seo_meta do |seo_form| %>
-    <%= seo_form.text_field :meta_title %>
-    <%= seo_form.text_area :meta_description %>
-    <%= seo_form.check_box :_destroy %>
-    <%= seo_form.label :_destroy, "ลบ SEO Meta" %>
-  <% end %>
-
-  <%= f.submit %>
-<% end %>
+**เฉลย:**
+```yaml
+# config/locales/th.yml
+th:
+  activerecord:
+    errors:
+      messages:
+        blank: "ไม่สามารถเว้นว่างได้"
+        taken: "ถูกใช้งานแล้ว"
+        too_short: "สั้นเกินไป (ขั้นต่ำ %{count} ตัวอักษร)"
+        invalid: "ไม่ถูกต้อง"
 ```
 
----
+### แบบฝึกหัดที่ 14
+สร้าง uniqueness validation ที่ scoped
 
-## ขั้นตอนที่ 867: Client-side Validation Hints
-
+**เฉลย:**
 ```ruby
-# Rails form helpers สร้าง HTML validation attributes อัตโนมัติ
-# โดย reflect บน model validations
-
-# ตัวอย่าง:
-class User < ApplicationRecord
-  validates :username, presence: true, length: { minimum: 3, maximum: 50 }
-  validates :email, presence: true, format: { with: URI::MailTo::EMAIL_REGEXP }
-end
-
-# Form:
-<%= form_with model: @user do |f| %>
-  <%= f.text_field :username %>
-  <%# สร้าง: <input type="text" name="user[username]" required minlength="3" maxlength="50"> %>
-
-  <%= f.email_field :email %>
-  <%# สร้าง: <input type="email" name="user[email]" required> %>
-<% end %>
-
-# Custom HTML5 validation attributes:
-<%= f.text_field :phone, pattern: "0[0-9]{8,9}", title: "กรอกเบอร์โทร 9-10 หลัก" %>
-
-# Disable HTML5 validation (ใช้เฉพาะ server-side):
-<%= form_with model: @user, novalidate: true do |f| %>
+# Username unique ภายใน team
+validates :username, uniqueness: {
+  scope: :team_id,
+  message: "ชื่อนี้มีใน team แล้ว"
+}
 ```
 
----
+### แบบฝึกหัดที่ 15
+validate ว่า age เป็น integer ระหว่าง 0-150
 
-## ขั้นตอนที่ 868: Complete Model Example
-
+**เฉลย:**
 ```ruby
-# app/models/user.rb
-class User < ApplicationRecord
-  # Constants
-  VALID_EMAIL_REGEX = /\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/i
-  VALID_PHONE_REGEX = /\A0[0-9]{8,9}\z/
-  ROLES = %w[user moderator admin].freeze
+validates :age, numericality: {
+  only_integer: true,
+  greater_than_or_equal_to: 0,
+  less_than_or_equal_to: 150,
+  message: "อายุต้องอยู่ระหว่าง 0-150 ปี"
+}, allow_nil: true
+```
 
-  # Validations
-  validates :name, presence: true, length: { in: 2..100 }
-  validates :username, presence: true,
-    length: { in: 3..50 },
-    format: { with: /\A[a-zA-Z0-9_]+\z/, message: "ใช้ได้เฉพาะ a-z, 0-9, _" },
-    uniqueness: { case_sensitive: false }
+### แบบฝึกหัดที่ 16
+สร้าง custom validator สำหรับ Thai phone number
 
-  validates :email, presence: true,
-    format: { with: VALID_EMAIL_REGEX, message: "รูปแบบอีเมลไม่ถูกต้อง" },
-    uniqueness: { case_sensitive: false }
-
-  validates :phone, format: { with: VALID_PHONE_REGEX, allow_blank: true }
-
-  validates :role, inclusion: { in: ROLES }
-
-  validates :password, presence: true,
-    length: { minimum: 8 },
-    format: {
-      with: /(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-      message: "ต้องมีตัวพิมพ์ใหญ่ ตัวพิมพ์เล็ก และตัวเลข"
-    },
-    on: :create
-  validates :password_confirmation, presence: true, on: :create
-
-  validates :bio, length: { maximum: 500 }, allow_blank: true
-  validates :website, format: { with: URI::DEFAULT_PARSER.make_regexp(%w[http https]),
-                                  allow_blank: true }
-
-  validates :age, numericality: { only_integer: true, greater_than_or_equal_to: 13,
-                                   less_than: 120 }, allow_nil: true
-
-  validates :terms_accepted, acceptance: true, on: :create
-
-  validate :email_not_in_blocked_list
-
-  # Callbacks
-  before_validation :normalize_email, :normalize_username
-
-  private
-
-  def normalize_email
-    self.email = email.strip.downcase if email.present?
+**เฉลย:**
+```ruby
+# app/validators/thai_phone_validator.rb
+class ThaiPhoneValidator < ActiveModel::EachValidator
+  def validate_each(record, attribute, value)
+    return if value.blank? && options[:allow_blank]
+    
+    cleaned = value.to_s.gsub(/[\s\-]/, "")
+    unless cleaned.match?(/\A0[0-9]{8,9}\z/)
+      record.errors.add(attribute, options[:message] || "เบอร์โทรศัพท์ไม่ถูกต้อง")
+    end
   end
+end
 
-  def normalize_username
-    self.username = username.strip.downcase if username.present?
-  end
+# ใช้งาน
+class User < ApplicationRecord
+  validates :phone, thai_phone: { allow_blank: true }
+end
+```
 
-  def email_not_in_blocked_list
-    blocked_domains = %w[temp-mail.com throwaway.com fakeinbox.com]
-    if email.present?
-      domain = email.split("@").last
-      if blocked_domains.include?(domain)
-        errors.add(:email, "ไม่สามารถใช้อีเมลชั่วคราวได้")
+### แบบฝึกหัดที่ 17
+ตรวจสอบ valid? และ invalid? พร้อมแสดง errors
+
+**เฉลย:**
+```ruby
+user = User.new(email: "invalid-email")
+user.valid?    # => false
+
+user.errors.any?   # => true
+user.errors.full_messages  # => ["Name can't be blank", "Email is invalid"]
+user.errors[:email]  # => ["is invalid"]
+
+# ดี errors ทั้งหมด
+user.errors.each do |error|
+  puts "#{error.attribute.to_s.humanize}: #{error.message}"
+end
+```
+
+### แบบฝึกหัดที่ 18
+ใช้ validation บน custom context
+
+**เฉลย:**
+```ruby
+class Checkout < ApplicationRecord
+  validates :payment_method, presence: true, on: :payment
+  validates :shipping_address, presence: true, on: :shipping
+  
+  validates :items, presence: true
+end
+
+# รัน validation เฉพาะ context
+checkout.valid?(:payment)
+checkout.valid?(:shipping)
+
+# Save พร้อม context
+checkout.save(context: :payment)
+```
+
+### แบบฝึกหัดที่ 19
+เขียน test สำหรับ User validations
+
+**เฉลย:**
+```ruby
+# spec/models/user_spec.rb
+RSpec.describe User, type: :model do
+  describe "validations" do
+    it { is_expected.to validate_presence_of(:name) }
+    it { is_expected.to validate_presence_of(:email) }
+    it { is_expected.to validate_uniqueness_of(:email).case_insensitive }
+    it { is_expected.to validate_length_of(:password).is_at_least(8) }
+    
+    describe "email format" do
+      it "rejects invalid email" do
+        user = build(:user, email: "not-an-email")
+        expect(user).not_to be_valid
+        expect(user.errors[:email]).to include("รูปแบบอีเมลไม่ถูกต้อง")
+      end
+      
+      it "accepts valid email" do
+        user = build(:user, email: "valid@example.com")
+        expect(user).to be_valid
       end
     end
   end
 end
 ```
 
----
+### แบบฝึกหัดที่ 20
+สร้าง model พร้อม validations ครบถ้วน
 
-## แบบฝึกหัด Part 39 (ขั้นตอนที่ 861-880)
-
-**ข้อ 1:** เพิ่ม validation สำหรับ Article model
-
+**เฉลย:**
 ```ruby
-# คำตอบ:
 class Article < ApplicationRecord
-  validates :title, presence: true, length: { minimum: 5, maximum: 200 }
-  validates :body, presence: true, length: { minimum: 50 }
-  validates :status, inclusion: { in: %w[draft published archived] }
-  validates :published_at, presence: true, if: :published?
-
+  enum status: { draft: 0, published: 1, archived: 2 }, _default: :draft
+  
+  validates :title,
+    presence: { message: "กรุณากรอกหัวข้อ" },
+    length: { minimum: 5, maximum: 200 },
+    uniqueness: { scope: :author_id }
+  
+  validates :content,
+    presence: { message: "กรุณากรอกเนื้อหา" },
+    length: { minimum: 100 }
+  
+  validates :status,
+    inclusion: { in: statuses.keys }
+  
+  validates :published_at,
+    presence: { message: "กรุณาระบุวันที่เผยแพร่", if: :published? }
+  
+  validate :published_at_in_valid_range, if: :published_at_changed?
+  
   private
-  def published?
-    status == "published"
-  end
-end
-```
-
-**ข้อ 2:** สร้าง custom EmailValidator
-
-```ruby
-# คำตอบ:
-# app/validators/email_validator.rb
-class EmailValidator < ActiveModel::EachValidator
-  def validate_each(record, attribute, value)
-    unless value =~ /\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/i
-      record.errors.add(attribute, "ไม่ใช่รูปแบบอีเมลที่ถูกต้อง")
+  
+  def published_at_in_valid_range
+    return unless published_at
+    
+    if published_at < 1.year.ago
+      errors.add(:published_at, "ไม่สามารถย้อนหลังเกิน 1 ปีได้")
+    end
+    
+    if published_at > 1.year.from_now
+      errors.add(:published_at, "ไม่สามารถกำหนดเกิน 1 ปีข้างหน้าได้")
     end
   end
 end
-
-class User < ApplicationRecord
-  validates :email, email: true
-end
-```
-
-**ข้อ 3:** ใช้ conditional validation กับ on: context
-
-```ruby
-# คำตอบ:
-class Order < ApplicationRecord
-  validates :shipping_address, presence: true, on: :checkout
-  validates :payment_token, presence: true, on: :payment
-  validates :review_text, length: { minimum: 20 }, on: :review
-
-  # ใช้งาน:
-  # order.valid?(:checkout)
-  # order.save(context: :payment)
-end
-```
-
-**ข้อ 4:** จัดการ validation errors ใน view
-
-```ruby
-# คำตอบ:
-# app/views/shared/_form_errors.html.erb
-<% if object.errors.any? %>
-  <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-    <h4 class="font-bold">พบ <%= pluralize(object.errors.count, "ข้อผิดพลาด") %>:</h4>
-    <ul class="list-disc ml-4 mt-2">
-      <% object.errors.full_messages.each do |msg| %>
-        <li><%= msg %></li>
-      <% end %>
-    </ul>
-  </div>
-<% end %>
-
-# ใช้งาน:
-# <%= render "shared/form_errors", object: @article %>
-```
-
-**ข้อ 5:** ใช้ accepts_nested_attributes_for
-
-```ruby
-# คำตอบ:
-class Survey < ApplicationRecord
-  has_many :questions, dependent: :destroy
-  accepts_nested_attributes_for :questions,
-    allow_destroy: true,
-    reject_if: ->(attrs) { attrs["text"].blank? }
-  
-  validates :title, presence: true
-  validates :questions, length: { minimum: 1, message: "ต้องมีอย่างน้อย 1 คำถาม" }
-end
-
-class Question < ApplicationRecord
-  belongs_to :survey
-  validates :text, presence: true
-  validates :question_type, inclusion: { in: %w[text choice rating] }
-end
-
-# Controller:
-def survey_params
-  params.require(:survey).permit(
-    :title,
-    questions_attributes: [:id, :text, :question_type, :required, :_destroy]
-  )
-end
 ```
 
 ---
 
-## สรุป Part 39
+## สรุป
 
-ในบทนี้เราได้เรียนรู้:
+ใน Validations เราได้เรียนรู้:
 
-1. **Validation Helpers** - presence, length, numericality, format, inclusion, exclusion, uniqueness, acceptance, confirmation
-2. **Conditional Validations** - if, unless, on:
-3. **Custom Validations** - validate method, custom validator classes
-4. **Validation Errors** - errors object, full_messages, add, delete
-5. **save vs save!** - และวิธีจัดการ
-6. **accepts_nested_attributes_for** - validate nested models
-7. **Client-side hints** - HTML5 attributes
-
-Validations เป็นส่วนสำคัญในการรักษาความถูกต้องของข้อมูล และควรใช้ร่วมกับ database constraints เสมอ
-
----
-
-*ต่อไป: Part 40 - Forms (ขั้นตอนที่ 881-905)*
+1. **presence** - ต้องมีค่า
+2. **length** - ความยาว min/max/in/is
+3. **numericality** - ตรวจสอบตัวเลข
+4. **format** - ตรวจสอบ format ด้วย regex
+5. **inclusion/exclusion** - อยู่ใน/ไม่อยู่ใน list
+6. **uniqueness** - ต้องไม่ซ้ำ (รวม scope)
+7. **confirmation** - ยืนยัน (password, email)
+8. **acceptance** - checkbox ต้องถูก check
+9. **Custom validate methods** - logic เฉพาะ
+10. **Custom validator classes** - reusable validators
+11. **Conditional validations** - if/unless/on
+12. **valid?/invalid?/errors** - ตรวจสอบ validity
+13. **Error messages** - customization ด้วย i18n
+14. **Testing validations** - RSpec matchers
