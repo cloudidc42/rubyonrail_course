@@ -720,3 +720,499 @@ scope :search, ->(query) {
 3. ใช้ Elasticsearch/Meilisearch เมื่อ traffic สูงหรือ search ซับซ้อน
 4. Track searches เพื่อ improve UX
 5. Cache search results เมื่อเหมาะสม
+
+---
+
+## Step 1109: Advanced Ransack Techniques
+
+### Custom Ransack Scopes
+
+```ruby
+# app/models/article.rb
+class Article < ApplicationRecord
+  ransack_scope :has_min_views, ->(value, scope) {
+    scope.where("views_count >= ?", value.to_i) if value.present?
+  }
+  
+  ransack_scope :published_in_year, ->(year, scope) {
+    if year.present?
+      start = Date.new(year.to_i, 1, 1)
+      finish = Date.new(year.to_i, 12, 31)
+      scope.where(created_at: start.beginning_of_day..finish.end_of_day)
+    end
+  }
+  
+  # Allow custom ransack attribute
+  def self.ransackable_scopes(auth_object = nil)
+    [:has_min_views, :published_in_year]
+  end
+end
+```
+
+```erb
+<%# ใช้ custom scope ใน form %>
+<%= search_form_for @q do |f| %>
+  <%= f.search_field :has_min_views, placeholder: "ยอดวิวขั้นต่ำ" %>
+  <%= f.select :published_in_year, [2022, 2023, 2024].map { |y| [y, y] }, include_blank: "ทุกปี" %>
+  <%= f.submit "ค้นหา" %>
+<% end %>
+```
+
+### Ransack กับ Associations
+
+```ruby
+# ค้นหา articles โดย author's role
+@q = Article.ransack(params[:q])
+@q.result.includes(:user).where(users: { role: 'author' })
+
+# ค้นหาด้วย nested association attributes
+# params[:q] = { user_name_cont: "John", user_articles_count_gt: 5 }
+```
+
+---
+
+## Step 1110: pg_search Advanced Features
+
+### Custom Dictionary
+
+```ruby
+# app/models/article.rb
+class Article < ApplicationRecord
+  include PgSearch::Model
+  
+  pg_search_scope :thai_search,
+    against: { title: 'A', body: 'B' },
+    using: {
+      tsearch: {
+        dictionary: 'english',  # หรือสร้าง thai dictionary
+        prefix: true,
+        any_word: true  # match ถ้ามีคำใดคำหนึ่ง
+      }
+    }
+  
+  pg_search_scope :fuzzy_search,
+    against: :title,
+    using: {
+      trigram: {
+        threshold: 0.2  # 0.0 = wildcard, 1.0 = exact
+      }
+    }
+  
+  pg_search_scope :combined_search,
+    against: { title: 'A', body: 'B' },
+    using: {
+      tsearch: { prefix: true, any_word: true },
+      trigram: { only: [:title] }
+    }
+end
+```
+
+### pg_search กับ Score Ranking
+
+```ruby
+# ดึงผลลัพธ์พร้อม search rank
+articles = Article.search_by_full_text("ruby rails")
+                  .with_pg_search_rank
+                  .order("pg_search_rank DESC")
+
+articles.each do |article|
+  puts "#{article.title} (rank: #{article.pg_search_rank})"
+end
+```
+
+---
+
+## Step 1111: Search Performance Optimization
+
+### Index สำหรับ Search
+
+```ruby
+# Migration สำหรับ search performance
+class AddSearchIndexes < ActiveRecord::Migration[7.0]
+  def change
+    # PostgreSQL full-text search indexes
+    execute <<-SQL
+      -- GIN index for faster full-text search
+      CREATE INDEX idx_articles_fts ON articles 
+      USING GIN (to_tsvector('english', coalesce(title,'') || ' ' || coalesce(body,'')));
+      
+      -- Trigram index for LIKE queries
+      CREATE EXTENSION IF NOT EXISTS pg_trgm;
+      CREATE INDEX idx_articles_title_trgm ON articles USING GIN (title gin_trgm_ops);
+      CREATE INDEX idx_articles_body_trgm ON articles USING GIN (body gin_trgm_ops);
+    SQL
+    
+    # Regular indexes
+    add_index :articles, :published
+    add_index :articles, [:published, :created_at]
+    add_index :articles, :views_count
+  end
+end
+```
+
+### Search Result Caching
+
+```ruby
+# app/controllers/search_controller.rb
+def index
+  @query = params[:q].to_s.strip
+  return if @query.blank?
+  
+  cache_key = "search/#{Digest::MD5.hexdigest(@query + params[:page].to_s)}"
+  
+  @results = Rails.cache.fetch(cache_key, expires_in: 5.minutes) do
+    Article.search_by_full_text(@query)
+           .published
+           .includes(:user)
+           .limit(20)
+           .to_a
+  end
+end
+```
+
+---
+
+## Step 1112: Meilisearch Advanced Setup
+
+### Custom Ranking Rules
+
+```ruby
+class Article < ApplicationRecord
+  include MeiliSearch::Rails
+  
+  meilisearch do
+    attribute :title, :body, :excerpt, :tags
+    attribute :published_at do
+      published_at&.to_i  # Unix timestamp สำหรับ range filtering
+    end
+    attribute :score do
+      views_count + (comments.count * 3) + (likes.count * 2)
+    end
+    
+    searchable_attributes [:title, :body, :excerpt, :tags]
+    filterable_attributes [:published, :published_at, :category]
+    sortable_attributes [:score, :published_at, :title]
+    
+    ranking_rules [
+      'words',
+      'typo', 
+      'proximity',
+      'attribute',
+      'sort',
+      'exactness',
+      'score:desc'
+    ]
+    
+    synonyms ({
+      "ruby" => ["rb", "matz"],
+      "rails" => ["ror", "rubyonrails"]
+    })
+    
+    stop_words ["a", "an", "the", "and", "or"]
+    
+    distinct :slug  # ไม่ให้มี duplicate ตาม slug
+    
+    pagination max_total_hits: 1000
+  end
+end
+```
+
+### Meilisearch Controller
+
+```ruby
+# app/controllers/search_controller.rb  
+def index
+  @query = params[:q].to_s
+  
+  results = Article.search(
+    @query.present? ? @query : "*",
+    filter: build_filters,
+    sort: build_sort,
+    facets: ["category", "tags", "published"],
+    attributes_to_highlight: ["title", "body"],
+    highlight_pre_tag: "<mark>",
+    highlight_post_tag: "</mark>",
+    page: params[:page]&.to_i || 1,
+    hits_per_page: 20
+  )
+  
+  @articles = results.hits
+  @facets = results.facet_distribution
+  @total = results.total_hits
+  @processing_time = results.processing_time_ms
+  
+  render :index
+end
+
+private
+
+def build_filters
+  filters = ["published = true"]
+  filters << "category = '#{params[:category]}'" if params[:category].present?
+  filters << "tags IN [#{params[:tags].split(',').map { |t| "'#{t}'" }.join(', ')}]" if params[:tags].present?
+  filters.join(" AND ")
+end
+
+def build_sort
+  case params[:sort]
+  when 'views' then ["score:desc"]
+  when 'date' then ["published_at:desc"]
+  when 'relevance' then []
+  else []
+  end
+end
+```
+
+---
+
+## Step 1113: Search Analytics
+
+```ruby
+# app/models/search_query.rb
+class SearchQuery < ApplicationRecord
+  belongs_to :user, optional: true
+  
+  validates :query, presence: true, length: { maximum: 500 }
+  
+  scope :popular, -> { group(:query).order("count_all DESC").count }
+  scope :recent, -> { order(created_at: :desc) }
+  scope :no_results, -> { where(results_count: 0) }
+  
+  def self.track!(query, user: nil, results_count: 0, source: nil)
+    return if query.blank? || query.length < 2
+    
+    create!(
+      query: query.strip.downcase,
+      user: user,
+      results_count: results_count,
+      source: source,
+      ip_address: nil
+    )
+  rescue => e
+    Rails.logger.error "SearchQuery.track! failed: #{e.message}"
+  end
+  
+  def self.top_searches(limit: 10, days: 30)
+    where("created_at > ?", days.days.ago)
+      .group(:query)
+      .order("count_all DESC")
+      .limit(limit)
+      .count
+  end
+  
+  def self.failed_searches(limit: 10)
+    no_results.group(:query).order("count_all DESC").limit(limit).count
+  end
+end
+```
+
+```ruby
+# app/controllers/search_controller.rb
+def index
+  @query = params[:q].to_s.strip
+  
+  if @query.present?
+    @articles = Article.search_by_full_text(@query).published.includes(:user)
+    
+    SearchQuery.track!(
+      @query,
+      user: current_user,
+      results_count: @articles.count,
+      source: params[:source]
+    )
+  end
+end
+```
+
+---
+
+## Step 1114: Elasticsearch Advanced Queries
+
+```ruby
+# app/controllers/articles_controller.rb
+def index
+  if params[:q].present?
+    @articles = Article.search(
+      params[:q],
+      
+      # Boost recent articles
+      boost_by: {
+        views_count: { factor: 2 },
+        comments_count: { factor: 1.5 }
+      },
+      
+      # Boost fields
+      fields: ['title^5', 'body^2', 'tags^3'],
+      
+      # Match type
+      match: :word_start,  # หรือ :text_start, :word_middle
+      
+      # Multi-match
+      operator: 'or',  # หรือ 'and'
+      
+      # Highlight
+      highlight: {
+        fields: { title: {}, body: { number_of_fragments: 3 } },
+        pre_tag: '<mark>',
+        post_tag: '</mark>'
+      },
+      
+      # Aggregations
+      aggs: {
+        tags: { limit: 20 },
+        category: {},
+        price_ranges: {
+          ranges: [
+            { to: 100 },
+            { from: 100, to: 500 },
+            { from: 500 }
+          ]
+        }
+      },
+      
+      # Must/Should/Must Not
+      body: {
+        query: {
+          bool: {
+            must: { multi_match: { query: params[:q], fields: ['title^3', 'body'] } },
+            filter: [
+              { term: { published: true } },
+              { range: { created_at: { gte: "now-1y" } } }
+            ],
+            must_not: { term: { spam: true } }
+          }
+        }
+      }
+    )
+  else
+    @articles = Article.published.recent.includes(:user)
+    @pagy, @articles = pagy(@articles)
+  end
+end
+```
+
+---
+
+## Step 1115: Search Views
+
+```erb
+<%# app/views/search/index.html.erb %>
+<div class="search-page">
+  <!-- Search Form -->
+  <div class="search-header">
+    <%= form_tag search_path, method: :get, class: "search-form" do %>
+      <div class="search-input-group">
+        <%= text_field_tag :q, @query, 
+                           class: "search-input",
+                           placeholder: "ค้นหาบทความ...",
+                           autocomplete: "off",
+                           data: { controller: "autocomplete" } %>
+        <%= submit_tag "ค้นหา", class: "search-btn" %>
+      </div>
+      
+      <!-- Filters -->
+      <div class="search-filters">
+        <% if @facets.present? %>
+          <!-- Category filter -->
+          <% if @facets['category']&.any? %>
+            <div class="filter-group">
+              <strong>หมวดหมู่:</strong>
+              <% @facets['category'].each do |cat, count| %>
+                <%= link_to cat, search_path(q: @query, category: cat),
+                            class: "filter-tag #{params[:category] == cat ? 'active' : ''}" %>
+                <span class="count">(<%= count %>)</span>
+              <% end %>
+            </div>
+          <% end %>
+          
+          <!-- Tags filter -->
+          <% if @facets['tags']&.any? %>
+            <div class="filter-group">
+              <strong>แท็ก:</strong>
+              <% @facets['tags'].first(10).each do |tag, count| %>
+                <%= link_to tag, search_path(q: @query, tags: tag),
+                            class: "filter-tag" %>
+              <% end %>
+            </div>
+          <% end %>
+        <% end %>
+        
+        <!-- Sort options -->
+        <div class="sort-options">
+          <%= link_to "ความเกี่ยวข้อง", search_path(q: @query, sort: 'relevance'),
+                      class: params[:sort] == 'relevance' ? 'active' : '' %>
+          <%= link_to "วันที่", search_path(q: @query, sort: 'date'),
+                      class: params[:sort] == 'date' ? 'active' : '' %>
+          <%= link_to "ยอดนิยม", search_path(q: @query, sort: 'views'),
+                      class: params[:sort] == 'views' ? 'active' : '' %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+  
+  <!-- Results -->
+  <div class="search-results">
+    <% if @query.present? %>
+      <p class="results-summary">
+        พบ <strong><%= @total %></strong> ผลลัพธ์สำหรับ "<%= @query %>"
+        <% if @processing_time %>
+          ใช้เวลา <%= @processing_time %> ms
+        <% end %>
+      </p>
+      
+      <% if @articles.present? %>
+        <% @articles.each do |article| %>
+          <div class="search-result-item">
+            <h3>
+              <%= link_to article[:title], article_path(article[:id]) %>
+            </h3>
+            
+            <% if article[:_highlight] %>
+              <p class="excerpt"><%= article[:_highlight][:body]&.join("...") %></p>
+            <% else %>
+              <p class="excerpt"><%= article[:body]&.truncate(200) %></p>
+            <% end %>
+            
+            <div class="meta">
+              <span><%= article[:author] %></span>
+              <span><%= time_ago_in_words(Time.parse(article[:published_at])) %></span>
+              <span><%= article[:views_count] %> views</span>
+            </div>
+          </div>
+        <% end %>
+        
+        <!-- Pagination -->
+        <% if @total > 20 %>
+          <%= paginate @articles %>
+        <% end %>
+      <% else %>
+        <div class="no-results">
+          <p>ไม่พบผลลัพธ์สำหรับ "<%= @query %>"</p>
+          <p>ลองค้นหาด้วยคำอื่น หรือตรวจสอบการสะกดคำ</p>
+          
+          <!-- Suggestions -->
+          <% if @suggestions.present? %>
+            <p>คุณหมายถึง: 
+              <% @suggestions.each do |suggestion| %>
+                <%= link_to suggestion, search_path(q: suggestion) %>
+              <% end %>
+            </p>
+          <% end %>
+        </div>
+      <% end %>
+    <% end %>
+  </div>
+</div>
+```
+
+---
+
+## สรุปเพิ่มเติม
+
+Search เป็นฟีเจอร์ที่ซับซ้อนและมีผลต่อ UX มาก ควรเลือก solution ที่เหมาะสมกับ scale ของโปรเจกต์และทรัพยากรที่มี
+
+**Quick Reference:**
+- **pg_search** → PostgreSQL full-text, ง่าย, ไม่ต้องการ extra service
+- **Ransack** → search forms, filtering, sorting สำหรับ admin interfaces
+- **Searchkick** → Elasticsearch wrapper, rich features
+- **Meilisearch** → fast, easy setup, great for smaller apps
